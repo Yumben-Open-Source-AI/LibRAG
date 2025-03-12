@@ -44,10 +44,10 @@
 #     timeout=12000
 # )
 # print(completion.choices[0].message.content)
-
+import re
 
 with open('比亚迪汽车金融优先公司年度信息披露报告.md', 'r', encoding='utf-8') as f:
     data = f.read()
-import re
-print(re.findall(pattern=r'\{{.*?}\}', string=data))
+# 提取所有标识符
+print(re.findall(pattern=r'(?<=\{{\s)(.+?)\s(?=\})', string=data))
 
