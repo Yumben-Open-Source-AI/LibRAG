@@ -67,7 +67,7 @@ system_prompt = """
     # Profile：
     - version：1.0
     - language：zh-cn
-    - description：你将获得一个JSON数组作为现有数据，内容包含多个文件每页内容总结。你需要理解用户给出的操作提示，分析并通过对应操作如实准确无误的返回用户所需指定格式数据
+    - description：你将获得一个JSON数组作为现有数据，内容包含多个文件每页内容总结。用户会给出数据存放的位置例如XX页XX数据，你需要理解用户给出的操作提示，分析并通过理解数据存放位置如实准确无误的返回用户所需指定格式数据
     JSON结构：[
         {
             "filename": "文件名",
@@ -76,12 +76,21 @@ system_prompt = """
     ]
 
     # Skills
-    - 擅长分析理解用户提供的
-    - 擅长
+    - 深度解析JSON数据结构，并理解其内容操作提示。
+    - 具备优秀的索引能力，可以通过提示即数据存放位置找到对应数据。
+    - 具备强大的文本问题解析能力，可以借助用户提示精准找到数据内容。
 
     # Rules
-
+    - 遍历JSON数组中的所有文件及其文档每一页内容。
+    - 通过用户给出的数据存放位置提示，在JSON数据中准确无误获取数据。
+    - 如实且精准返回匹配的内容，不添加额外信息或主观判断。
+    
     # Workflow
+    1. 获取并理解现有JSON数组数据意义。
+    2. 获取并理解用户给出的数据存放位置提示。
+    3. 分析用户所需数据在第几页，确保与JSON数据中page_number数据一致。
+    4. 通过提示如实准确无误的返回用户所需数据。
+    5. 最终输出用户所需格式数据
 """
 remote_llm = openai.OpenAI(
     api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
@@ -91,41 +100,43 @@ completion = remote_llm.chat.completions.create(
     temperature=0.6,
     model='qwen2.5-14b-instruct',
     messages=[
+        {'role': 'user', 'content': str(doc_contents)},
         {'role': 'system', 'content': system_prompt},
         {'role': 'user', 'content': '从第三页文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
         {'role': 'assistant', 'content': '25415146000'},
-        {'role': 'user', 'content': user_question}
+        {'role': 'user', 'content': '从第二十一页文档中准确提取`归属于母公司所有者的綜合收益總額`，只输出不带有逗号分隔符数值金额'}
     ],
     max_tokens=8192,
     timeout=12000
 )
+print(completion.choices[0].message.content)
 
-remote_llm = openai.OpenAI(
-    api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
-    base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
-)
-
-# 调用远程llm 获取对应数据
-for identifier, values in all_identifier.items():
-    operate = values['operate']
-
-    completion = remote_llm.chat.completions.create(
-        temperature=0.6,
-        model='qwen2.5-14b-instruct',
-        messages=[
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': '从第三页文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
-            {'role': 'assistant', 'content': '25415146000'},
-            {'role': 'user', 'content': user_question}
-        ],
-        max_tokens=8192,
-        timeout=12000
-    )
-    value = completion.choices[0].message.content
-    value = value.strip()
-
-    identifier_dict[identifier] = value
-
-template = jinja2.Template(data)
-data = template.render(**identifier_dict)
-print(data)
+# remote_llm = openai.OpenAI(
+#     api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
+#     base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
+# )
+#
+# # 调用远程llm 获取对应数据
+# for identifier, values in all_identifier.items():
+#     operate = values['operate']
+#
+#     completion = remote_llm.chat.completions.create(
+#         temperature=0.6,
+#         model='qwen2.5-14b-instruct',
+#         messages=[
+#             {'role': 'system', 'content': system_prompt},
+#             {'role': 'user', 'content': '从第三页文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
+#             {'role': 'assistant', 'content': '25415146000'},
+#             {'role': 'user', 'content': user_question}
+#         ],
+#         max_tokens=8192,
+#         timeout=12000
+#     )
+#     value = completion.choices[0].message.content
+#     value = value.strip()
+#
+#     identifier_dict[identifier] = value
+#
+# template = jinja2.Template(data)
+# data = template.render(**identifier_dict)
+# print(data)
