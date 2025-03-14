@@ -73,20 +73,19 @@ def nlp_keyword():
     print(finally_result)
 
 
-def ai_keyword(filename: str = '比亚迪股份有限公司 2023年第三季度报告（2023-10-30）.pdf'):
+def ai_keyword(base_dir: str, filename: str = '重庆长安汽车股份有限公司2024年第三季度报告.pdf'):
     """
         提取报告内容
         """
     import fitz
-    local_llm_params = {
-        'base_url': 'http://192.168.199.11:8000/v1',
-        'api_key': 'ha'
-    }
-
-    # 本地ai总结分页信息
-    local_llm = openai.OpenAI(**local_llm_params)
+    # 线上ai概括信息
+    remote_llm = openai.OpenAI(
+        api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
     doc = fitz.open(filename)
     result = {'filename': filename, 'content': []}
+
     system_prompt = """
             Role: 文档总结专家
             - version: 1.0 
@@ -97,6 +96,7 @@ def ai_keyword(filename: str = '比亚迪股份有限公司 2023年第三季度�
             - 生成详细及信息丰富的描述。
             - 擅长提取文本中的数值数据。
             - 擅长提取文本中所有指标信息。
+            - 擅长生成严格符合JSON格式的输出。
             - 擅长使用清晰的语言完整总结文本的主要内容。
 
             Rules 
@@ -114,25 +114,29 @@ def ai_keyword(filename: str = '比亚迪股份有限公司 2023年第三季度�
             5. 输出最终的总结及描述，确保准确性、可读性、完整性。
 
             Example Output
+            ```json
             {
                 "summary": "#必须列出所有指标但不需要数值数据",
                 "description": "#所有指标及数值数据"
             }
+            ```
         """
+    page_count = 0
     for page in doc:
         doc_markdown = page.get_text()
         llm_params = {
             'temperature': 0.6,
             'messages': [
                 {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': '读取文档，生成这段文本的描述以及总结，最终只输出json格式数据' + doc_markdown}
+                {'role': 'user',
+                 'content': '读取文档，使用中文生成这段文本的描述以及总结，最终生成完整json格式数据' + doc_markdown}
             ],
-            'model': 'glm-4',
-            'max_tokens': 8192
+            'model': 'deepseek-r1-distill-qwen-32b',
+            'max_tokens': 16384,
+            'timeout': 120000
         }
-        response = local_llm.chat.completions.create(**llm_params)
+        response = remote_llm.chat.completions.create(**llm_params)
         response_content = response.choices[0].message.content
-        print(response_content)
 
         # 处理思考链
         if '</think>' in response_content:
@@ -146,30 +150,30 @@ def ai_keyword(filename: str = '比亚迪股份有限公司 2023年第三季度�
         response_content['index'] = str(uuid.uuid4())
         result['content'].append(response_content)
 
-    # 线上ai概括全文信息
-    remote_llm = openai.OpenAI(
-        api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
-        base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
-    )
+        if page_count < 25:
+            response_content
+        page_count += 1
+
+    # 生成总结
     system_prompt = """
-        # Roles:文档总结专家
-        - language：中文
-        - description：你擅长根据文档段落内容进行概括，用户会提供一篇文章的段落信息，理解段落内容且进行总结概括涉及的主要业务领域信息。
+            # Roles:文档总结专家
+            - language：中文
+            - description：你擅长根据文档段落内容进行概括，用户会提供一篇文章的段落信息，理解段落内容且进行总结概括涉及的主要业务领域信息。
 
-        # Skill:
-        - 擅长概括文档所属的领域信息且生成简洁总结性内容。
+            # Skill:
+            - 擅长概括文档所属的领域信息且生成简洁总结性内容。
 
-        # Rules:
-        - 以叙述的语义进行总结表述。
-        - 概括只需总结文档所属什么业务领域即可，不需要生成具体数值。
-        - 概括不超过10个字，且需要概括所有文档中实际出现的业务领域，确保不存在遗漏业务领域情况。
+            # Rules:
+            - 以叙述的语义进行总结表述。
+            - 概括只需总结文档所属什么业务领域即可，不需要生成具体数值。
+            - 概括不超过10个字，且需要概括所有文档中实际出现的业务领域，确保不存在遗漏业务领域情况。
 
-        # Workflows:
-        1. 获取段落内容。
-        2. 理解所有段落内容。
-        3. 仅精准概括文中所属什么业务领域，且概括的业务领域概念定义清晰，具备行业专业性。
-        4. 最终输出概括，确保准确性、简洁性。
-        """
+            # Workflows:
+            1. 获取段落内容。
+            2. 理解所有段落内容。
+            3. 仅精准概括文中所属什么业务领域，且概括的业务领域概念定义清晰，具备行业专业性。
+            4. 最终输出概括，确保准确性、简洁性。
+            """
     completion = remote_llm.chat.completions.create(
         temperature=0.6,
         model='deepseek-r1-distill-qwen-32b',
@@ -181,11 +185,18 @@ def ai_keyword(filename: str = '比亚迪股份有限公司 2023年第三季度�
         timeout=120000,
     )
     result['overall_description'] = completion.choices[0].message.content
-    with open('byd_info.json', 'r', encoding='utf-8') as f:
+
+    # 结合overall_description整理summary
+    for content in result['content']:
+        summary = content['summary']
+        summary = f'段落来源描述:<{result["overall_description"]}>;段落内容描述:' + summary
+        content['summary'] = summary
+
+    with open('/robot/yumbotAPI/src/ai/byd_info.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
         data.append(result)
 
-    with open('byd_info.json', 'w+', encoding='utf-8') as f:
+    with open('/robot/yumbotAPI/src/ai/byd_info.json', 'w+', encoding='utf-8') as f:
         f.write(json.dumps(data, ensure_ascii=False))
 
     return 'success'
@@ -278,4 +289,11 @@ def get_report_template(files: None):
 
 
 if __name__ == '__main__':
-    ai_keyword()
+    # ai_keyword()
+
+    with open('byd_info.json', 'r', encoding='utf-8') as f:
+        doc_markdown = json.load(f)
+
+    for doc in doc_markdown:
+        [for ]
+

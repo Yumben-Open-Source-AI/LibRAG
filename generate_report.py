@@ -1,18 +1,17 @@
 import json
 import re
 
-import jinja2
 import openai
 from docx import Document
+from docxtpl import DocxTemplate
 
 
-def read_docx(file_path: str):
+def read_docx(doc: Document):
     """
     读取docx 文档获取内容
-    :param file_path: docx文件地址
+    :param doc: Document object
     :return:
     """
-    doc = Document(file_path)
     full_text = []
     for paragraph in doc.paragraphs:
         full_text.append(paragraph.text)
@@ -25,34 +24,40 @@ def read_docx(file_path: str):
     return ''.join(full_text)
 
 
-def value_conversion(value: str, type: str):
+def arguments_convert(arg: str, arg_type: str):
     """
-    结果转换器
-    :param value:
-    :param type:
+    变量数值转换
+    :param arg: 变量
+    :param arg_type: 目标转换数值类型
     :return:
     """
-    result = None
-    if type == 'int':
-        result = int(value)
-    elif type == 'float':
-        result = float(value)
-
-    return result
+    try:
+        convert_mapping = {
+            'int': int,
+            'float': float,
+            'str': str
+        }
+        return convert_mapping[arg_type](arg)
+    except Exception as e:
+        print(e)
+        return arg
 
 
 # 提取所有标识符
-data = read_docx('比亚迪汽车金融优先公司年度信息披露报告.docx')
-targets = re.findall(pattern=r'(?<=\{{\s)(.+?)\s(?=\})', string=data)
+doc = DocxTemplate('比亚迪尽职调查报告模板.docx')
+doc_content = read_docx(doc.get_docx())
+targets = re.findall(pattern=r'(?<=\{{\s)(.+?)\s(?=\})', string=doc_content)
 
+# 获取标识符映射信息
 with open('content_mapping.json', 'r', encoding='utf-8') as f:
     all_identifier = json.load(f)
 
-# 读取文档信息
+# 获取文档信息
 with open('byd_info.json', 'r', encoding='utf-8') as f:
     doc_contents = json.load(f)
 doc_contents = doc_contents[0]
 
+# 整理文档信息
 page_number = 1
 for content in doc_contents['content']:
     del content['summary']
@@ -61,6 +66,11 @@ for content in doc_contents['content']:
     page_number += 1
 identifier_dict = {}
 
+# 创建远程llm 获取对应数据
+remote_llm = openai.OpenAI(
+    api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
+    base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
+)
 system_prompt = """
     # Role：数据解析师
 
@@ -83,60 +93,38 @@ system_prompt = """
     # Rules
     - 遍历JSON数组中的所有文件及其文档每一页内容。
     - 通过用户给出的数据存放位置提示，在JSON数据中准确无误获取数据。
+    - 如果是数值型数据，需要严格保证小数点位置正确。
     - 如实且精准返回匹配的内容，不添加额外信息或主观判断。
-    
+
     # Workflow
     1. 获取并理解现有JSON数组数据意义。
     2. 获取并理解用户给出的数据存放位置提示。
-    3. 分析用户所需数据在第几页，确保与JSON数据中page_number数据一致。
+    3. 分析用户所需数据在第几页，严格确保与JSON数据中page_number数值一致。
     4. 通过提示如实准确无误的返回用户所需数据。
-    5. 最终输出用户所需格式数据
+    5. 最终输出用户所需格式数据。
 """
-remote_llm = openai.OpenAI(
-    api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
-    base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
-)
-completion = remote_llm.chat.completions.create(
-    temperature=0.6,
-    model='qwen2.5-14b-instruct',
-    messages=[
-        {'role': 'user', 'content': str(doc_contents)},
-        {'role': 'system', 'content': system_prompt},
-        {'role': 'user', 'content': '从第三页文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
-        {'role': 'assistant', 'content': '25415146000'},
-        {'role': 'user', 'content': '从第二十一页文档中准确提取`归属于母公司所有者的綜合收益總額`，只输出不带有逗号分隔符数值金额'}
-    ],
-    max_tokens=8192,
-    timeout=12000
-)
-print(completion.choices[0].message.content)
+for identifier, values in all_identifier.items():
+    operate = values['operate']
 
-# remote_llm = openai.OpenAI(
-#     api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
-#     base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
-# )
-#
-# # 调用远程llm 获取对应数据
-# for identifier, values in all_identifier.items():
-#     operate = values['operate']
-#
-#     completion = remote_llm.chat.completions.create(
-#         temperature=0.6,
-#         model='qwen2.5-14b-instruct',
-#         messages=[
-#             {'role': 'system', 'content': system_prompt},
-#             {'role': 'user', 'content': '从第三页文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
-#             {'role': 'assistant', 'content': '25415146000'},
-#             {'role': 'user', 'content': user_question}
-#         ],
-#         max_tokens=8192,
-#         timeout=12000
-#     )
-#     value = completion.choices[0].message.content
-#     value = value.strip()
-#
-#     identifier_dict[identifier] = value
-#
-# template = jinja2.Template(data)
-# data = template.render(**identifier_dict)
-# print(data)
+    completion = remote_llm.chat.completions.create(
+        temperature=0.6,
+        model='qwen2.5-14b-instruct',
+        messages=[
+            {'role': 'user', 'content': str(doc_contents)},
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': '从`第三页`文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
+            {'role': 'assistant', 'content': '25415146000'},
+            {'role': 'user', 'content': operate}
+        ],
+        max_tokens=8192,
+        timeout=12000
+    )
+    value = completion.choices[0].message.content
+    value = value.strip()
+
+    value = arguments_convert(value, values['type'])
+    print(identifier + ": " + str(value))
+    identifier_dict[identifier] = value
+
+doc.render(identifier_dict)
+doc.save(filename='比亚迪尽职调查报告.docx')
