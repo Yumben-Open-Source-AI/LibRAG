@@ -1,24 +1,13 @@
 import json
 import os.path
-import uuid
+import time
+
+import fitz
 
 import openai
 import pymupdf4llm
-import pymupdf
 import requests
-
-# doc = pymupdf.open('C_24070018IR-C-BYD+COMPANY-1707-HKEx.pdf')
-# page_count = doc.page_count
-# doc.close()
-# doc_markdown = pymupdf4llm.to_markdown('C_24070018IR-C-BYD+COMPANY-1707-HKEx.pd', pages=[i for i in range(1, page_count)])
-
-descriptions = {
-    "公司信息": "描述企业基本情况，包括业务范围、市场定位及产业链构成。",
-    "资产负债": "衡量企业总资产、总负债、资本支出、债务结构，反映偿债能力及资金流动性。",
-    "财务状况": "表示企业在某一时刻经营资金的来源收入支出和分布情况。",
-    "股东信息": "展示股东名单、持股比例、治理结构、控股股东、高管团队及投资者信息。",
-    "法律合规": "衡量专利保护、法律诉讼、环保法规、税收合规及ESG评级等风险管理。"
-}
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 header = {
     "Host": "www.bydglobal.com",
@@ -73,158 +62,168 @@ def nlp_keyword():
     print(finally_result)
 
 
-def ai_keyword(base_dir: str, filename: str = '重庆长安汽车股份有限公司2024年第三季度报告.pdf'):
+def create_llm_completion(llm, model: str, message_prompts: list, max_token: int, timeout: int, temperature=0.6,
+                          max_retries=3):
+    def _try_parse_json(content: str) -> dict:
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            import re
+            json_match = re.findall(r"\{.*\}", content, re.DOTALL)
+            if json_match:
+                return json.loads(json_match[0])
+            else:
+                return content
+
+    retries = 0
+    while retries < max_retries:
+        try:
+            completion = llm.chat.completions.create(
+                temperature=temperature,
+                model=model,
+                messages=message_prompts,
+                max_tokens=max_token,
+                timeout=timeout,
+                top_p=0.95
+            )
+            content = completion.choices[0].message.content
+            return _try_parse_json(content)
+        except Exception as e:
+            print(e)
+            retries += 1
+
+
+def ai_keyword(base_dir: str, filename: str):
     """
-        提取报告内容
-        """
-    import fitz
-    # 线上ai概括信息
+    提取报告内容
+    """
+    # init params
+    page_count = 1
+    page_content = ''
+    doc = fitz.open(base_dir + filename)
+    result = {'filename': filename, 'content': []}
     remote_llm = openai.OpenAI(
         api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
     )
-    doc = fitz.open(filename)
-    result = {'filename': filename, 'content': []}
 
-    system_prompt = """
+    # 生成每页段落描述
+    system_prompt = """    
             Role: 文档总结专家
-            - version: 1.0 
+            - version: 1.0
             - language: 中文
-            - description: 你将得到一段文本，详细提取且总结描述其内容，包含必须如实准确提取关键信息如所有指标及其数值数据等，最终按指定格式生成总结及描述。
-
-            Skills 
+            - description: 你将得到User输入的一段文本，请详细提取且总结描述其内容，包含必须如实准确提取关键信息如所有指标及其数值数据等，最终按指定格式生成总结及描述。
+    
+            Skills
+            - 擅长使用面向对象的视角抽取文本内容的对象属性(属性选项:当前页,内容所属类型[摘要/引言/目录/首页/正文/公告/...]。
             - 生成详细及信息丰富的描述。
             - 擅长提取文本中的数值数据。
             - 擅长提取文本中所有指标信息。
             - 擅长生成严格符合JSON格式的输出。
             - 擅长使用清晰的语言完整总结文本的主要内容。
-
-            Rules 
-            - 描述与总结只能输出中文，不得输出任何英文单词、短语或句子。
-            - 每个总结至少20字，用清晰准确的语言表达，不添加额外主观评价，仅列出所有指标。
-            - 每个描述至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
+            - 擅长使用陈述叙事的风格总结文本的主要内容。
+    
+            Rules
+            - 描述与总结只能输出中文，不得输出任何英文单词、短语或句子、不能省略。
+            - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx第xxx页的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
+            - 每个description至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
             - 严格生成结构化不带有转义的JSON数据的总结及描述。
             - 总结和描述仅使用文本格式呈现。
-
-            Workflows 
-            1. 获取用户提供的文本。 
+    
+            Workflows
+            1. 获取用户提供的文本。
             2. 逐行解析提取文本的指标。
-            3. 理解文中主要内容，结合指标生成总结。
-            4. 组合关键信息生成描述，确保指标信息及数值数据完整。
+            3. 理解文中主要内容，结合指标和对象属性生成总结。
+            4. 组合关键信息和对象属性生成描述，确保指标信息及数值数据完整。
             5. 输出最终的总结及描述，确保准确性、可读性、完整性。
-
+    
             Example Output
             ```json
             {
-                "summary": "#必须列出所有指标但不需要数值数据",
-                "description": "#所有指标及数值数据"
+                "summary": "",
+                "description": ""
             }
             ```
+            Warning:
+             -summary必须列出所有指标字段，禁止使用```等```字眼省略指标项，但不需要数值数据。
+             -description必须列出所有指标及数值数据，不能省略。  
         """
-    page_count = 0
-    for page in doc:
-        doc_markdown = page.get_text()
-        llm_params = {
-            'temperature': 0.6,
-            'messages': [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user',
-                 'content': '读取文档，使用中文生成这段文本的描述以及总结，最终生成完整json格式数据' + doc_markdown}
-            ],
-            'model': 'deepseek-r1-distill-qwen-32b',
-            'max_tokens': 16384,
-            'timeout': 120000
-        }
-        response = remote_llm.chat.completions.create(**llm_params)
-        response_content = response.choices[0].message.content
 
-        # 处理思考链
-        if '</think>' in response_content:
-            response_content = response_content.split('</think>')[1]
-        response_content = response_content.replace('\n', '')
+    with ThreadPoolExecutor(max_workers=25) as executor:
+        tasks_page = {}
+        for page in doc:
+            doc_markdown = page.get_text()
+            task_param = {
+                'llm': remote_llm,
+                'model': 'qwen2.5-72b-instruct',
+                'message_prompts': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user',
+                     'content': f"读取文档，使用中文生成这段文本的描述以及总结，最终生成完整json格式数据```page_number:{page_content},content:{doc_markdown}```"}
+                ],
+                'max_token': 8192,
+                'timeout': 120000
+            }
+            task = executor.submit(create_llm_completion, **task_param)
+            tasks_page[task] = page_count
+            page_count += 1
 
-        # 转换json
-        if '```json' in response_content:
-            response_content = response_content.replace('```', '').replace('json', '')
-        response_content = json.loads(response_content)
-        response_content['index'] = str(uuid.uuid4())
-        result['content'].append(response_content)
+        for task in as_completed(tasks_page.keys()):
+            completion = task.result()
+            page_count = tasks_page[task]
+            completion['page_number'] = page_count
+            result['content'].append(completion)
 
-        if page_count < 25:
-            response_content
-        page_count += 1
+            if page_count < 25:
+                # 页数限制避免数据量超出max_tokens
+                print(completion)
+                page_content += completion['description']
 
-    # 生成总结
+    # 生成全文总结
     system_prompt = """
             # Roles:文档总结专家
             - language：中文
-            - description：你擅长根据文档段落内容进行概括，用户会提供一篇文章的段落信息，理解段落内容且进行总结概括涉及的主要业务领域信息。
+            - description：你擅长根据文档段落内容进行概括，用户会提供一篇文章的段落信息，理解段落内容且进行充分总结概括涉及的主要业务领域信息及时间维度信息。
 
             # Skill:
             - 擅长概括文档所属的领域信息且生成简洁总结性内容。
 
             # Rules:
             - 以叙述的语义进行总结表述。
-            - 概括只需总结文档所属什么业务领域即可，不需要生成具体数值。
-            - 概括不超过10个字，且需要概括所有文档中实际出现的业务领域，确保不存在遗漏业务领域情况。
+            - 仅概括文档所属的业务领域以及时间维度信息，不需要生成具体数值。
+            - 根据文档内容生成相关时间维度信息的陈述。
+            - 概括至少20个字，且需要概括所有文档中实际出现的业务领域，确保不存在遗漏业务领域情况。
 
             # Workflows:
             1. 获取段落内容。
             2. 理解所有段落内容。
             3. 仅精准概括文中所属什么业务领域，且概括的业务领域概念定义清晰，具备行业专业性。
-            4. 最终输出概括，确保准确性、简洁性。
+            4. 最终输出概括，确保准确性、简洁性以及时间维度的完整性。
+            
+            # Example output
+            这是XXX年XXX文档，文档内容涵盖了XXXX业务领域信息。
             """
-    completion = remote_llm.chat.completions.create(
-        temperature=0.6,
-        model='deepseek-r1-distill-qwen-32b',
-        messages=[
-            {'role': 'user', 'content': str(
-                result) + '\n根据文档段落内容生成一句话的简洁精准概括，需要总结文档段落涉及的业务领域'}
-        ],
-        max_tokens=16384,
-        timeout=120000,
-    )
-    result['overall_description'] = completion.choices[0].message.content
+    completion = create_llm_completion(remote_llm, 'qwen2.5-72b-instruct', [
+        {'role': 'system', 'content': system_prompt},
+        {'role': 'user', 'content': str(
+            page_content) + '\n根据文档段落内容生成一句话的简洁精准概括'}
+    ], max_token=8192, timeout=120000)
+    result['overall_description'] = completion
 
-    # 结合overall_description整理summary
+    # summary更新段落描述
     for content in result['content']:
-        summary = content['summary']
-        summary = f'段落来源描述:<{result["overall_description"]}>;段落内容描述:' + summary
-        content['summary'] = summary
+        content['summary'] = f'段落来源描述:{result["overall_description"]};段落内容描述:{content["summary"]}'
 
-    with open('/robot/yumbotAPI/src/ai/byd_info.json', 'r', encoding='utf-8') as f:
+    # 根据页码重排序段落
+    result['content'] = sorted(result['content'], key=lambda x: x['page_number'])
+    with open('byd_info.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
         data.append(result)
 
-    with open('/robot/yumbotAPI/src/ai/byd_info.json', 'w+', encoding='utf-8') as f:
+    with open('byd_info.json', 'w+', encoding='utf-8') as f:
         f.write(json.dumps(data, ensure_ascii=False))
 
     return 'success'
-
-
-def splicing_keyword():
-    with open('byd_info.json', 'r+', encoding='utf-8') as f:
-        data = json.load(f)
-
-    with open('byd_info.json', 'w', encoding='utf-8') as f:
-        keywords = {
-            "财务状况": ["资产负债表", "总资产", "总负债", "净资产", "资产负债率", "营收增长率", "经营现金流量净额",
-                         "流动资产合计", "非流动资产合计", "所有者权益合计"],
-            "股东信息": ["主要股东名单", "持股比例", "控股股东", "实际控制人", "机构投资者", "普通股股东总数",
-                         "前10名股东持股情况", "持有有限售条件的股份数量", "质押、标记或冻结情况",
-                         "报告期末表决权恢复的优先股股东总数", "前10名无限售流通股股东持股情况"]}
-        result = {
-            'title': '比亚迪股份有限公司 2024年第一季度报告（2024-04-29）',
-            'http': 'http://www.bydglobal.com:80/sites/REST/resources/v1/aggregates/BYD_CN/BydInvestorNotice/1617162416460',
-            'description': []
-        }
-        for index, field in enumerate(keywords.keys()):
-            result['description'].append({
-                'info': field,
-                'keyword': keywords[field],
-            })
-        data.append(result)
-        json.dump(data, f, ensure_ascii=False)
 
 
 def get_online_report_list():
@@ -247,10 +246,6 @@ def get_online_report_list():
         result[index] = {"http": href, "Title": title}
 
     return result
-
-
-def download_online_files(hei):
-    json.loads(hei)
 
 
 def get_report_template(files: None):
@@ -289,11 +284,4 @@ def get_report_template(files: None):
 
 
 if __name__ == '__main__':
-    # ai_keyword()
-
-    with open('byd_info.json', 'r', encoding='utf-8') as f:
-        doc_markdown = json.load(f)
-
-    for doc in doc_markdown:
-        [for ]
-
+    ai_keyword('./', '比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
