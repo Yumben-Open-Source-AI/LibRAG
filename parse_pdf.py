@@ -62,7 +62,7 @@ def nlp_keyword():
     print(finally_result)
 
 
-def create_llm_completion(llm, model: str, message_prompts: list, max_token: int, timeout: int, temperature=0.6,
+def create_llm_completion(llm, message_prompts: list, model: str = 'qwen2.5-72b-instruct', max_token: int = 8192, timeout: int = 12000, temperature=0.6,
                           max_retries=3):
     def _try_parse_json(content: str) -> dict:
         try:

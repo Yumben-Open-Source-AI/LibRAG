@@ -1,9 +1,12 @@
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import openai
 from docx import Document
 from docxtpl import DocxTemplate
+
+from parse_pdf import create_llm_completion
 
 
 def read_docx(doc: Document):
@@ -43,88 +46,92 @@ def arguments_convert(arg: str, arg_type: str):
         return arg
 
 
-# 提取所有标识符
-doc = DocxTemplate('比亚迪尽职调查报告模板.docx')
-doc_content = read_docx(doc.get_docx())
-targets = re.findall(pattern=r'(?<=\{{\s)(.+?)\s(?=\})', string=doc_content)
+def generate_report():
+    # 提取所有标识符
+    doc = DocxTemplate('比亚迪尽职调查报告模板.docx')
+    doc_content = read_docx(doc.get_docx())
+    targets = re.findall(pattern=r'(?<=\{{\s)(.+?)\s(?=\})', string=doc_content)
 
-# 获取标识符映射信息
-with open('content_mapping.json', 'r', encoding='utf-8') as f:
-    all_identifier = json.load(f)
+    # 获取标识符映射信息
+    with open('content_mapping.json', 'r', encoding='utf-8') as f:
+        all_identifier = json.load(f)
 
-# 获取文档信息
-with open('byd_info.json', 'r', encoding='utf-8') as f:
-    doc_contents = json.load(f)
-doc_contents = doc_contents[0]
+    # 获取文档信息
+    with open('byd_info.json', 'r', encoding='utf-8') as f:
+        doc_contents = json.load(f)
+    doc_contents = doc_contents[0]
 
-# 整理文档信息
-page_number = 1
-for content in doc_contents['content']:
-    del content['summary']
-    del content['index']
-    content['page_number'] = page_number
-    page_number += 1
-identifier_dict = {}
+    # 整理文档信息
+    for content in doc_contents['content']:
+        del content['summary']
+        del content['index']
+    identifier_dict = {}
 
-# 创建远程llm 获取对应数据
-remote_llm = openai.OpenAI(
-    api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
-    base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
-)
-system_prompt = """
-    # Role：数据解析师
-
-    # Profile：
-    - version：1.0
-    - language：zh-cn
-    - description：你将获得一个JSON数组作为现有数据，内容包含多个文件每页内容总结。用户会给出数据存放的位置例如XX页XX数据，你需要理解用户给出的操作提示，分析并通过理解数据存放位置如实准确无误的返回用户所需指定格式数据
-    JSON结构：[
-        {
-            "filename": "文件名",
-            "content": [{"description": "每一页文档的指标描述总结", "page_number": "第几页文档"}]
-        }
-    ]
-
-    # Skills
-    - 深度解析JSON数据结构，并理解其内容操作提示。
-    - 具备优秀的索引能力，可以通过提示即数据存放位置找到对应数据。
-    - 具备强大的文本问题解析能力，可以借助用户提示精准找到数据内容。
-
-    # Rules
-    - 遍历JSON数组中的所有文件及其文档每一页内容。
-    - 通过用户给出的数据存放位置提示，在JSON数据中准确无误获取数据。
-    - 如果是数值型数据，需要严格保证小数点位置正确。
-    - 如实且精准返回匹配的内容，不添加额外信息或主观判断。
-
-    # Workflow
-    1. 获取并理解现有JSON数组数据意义。
-    2. 获取并理解用户给出的数据存放位置提示。
-    3. 分析用户所需数据在第几页，严格确保与JSON数据中page_number数值一致。
-    4. 通过提示如实准确无误的返回用户所需数据。
-    5. 最终输出用户所需格式数据。
-"""
-for identifier, values in all_identifier.items():
-    operate = values['operate']
-
-    completion = remote_llm.chat.completions.create(
-        temperature=0.6,
-        model='qwen2.5-14b-instruct',
-        messages=[
-            {'role': 'user', 'content': str(doc_contents)},
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': '从`第三页`文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
-            {'role': 'assistant', 'content': '25415146000'},
-            {'role': 'user', 'content': operate}
-        ],
-        max_tokens=8192,
-        timeout=12000
+    # 创建远程llm 获取对应数据
+    remote_llm = openai.OpenAI(
+        api_key='sk-3fb76d31383b4552b9c3ebf82f44157d',
+        base_url='https://dashscope.aliyuncs.com/compatible-mode/v1'
     )
-    value = completion.choices[0].message.content
-    value = value.strip()
+    system_prompt = """
+        # Role：数据解析师
 
-    value = arguments_convert(value, values['type'])
-    print(identifier + ": " + str(value))
-    identifier_dict[identifier] = value
+        # Profile：
+        - version：1.0
+        - language：zh-cn
+        - description：你将获得一个JSON数组作为现有数据，内容包含多个文件每页内容总结。用户会给出数据存放的位置例如XX页XX数据，你需要理解用户给出的操作提示，分析并通过理解数据存放位置如实准确无误的返回用户所需指定格式数据
+        JSON结构：[
+            {
+                "filename": "文件名",
+                "content": [{"description": "每一页文档的指标描述总结", "page_number": "第几页文档"}]
+            }
+        ]
 
-doc.render(identifier_dict)
-doc.save(filename='比亚迪尽职调查报告.docx')
+        # Skills
+        - 深度解析JSON数据结构，并理解其内容操作提示。
+        - 具备优秀的索引能力，可以通过提示即数据存放位置找到对应数据。
+        - 具备强大的文本问题解析能力，可以借助用户提示精准找到数据内容。
+
+        # Rules
+        - 遍历JSON数组中的所有文件及其文档每一页内容。
+        - 通过用户给出的数据存放位置提示，在JSON数据中准确无误获取数据。
+        - 如果是数值型数据，需要严格保证小数点位置正确。
+        - 如实且精准返回匹配的内容，不添加额外信息或主观判断。
+
+        # Workflow
+        1. 获取并理解现有JSON数组数据意义。
+        2. 获取并理解用户给出的数据存放位置提示。
+        3. 分析用户所需数据在第几页，严格确保与JSON数据中page_number数值一致。
+        4. 通过提示如实准确无误的返回用户所需数据。
+        5. 最终输出用户所需格式数据。
+    """
+    with ThreadPoolExecutor(max_workers=25) as executor:
+        tasks_type = {}
+        for identifier, values in all_identifier.items():
+            operate = values['operate']
+            values['identifier'] = identifier
+            task_param = {
+                'llm': remote_llm,
+                'message_prompts': [
+                    {'role': 'user', 'content': str(doc_contents)},
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': '从`第三页`文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
+                    {'role': 'assistant', 'content': '25415146000'},
+                    {'role': 'user', 'content': operate}
+                ]
+            }
+            task = executor.submit(create_llm_completion, **task_param)
+            tasks_type[task] = values
+
+        for task in as_completed(tasks_type.keys()):
+            completion = task.result()
+            values = tasks_type[task]
+            identifier = values['identifier']
+            value = arguments_convert(completion, values['type'])
+            print(identifier + ": " + str(value))
+            identifier_dict[identifier] = value
+
+    doc.render(identifier_dict)
+    doc.save(filename='比亚迪尽职调查报告.docx')
+
+
+generate_report()
