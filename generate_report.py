@@ -57,7 +57,7 @@ def generate_report():
         all_identifier = json.load(f)
 
     # 获取文档信息
-    with open('byd_info.json', 'r', encoding='utf-8') as f:
+    with open('byd_info-generate.json', 'r', encoding='utf-8') as f:
         doc_contents = json.load(f)
     doc_contents = doc_contents[0]
 
