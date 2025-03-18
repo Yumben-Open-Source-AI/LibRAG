@@ -1,6 +1,6 @@
 import json
 import os.path
-import time
+import uuid
 
 import fitz
 
@@ -172,6 +172,7 @@ def ai_keyword(base_dir: str, filename: str):
             completion = task.result()
             page_count = tasks_page[task]
             completion['page_number'] = page_count
+            completion['index'] = str(uuid.uuid4())
             result['content'].append(completion)
 
             if page_count < 25:
