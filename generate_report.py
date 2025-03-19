@@ -1,6 +1,6 @@
 import json
-import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from jinja2 import Environment, meta, FileSystemLoader, FunctionLoader
 
 import openai
 from docx import Document
@@ -49,8 +49,10 @@ def arguments_convert(arg: str, arg_type: str):
 def generate_report():
     # 提取所有标识符
     doc = DocxTemplate('比亚迪尽职调查报告模板.docx')
-    doc_content = read_docx(doc.get_docx())
-    targets = re.findall(pattern=r'(?<=\{{\s)(.+?)\s(?=\})', string=doc_content)
+    env = Environment(loader=FunctionLoader(read_docx))
+    template = env.loader.get_source(env, doc.get_docx())
+    parsed_content = env.parse(template)
+    targets = meta.find_undeclared_variables(parsed_content)
 
     # 获取标识符映射信息
     with open('content_mapping.json', 'r', encoding='utf-8') as f:
@@ -59,12 +61,7 @@ def generate_report():
     # 获取文档信息
     with open('byd_info-generate.json', 'r', encoding='utf-8') as f:
         doc_contents = json.load(f)
-    doc_contents = doc_contents[0]
-
-    # 整理文档信息
-    for content in doc_contents['content']:
-        del content['summary']
-        del content['index']
+    doc_contents = {doc_detail['filename']: doc_detail for doc_detail in doc_contents}
     identifier_dict = {}
 
     # 创建远程llm 获取对应数据
@@ -106,13 +103,16 @@ def generate_report():
     """
     with ThreadPoolExecutor(max_workers=25) as executor:
         tasks_type = {}
-        for identifier, values in all_identifier.items():
+        for identifier in targets:
+            values = all_identifier[identifier]
             operate = values['operate']
             values['identifier'] = identifier
+
+            # TODO 不同维度数据来源获取
             task_param = {
                 'llm': remote_llm,
                 'message_prompts': [
-                    {'role': 'user', 'content': str(doc_contents)},
+                    {'role': 'user', 'content': str(doc_contents[values['target_file']])},
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': '从`第三页`文档中提取`交易性金融資產`，只输出不带有逗号分隔符数值金额'},
                     {'role': 'assistant', 'content': '25415146000'},
