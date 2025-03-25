@@ -48,7 +48,7 @@ def arguments_convert(arg: str, arg_type: str):
 
 def generate_report():
     # 提取所有标识符
-    doc = DocxTemplate('比亚迪尽职调查报告模板.docx')
+    doc = DocxTemplate('files/比亚迪尽职调查报告模板.docx')
     env = Environment(loader=FunctionLoader(read_docx))
     template = env.loader.get_source(env, doc.get_docx())
     parsed_content = env.parse(template)

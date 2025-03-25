@@ -22,46 +22,6 @@ header = {
 }
 
 
-def keybert_keyword():
-    """ keyBERT 关键词提取技术 """
-    from keybert import KeyBERT
-    kw_model = KeyBERT(model='paraphrase-multilingual-MiniLM-L12-v2')
-    keywords = kw_model.extract_keywords(doc_markdown, keyphrase_ngram_range=(1, 3), stop_words='english',
-                                         use_maxsum=True,
-                                         nr_candidates=20, top_n=5)
-
-
-def nlp_keyword():
-    """ nlp_mt5_zero-shot-augment_chinese-base 模型提取关键词 """
-    from modelscope.pipelines import pipeline
-    from langchain_text_splitters import MarkdownHeaderTextSplitter
-
-    # 定义要分割的标题级别
-    headers_to_split_on = [
-        ("#", "Header 1"),
-        ("##", "Header 2"),
-        ("###", "Header 3"),
-        ("####", "Header 4"),
-    ]
-    # 创建分割器
-    markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on, strip_headers=False)
-    # 执行分割
-    md_header_splits = markdown_splitter.split_text(doc_markdown)
-    t2t_generator = pipeline('text2text-generation', 'damo/nlp_mt5_zero-shot-augment_chinese-base',
-                             model_revision='v1.0.0')
-    result = {}
-    finally_result = []
-    # 打印结果
-    for index, doc in enumerate(md_header_splits):
-        current_keyword = t2t_generator('抽取关键词:' + doc.page_content)
-        print(current_keyword)
-        result[str(index)] = current_keyword
-        # 整理关键词
-        text = current_keyword['text']
-        [finally_result.append(keyword) for keyword in text.split(',') if keyword not in finally_result]
-    print(finally_result)
-
-
 def create_llm_completion(llm, message_prompts: list, model: str = 'qwen2.5-72b-instruct', max_token: int = 8192,
                           timeout: int = 12000, temperature=0.6,
                           max_retries=3):
@@ -286,4 +246,9 @@ def get_report_template(files: None):
 
 
 if __name__ == '__main__':
-    ai_keyword('./', '比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
+    # ai_keyword('./', '比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
+    import docx
+
+    doc = docx.Document('大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.doc')
+    for body in iter(doc.element.body):
+        print(body)
