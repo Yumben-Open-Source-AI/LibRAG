@@ -178,11 +178,11 @@ def ai_keyword(base_dir: str, filename: str):
 
     # 根据页码重排序段落
     result['content'] = sorted(result['content'], key=lambda x: x['page_number'])
-    with open('byd_info.json', 'r', encoding='utf-8') as f:
+    with open('data/byd_info.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
         data.append(result)
 
-    with open('byd_info.json', 'w+', encoding='utf-8') as f:
+    with open('data/byd_info.json', 'w+', encoding='utf-8') as f:
         f.write(json.dumps(data, ensure_ascii=False))
 
     return 'success'

@@ -55,11 +55,11 @@ def generate_report():
     targets = meta.find_undeclared_variables(parsed_content)
 
     # 获取标识符映射信息
-    with open('content_mapping.json', 'r', encoding='utf-8') as f:
+    with open('data/content_mapping.json', 'r', encoding='utf-8') as f:
         all_identifier = json.load(f)
 
     # 获取文档信息
-    with open('byd_info-generate.json', 'r', encoding='utf-8') as f:
+    with open('data/byd_info-generate.json', 'r', encoding='utf-8') as f:
         doc_contents = json.load(f)
     doc_contents = {doc_detail['filename']: doc_detail for doc_detail in doc_contents}
     identifier_dict = {}
