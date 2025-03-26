@@ -35,8 +35,103 @@ PARAGRAPH_SYSTEM_PROMPT = [
 PARAGRAPH_FEW_SHOT_PROMPT = [
     {
         'role': 'user',
-        ''
-    }
+        'content': """{
+            "input_text": "2023年新能源汽车补贴政策调整有哪些？",
+            "documents": [
+                {
+                    "document_id": "6a9f1a62-d4a5-4c93-872f-2d74b9e2b681",
+                    "document_description": "2023年新能源汽车补贴政策全文，涵盖补贴标准调整、补贴申领流程变更及适用车型范围。"
+                },
+                {
+                    "document_id": "e3d4a8b9-72cf-46e5-b4f8-f98c612d9e36",
+                    "document_description": "2023年新能源汽车购置税减免政策，适用于特定新能源车型，规定购置税免除标准。"
+                },
+                {
+                    "document_id": "政策汇编-2022.pdf",
+                    "document_description": "2022年新能源行业相关政策汇编，包括财政补贴、市场监管、税收优惠等。"
+                }
+            ],
+            "classification_instructions": []
+        }"""
+    },
+    {
+        'role': 'assistant',
+        'content': """{
+            "keywords": ["新能源汽车", "补贴政策", "2023年", "调整"],
+            "selected_documents": [
+                {
+                    "document_id": "6a9f1a62-d4a5-4c93-872f-2d74b9e2b681",
+                    "document_description": "2023年新能源汽车补贴政策全文，涵盖补贴标准调整、补贴申领流程变更及适用车型范围。"
+                },
+                {
+                    "document_id": "e3d4a8b9-72cf-46e5-b4f8-f98c612d9e36",
+                    "document_description": "2023年新能源汽车购置税减免政策，适用于特定新能源车型，规定购置税免除标准。"
+                }
+            ]
+        }"""
+    },
+    {
+        'role': 'user',
+        'content': """{
+            "input_text": "比亚迪最近的高管变动情况？",
+            "documents": [
+                {
+                    "document_id": "cfa82b11-5f6c-4a9a-8f21-3d2d9e7b1b45",
+                    "document_description": "2022年比亚迪公司管理层调整公告，涉及新任CFO及多名高管调整。"
+                },
+                {
+                    "document_id": "比亚迪股份有限公司 2024年人事变更公告（2024-06-15）.pdf",
+                    "document_description": "比亚迪2024年最新人事调整，涉及董事会成员变更、新任CEO上任。"
+                },
+                {
+                      "document_id": "9d6c319b-d86e-4c23-8a1f-5d56729a9c13",
+                      "document_description": "2023年比亚迪人事调整文件，包含多个部门高管轮岗及管理层架构优化。"
+                }
+            ],
+            "classification_instructions": []
+        }"""
+    },
+    {
+        'role': 'assistant',
+        'content': """{
+            "keywords": ["比亚迪", "高管变动", "最近", "人事调整"],
+            "selected_documents": [
+                {
+                    "document_id": "比亚迪股份有限公司 2024年人事变更公告（2024-06-15）.pdf",
+                    "document_description": "比亚迪2024年最新人事调整，涉及董事会成员变更、新任CEO上任。"
+                }
+            ]
+        }"""
+    },
+    {
+        'role': 'user',
+        'content': """{
+            "input_text": "比亚迪今年在欧洲的销量如何？",
+            "documents": [
+                {
+                    "document_id": "f3c27e94-1d72-4e86-b9e8-97b542ef1e63",
+                    "document_description": "比亚迪2023年全球市场销量报告，包含欧洲、北美和亚洲市场的增长趋势。"
+                },
+                {
+                    "document_id": "2022年比亚迪全球销量数据.pdf",
+                    "document_description": "比亚迪2022年全球销量分析，涵盖主要市场份额及竞争态势。"
+                }
+            ],
+            "classification_instructions": []
+        }"""
+    },
+    {
+        'role': 'assistant',
+        'content': """{
+            "keywords": ["比亚迪", "欧洲", "销量", "今年"],
+            "selected_documents": [
+                {
+                    "document_id": "f3c27e94-1d72-4e86-b9e8-97b542ef1e63",
+                    "document_description": "比亚迪2023年全球市场销量报告，包含欧洲、北美和亚洲市场的增长趋势。"
+                }
+            ]
+        }"""
+    },
 ]
 
 
@@ -53,7 +148,46 @@ class ParagraphSelector(BaseSelector):
         return data
 
     def start_select(self):
-        response_chat = self.llm.chat(PARAGRAPH_SYSTEM_PROMPT)
+        response_chat = self.llm.chat(PARAGRAPH_SYSTEM_PROMPT + PARAGRAPH_FEW_SHOT_PROMPT)
         content, total_token = response_chat
         self.selected_paragraphs = self.llm.literal_eval(content)
         return self
+
+    def collate_select_result(self) -> List:
+        # 建立辅助结构：
+        #   - index_map: index -> (filename, { "index": ..., "description": ... })
+        #   - file_desc_map: filename -> overall_description
+        index_map = {}
+        file_desc_map = {}
+
+        for file_item in self.paragraphs:
+            filename = file_item["filename"]
+            overall_desc = file_item.get("overall_description", "")
+            file_desc_map[filename] = overall_desc
+
+            for content in file_item.get("content", []):
+                index_map[content["index"]] = (filename, content)
+
+        # 按 filename 分组收集匹配到的内容（index + description）
+        filename_to_contents = {}
+        for doc in self.selected_paragraphs:
+            doc_id = doc["document_id"]  # 即 content[i]["index"]
+            if doc_id in index_map:
+                filename, content_item = index_map[doc_id]
+                # 需要的内容包含 index 和 description
+                needed_info = {
+                    "index": content_item["index"],
+                    "description": content_item["description"]
+                }
+                filename_to_contents.setdefault(filename, []).append(needed_info)
+
+        # 组装最终输出结构
+        result_list = []
+        for filename, contents in filename_to_contents.items():
+            result_list.append({
+                "filename": filename,
+                "content": contents,
+                "overall_description": file_desc_map.get(filename, "")
+            })
+
+        return result_list
