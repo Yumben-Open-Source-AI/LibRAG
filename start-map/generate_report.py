@@ -6,7 +6,7 @@ import openai
 from docx import Document
 from docxtpl import DocxTemplate
 
-from parse_pdf import create_llm_completion
+from web_server.routers.loading_router import create_llm_completion
 
 
 def read_docx(doc: Document):

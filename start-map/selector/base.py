@@ -15,12 +15,14 @@ class BaseSelector:
         pass
 
     def get_layer_data(self) -> List[Dict]:
+        # Get the data needed for selector
         pass
 
-    def start_select(self):
+    def start_select(self, question: str):
+        # Search for data related to the current layer
         pass
 
-    def collate_select_params(self):
+    def collate_select_params(self, params: List[Dict] = None):
         pass
 
     def collate_select_result(self) -> List:

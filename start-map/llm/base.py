@@ -24,4 +24,29 @@ class BaseLLM:
         """
         convert the response content to a literal string
         """
-        return response_content
+        import ast
+
+        response_content = response_content.strip()
+        # handler think
+        if '<think>' in response_content and '</think>' in response_content:
+            think_id = response_content.find('</think>') + len('</think>')
+            response_content = response_content[think_id:]
+
+        try:
+            if '```' in response_content:
+                # handler json
+                if '```json' in response_content:
+                    response_content = response_content[7:-3]
+
+            result = ast.literal_eval(response_content)
+        except Exception as e:
+            import re
+
+            json_match = re.findall(r"\{.*\}", response_content, re.DOTALL)
+            if len(json_match) < 0:
+                raise Exception('the response is invalid JSON content, please try again')
+
+            result = ast.literal_eval(json_match[0])
+
+        print(result)
+        return result

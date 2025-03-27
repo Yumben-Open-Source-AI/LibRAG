@@ -188,63 +188,6 @@ def ai_keyword(base_dir: str, filename: str):
     return 'success'
 
 
-def get_online_report_list():
-    """
-    在线映射报告
-    :return:
-    """
-    url = 'https://www.bydglobal.com/sites/REST/resources/v1/search/sites/BYD_CN/types/BydInvestorNotice/assets?fields=name,id,createdby,updatedby,description,Title,publishTime,loadFile&field:subtype:equals=regualrReport&orderBy=publishTime:desc&links=next'
-
-    response = requests.get(url, headers=header).json()
-
-    # Initialize an empty dictionary to store results
-    result = {}
-
-    # Loop through the 'items' and extract the necessary data
-    for index, item in enumerate(response.get('items', [])):
-        href = item.get('link', {}).get('href', '')
-        title = item.get('Title', '')
-        # Use the index or href as a unique key for each entry
-        result[index] = {"http": href, "Title": title}
-
-    return result
-
-
-def get_report_template(files: None):
-    """
-    获取文件模板列表
-    :return:
-    """
-    reports = get_online_report_list()
-    download_fail = ['比亚迪股份有限公司 2023年年报（2024-03-26）', '比亚迪股份有限公司 2023年年报（印刷版）（2024-04-26）',
-                     '比亚迪股份有限公司 2024年中期报告（2024-08-28）', '比亚迪股份有限公司 2023年中期报告（2023-08-28）',
-                     '比亚迪股份有限公司 2022年年报(印刷版) （2023-04-18）', '比亚迪股份有限公司 2022年年报（2023-03-28）',
-                     '比亚迪股份有限公司 2022年中期报告（2022-08-29）',
-                     '比亚迪股份有限公司 2021年年报(印刷版) （2022-04-14）']
-    for key, report in reports.items():
-        tile = report['Title']
-        url = report['http']
-
-        if tile in download_fail:
-            continue
-
-        if os.path.exists(tile + '.pdf'):
-            markdown = pymupdf4llm.to_markdown(tile + '.pdf')
-            import pathlib
-            pathlib.Path(tile + '.md').write_bytes(markdown.encode('utf-8'))
-            continue
-
-        # print('start downloading', tile)
-        response = requests.get(url, headers=header, timeout=100).status_code
-        # start = response['start']
-        # link_suffix = response[start]['loadFile_bloblink_']
-        # download_url = 'https://www.bydglobal.com' + link_suffix
-        #
-        # with open(tile + '.pdf', 'wb') as f:
-        #     f.write(requests.get(download_url, headers=header, timeout=100).content)
-        # print(tile, 'finish')
-
-
 if __name__ == '__main__':
     # ai_keyword('./', '比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
     import docx

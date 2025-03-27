@@ -7,7 +7,7 @@ from selector.base import BaseSelector
 
 # system action
 now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-PARAGRAPH_SYSTEM_PROMPT = [
+PARAGRAPH_SYSTEM_MESSAGES = [
     {
         'role': 'system',
         'content': f"""
@@ -32,7 +32,8 @@ PARAGRAPH_SYSTEM_PROMPT = [
     }
 ]
 
-PARAGRAPH_FEW_SHOT_PROMPT = [
+# few shot example input output
+PARAGRAPH_FEW_SHOT_MESSAGES = [
     {
         'role': 'user',
         'content': """{
@@ -134,23 +135,57 @@ PARAGRAPH_FEW_SHOT_PROMPT = [
     },
 ]
 
+PARAGRAPH_USER_PROMPT = """
+    "input_text": "{question}",
+    "documents": "{paragraph_params}",
+    "classification_instructions": []
+"""
+
 
 class ParagraphSelector(BaseSelector):
     def __init__(self, llm: BaseLLM):
         self.llm = llm
-        self.paragraphs = self.get_layer_data()
         self.selected_paragraphs = None
+        self.params = []
+        self.paragraphs = self.get_layer_data()
 
-    def get_layer_data(self) -> List[Dict]:
+    def get_layer_data(self):
         with open('data/byd_info.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         return data
 
-    def start_select(self):
-        response_chat = self.llm.chat(PARAGRAPH_SYSTEM_PROMPT + PARAGRAPH_FEW_SHOT_PROMPT)
+    def collate_select_params(self, params: List[Dict] = None):
+        parsed_data = self.paragraphs
+        selected_documents = params
+
+        filename_to_data = {item['filename']: item.get('content', []) for item in parsed_data}
+        next_layer_params = []
+        for doc in selected_documents:
+            doc_id = doc["document_id"]
+
+            if doc_id in filename_to_data:
+                content_list = filename_to_data[doc_id]
+
+                for content in content_list:
+                    next_layer_params.append({
+                        "document_id": content["index"],
+                        "document_description": content["summary"]
+                    })
+
+        self.params = next_layer_params
+        return self
+
+    def start_select(self, question: str, params: List[Dict] = None):
+        user_messages = [
+            {
+                'role': 'user',
+                'content': '{' + PARAGRAPH_USER_PROMPT.format(question=question, paragraph_params=self.params) + '}'
+            }
+        ]
+        response_chat = self.llm.chat(PARAGRAPH_SYSTEM_MESSAGES + PARAGRAPH_FEW_SHOT_MESSAGES + user_messages)
         content, total_token = response_chat
-        self.selected_paragraphs = self.llm.literal_eval(content)
+        self.selected_paragraphs = self.llm.literal_eval(content)['selected_documents']
         return self
 
     def collate_select_result(self) -> List:

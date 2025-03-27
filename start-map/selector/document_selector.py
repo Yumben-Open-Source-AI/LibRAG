@@ -1,13 +1,13 @@
 import datetime
 import json
-from typing import List
+from typing import List, Dict
 
 from llm.base import BaseLLM
 from selector.base import BaseSelector
 
 # system action
 now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-DOCUMENT_SYSTEM_PROMPT = [
+DOCUMENT_SYSTEM_MESSAGES = [
     {
         'role': 'system',
         'content': f"""
@@ -33,7 +33,7 @@ DOCUMENT_SYSTEM_PROMPT = [
 ]
 
 # few_shot example input output
-DOCUMENT_FEW_SHOT_PROMPT = [
+DOCUMENT_FEW_SHOT_MESSAGES = [
     {
         'role': 'user',
         'content': """{
@@ -164,13 +164,19 @@ DOCUMENT_FEW_SHOT_PROMPT = [
     }
 ]
 
+# user input
+DOCUMENT_USER_PROMPT = """
+    "input_text": "{question}",
+    "documents": "{document_params}",
+    "classification_instructions": []
+"""
+
 
 class DocumentSelector(BaseSelector):
     def __init__(self, llm: BaseLLM):
         self.llm = llm
         self.selected_documents = None
-        self.select_params = []
-        # TODO data source from file to db
+        self.params = []
         self.documents = self.get_layer_data()
 
     def get_layer_data(self):
@@ -179,37 +185,21 @@ class DocumentSelector(BaseSelector):
 
         return data
 
-    def collate_select_params(self):
+    def collate_select_params(self, params: List[Dict] = None):
         for item in self.documents:
-            self.select_params.append({
+            self.params.append({
                 "document_id": item["filename"],
                 "document_description": item["overall_description"]
             })
         return self
 
-    def start_select(self):
-        # TODO add user input
-        response_chat = self.llm.chat(DOCUMENT_SYSTEM_PROMPT + DOCUMENT_FEW_SHOT_PROMPT)
+    def start_select(self, question: str, params: List[Dict] = None):
+        user_messages = [
+            {
+                'role': 'user',
+                'content': '{' + DOCUMENT_USER_PROMPT.format(question=question, document_params=self.params) + '}'
+            }
+        ]
+        response_chat = self.llm.chat(DOCUMENT_SYSTEM_MESSAGES + DOCUMENT_FEW_SHOT_MESSAGES + user_messages)
         content, total_tokens = response_chat
-        self.selected_documents = self.llm.literal_eval(content)
-        return self
-
-    def collate_select_result(self) -> List:
-        parsed_data = self.documents
-        selected_documents = self.selected_documents
-
-        filename_to_data = {item['filename']: item.get('content', []) for item in parsed_data}
-        next_layer_params = []
-        for doc in selected_documents:
-            doc_id = doc["document_id"]
-
-            if doc_id in filename_to_data:
-                content_list = filename_to_data[doc_id]
-
-                for content in content_list:
-                    next_layer_params.append({
-                        "document_id": content["index"],
-                        "document_description": content["summary"]
-                    })
-
-        return next_layer_params
+        return self.llm.literal_eval(content)['selected_documents']
