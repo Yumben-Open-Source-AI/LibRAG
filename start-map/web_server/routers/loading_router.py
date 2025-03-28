@@ -1,3 +1,4 @@
+import datetime
 import uuid
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -7,57 +8,54 @@ import openai
 
 from llm.qwen import Qwen
 
-PARAGRAPH_PARSE_MESSAGES = [
-    {'role': 'system', 'content': """
-        Role: 文档总结专家
-        - version: 1.0
-        - language: 中文
-        - description: 你将得到User输入的一段文本，请详细提取且总结描述其内容，包含必须如实准确提取关键信息如所有指标及其数值数据等，最终按指定格式生成总结及描述。
+PARAGRAPH_PARSE_PROMPT = """
+    Role: 文档总结专家
+    - version: 1.0
+    - language: 中文
+    - description: 你将得到User输入的一段文本，请详细提取且总结描述其内容，包含必须如实准确提取关键信息如所有指标及其数值数据等，最终按指定格式生成总结及描述。
 
-        Skills
-        - 擅长使用面向对象的视角抽取文本内容的对象属性(属性选项:当前页,内容所属类型[摘要/引言/目录/首页/正文/公告/...]。
-        - 生成详细及信息丰富的描述。
-        - 擅长提取文本中的数值数据。
-        - 擅长提取文本中所有指标信息。
-        - 擅长生成严格符合JSON格式的输出。
-        - 擅长使用清晰的语言完整总结文本的主要内容。
-        - 擅长使用陈述叙事的风格总结文本的主要内容。
+    Skills
+    - 擅长使用面向对象的视角抽取文本内容的对象属性(属性选项:当前页,内容所属类型[摘要/引言/目录/首页/正文/公告/...]。
+    - 生成详细及信息丰富的描述。
+    - 擅长提取文本中的数值数据。
+    - 擅长提取文本中所有指标信息。
+    - 擅长生成严格符合JSON格式的输出。
+    - 擅长使用清晰的语言完整总结文本的主要内容。
+    - 擅长使用陈述叙事的风格总结文本的主要内容。
 
-        Rules
-        - 描述与总结不能省略内容。
-        - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx第xxx页的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
+    Rules
+    - 描述与总结不能省略内容。
+    - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx第xxx页的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
+    - 每个content至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
+    - 严格生成结构化不带有转义的JSON数据的总结及描述。
+    - 总结和描述仅使用文本格式呈现。
 
-        - 每个content至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
-        - 严格生成结构化不带有转义的JSON数据的总结及描述。
-        - 总结和描述仅使用文本格式呈现。
+    Workflows
+    1. 获取用户提供的文本。
+    2. 逐行解析提取文本的指标。
+    3. 理解文中主要内容，结合指标和对象属性生成总结。
+    4. 组合关键信息和对象属性生成描述，确保指标信息及数值数据完整。
+    5. 输出最终的总结及描述，确保准确性、可读性、完整性。
 
-        Workflows
-        1. 获取用户提供的文本。
-        2. 逐行解析提取文本的指标。
-        3. 理解文中主要内容，结合指标和对象属性生成总结。
-        4. 组合关键信息和对象属性生成描述，确保指标信息及数值数据完整。
-        5. 输出最终的总结及描述，确保准确性、可读性、完整性。
-
-        Example Output
-        ```json
-        {
-            "paragraph_name": "",#填写章节或段落名称
-            "paragraph_id": "{{#1742956971474.text#}}",
-            "summary": "段落描述:<>",
-            "content": "",
-            "keywords": [],#关键词
-            "position":""，#段落在文中的位置
-            "metadata": {最后更新时间: "{{#1742954273623.text#}}"}
-        }
-        ```
-        Warning:
-            -summary必须列出所有指标字段，禁止使用```等```字眼省略指标项，但不需要数值数据。
-            -content必须列出所有指标及数值数据，不能省略。  
-    """}
-]
+    Example Output
+    ```json
+    {
+        "paragraph_name": "",#填写章节或段落名称,
+        "summary": "段落描述:<>",
+        "content": "",
+        "keywords": [],#关键词
+        "position":""，#段落在文中的位置
+        "metadata": {最后更新时间: "{{#1742954273623.text#}}"}
+    }
+    ```
+    Warning:
+    -summary必须列出所有指标字段，禁止使用```等```字眼省略指标项，但不需要数值数据。
+    -content必须列出所有指标及数值数据，不能省略。  
+"""
 
 
 def loading_data(filename: str, base_dir: str = 'data/'):
+    # TODO feat config system
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
     os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     page_count = 1
@@ -184,3 +182,44 @@ def loading_data(filename: str, base_dir: str = 'data/'):
         f.write(json.dumps(data, ensure_ascii=False))
 
     return 'success'
+
+
+if __name__ == '__main__':
+    from langchain_text_splitters import MarkdownHeaderTextSplitter
+
+    # doc = pymupdf4llm.to_markdown('../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
+    # print(doc)
+
+    # from marker.converters.pdf import PdfConverter
+    # from marker.models import create_model_dict
+    # from marker.output import text_from_rendered
+    #
+    # converter = PdfConverter(artifact_dict=create_model_dict())
+    # rendered = converter("../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf")
+    # text, _, images = text_from_rendered(rendered)
+    # print(text)
+    #
+    # # 定义要分割的标题级别
+    # headers_to_split_on = [
+    #     ("#", "Header 1"),
+    #     ("##", "Header 2"),
+    #     ("###", "Header 3"),
+    #     ("####", "Header 4"),
+    # ]
+    #
+    # # 创建分割器
+    # markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on, strip_headers=False)
+    # document = markdown_splitter.split_text(text)
+    # page_count = 1
+    # for doc in document:
+    #     print('分页', page_count)
+    #     print(doc.page_content)
+    #     page_count += 1
+    import pdfplumber
+
+    with pdfplumber.open("../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf") as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            print(text)
+            tables = page.extract_tables()
+            print(tables)
