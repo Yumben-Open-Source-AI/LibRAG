@@ -12,7 +12,6 @@ router = APIRouter(tags=['ai'], prefix='/ai')
 @router.get('/query')
 async def query_with_llm(question: str):
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
-    os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 
     qwen = Qwen()
     document_selector = DocumentSelector(qwen)

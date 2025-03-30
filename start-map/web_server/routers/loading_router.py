@@ -3,9 +3,12 @@ import uuid
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+
+import pdfplumber
 import pymupdf4llm
 import openai
 
+from llm.deepseek import DeepSeek
 from llm.qwen import Qwen
 
 PARAGRAPH_PARSE_PROMPT = """
@@ -185,7 +188,7 @@ def loading_data(filename: str, base_dir: str = 'data/'):
 
 
 if __name__ == '__main__':
-    from langchain_text_splitters import MarkdownHeaderTextSplitter
+    # from langchain_text_splitters import MarkdownHeaderTextSplitter
 
     # doc = pymupdf4llm.to_markdown('../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
     # print(doc)
@@ -215,11 +218,19 @@ if __name__ == '__main__':
     #     print('分页', page_count)
     #     print(doc.page_content)
     #     page_count += 1
-    import pdfplumber
-
-    with pdfplumber.open("../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf") as pdf:
+    # import pymupdf4llm
+    # doc = pymupdf4llm.to_markdown('../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
+    # print(doc)
+    text = ''
+    with pdfplumber.open("../../files/比亚迪股份有限公司 2023年第一季度报告（2023-04-27）.pdf") as pdf:
         for page in pdf.pages:
-            text = page.extract_text()
-            print(text)
-            tables = page.extract_tables()
-            print(tables)
+            text += page.extract_text() + '/n'
+    print(text)
+
+    # os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
+    # deepseek = DeepSeek()
+    # # deepseek prompt
+    # ds_messages = [
+    #     {'role': 'user', 'content':  '精确提取文件主要的多级大标题层级，需要按照顺序提取多级标题且严格按照原文内容提取，最终只输出标题结构(#为一级标题以此类推)' + f'```{text}```'}
+    # ]
+    # print(deepseek.chat(ds_messages)[0])
