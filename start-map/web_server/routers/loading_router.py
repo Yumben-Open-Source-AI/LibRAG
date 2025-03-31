@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
 import os
 
-import pymupdf4llm
 from llm.qwen import Qwen
 from docx.document import Document
 from docx.oxml.table import CT_Tbl
@@ -191,8 +190,6 @@ def loading_data(filename: str, base_dir: str = 'data/'):
 
 
 class TitleNode:
-    """标题节点类"""
-
     def __init__(self, title, level):
         self.title = title  # title
         self.level = level  # level
@@ -229,37 +226,23 @@ def read_table(table):
     return table_str
 
 
-# def get_title_rank(paragraph):
-#     xml = paragraph._p.xml
-#     # 进行xml源码字符匹配
-#     if xml.find('<w:outlineLvl') >= 0:
-#         start_index = xml.find('<w:outlineLvl')
-#         end_index = xml.find('>', start_index)
-#         outlineLvl_value = xml[start_index:end_index + 1]
-#         outlineLvl_value = re.search("\d+", outlineLvl_value).group()
-#
-#         outlineLvl_value = int(outlineLvl_value)
-#         title = paragraph.text
-#         if outlineLvl_value < 0:
-#             return 0
-#
-#         if outlineLvl_value == 1:
-#             title_tree[title] = {}
-#         elif outlineLvl_value == 2:
-#             first = list(title_tree.keys())[-1]
-#             title_tree[first]
-#
-#         elif outlineLvl_value == 3:
-#
-#         print(f"文本：{title}-->大纲等级：{outlineLvl_value}")
-#         return {'title': title, 'level': outlineLvl_value}
+def tree_to_dict(tree: TitleNode):
+    """
+    Converting a title tree to a dict
+    """
+    return {
+        'title': tree.title,
+        'level': tree.level,
+        'children': [tree_to_dict(child) for child in tree.children]
+    }
 
 
 def read_word():
     import docx
-    doc = docx.Document('../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.docx')
-    root = TitleNode("ROOT", level=0)
+    doc = docx.Document(r'C:\Users\Xman\Downloads\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.docx')
+    root = TitleNode("ROOT", level=-1)
     stack = deque([root])
+    doc_str = ''
 
     for block in iter_block_items(doc):
         if isinstance(block, Paragraph):
@@ -269,21 +252,66 @@ def read_word():
             if xml.find('<w:outlineLvl') > 0:
                 start_index = xml.find('<w:outlineLvl')
                 end_index = xml.find('>', start_index)
-                outlineLvl_value = xml[start_index:end_index + 1]
-                outlineLvl_value = re.search("\d+", xml[start_index:end_index + 1]).group()
+                outline_xml = xml[start_index:end_index + 1]
+                outline_value = int(re.search("\d+", outline_xml).group())
 
-                outlineLvl_value = int(outlineLvl_value)
-                new_node = TitleNode(title, level=outlineLvl_value)
-                while stack[-1].level >= outlineLvl_value:
+                if outline_value <= 0:
+                    continue
+                new_node = TitleNode(title, level=outline_value)
+                while stack[-1].level >= outline_value:
                     stack.pop()
-
-
-
-            # print("text", [block.text])
+                stack[-1].children.append(new_node)
+                stack.append(new_node)
+            doc_str += block.text
         elif isinstance(block, Table):
-            # print("table", read_table(block))
-            ...
+            doc_str += read_table(block)
+    return root.children, doc_str
+
+
+def merge_nodes(nodes):
+    """
+    Merge check title tree to filter duplicate items
+    """
+    import copy
+    nodes = copy.deepcopy(nodes)
+    i = 0
+    while i < len(nodes):
+        current = nodes[i]
+        j = i + 1
+        while j < len(nodes):
+            next_node = nodes[j]
+            if current['title'] == next_node['title'] and current['level'] == next_node['level']:
+                current['children'].extend(next_node['children'])
+                del nodes[j]
+            else:
+                j += 1
+        current['children'] = merge_nodes(current['children'])
+        i += 1
+    return nodes
+
+
+def extract_subtitles(data):
+    def add_children(node):
+        nonlocal subtitle
+        for child in node.get('children', []):
+            subtitle += child['title']
+            add_children(child)
+
+    result = []
+    for first in data:
+        for second in first['children']:
+            # 提取二级标题
+            subtitle = second['title']
+            # 递归拼接子节点内容
+            add_children(second)
+            result.append(subtitle)
+    return result
 
 
 if __name__ == '__main__':
-    read_word()
+    title_tree, all_doc = read_word()
+    print(title_tree)
+    # title_tree = [tree_to_dict(node) for node in title_tree]
+    # merge_tree = merge_nodes(title_tree)
+    #
+    # print(extract_subtitles(merge_tree))
