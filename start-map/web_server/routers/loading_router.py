@@ -1,15 +1,18 @@
 import datetime
+import re
 import uuid
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import deque
 import os
 
-import pdfplumber
 import pymupdf4llm
-import openai
-
-from llm.deepseek import DeepSeek
 from llm.qwen import Qwen
+from docx.document import Document
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+from docx.table import _Cell, Table
+from docx.text.paragraph import Paragraph
 
 PARAGRAPH_PARSE_PROMPT = """
     Role: 文档总结专家
@@ -187,50 +190,100 @@ def loading_data(filename: str, base_dir: str = 'data/'):
     return 'success'
 
 
+class TitleNode:
+    """标题节点类"""
+
+    def __init__(self, title, level):
+        self.title = title  # title
+        self.level = level  # level
+        self.children = []  # children
+
+
+def iter_block_items(parent):
+    """
+    Yield each paragraph and table child within *parent*, in document order.
+    Each returned value is an instance of either Table or Paragraph. *parent*
+    would most commonly be a reference to a main Document object, but
+    also works for a _Cell object, which itself can contain paragraphs and tables.
+    """
+    if isinstance(parent, Document):
+        parent_elm = parent.element.body
+    elif isinstance(parent, _Cell):
+        parent_elm = parent._tc
+    else:
+        raise ValueError("something's not right")
+
+    for child in parent_elm.iterchildren():
+        if isinstance(child, CT_P):
+            yield Paragraph(child, parent)
+        elif isinstance(child, CT_Tbl):
+            yield Table(child, parent)
+
+
+def read_table(table):
+    table_str = ''
+    for row in table.rows:
+        current_row = '|'.join([cell.text.replace('\n', '').replace(' ', '') for cell in row.cells])
+        row_str = "{}{}{}".format('|', current_row, '|')
+        table_str += row_str + '\n'
+    return table_str
+
+
+# def get_title_rank(paragraph):
+#     xml = paragraph._p.xml
+#     # 进行xml源码字符匹配
+#     if xml.find('<w:outlineLvl') >= 0:
+#         start_index = xml.find('<w:outlineLvl')
+#         end_index = xml.find('>', start_index)
+#         outlineLvl_value = xml[start_index:end_index + 1]
+#         outlineLvl_value = re.search("\d+", outlineLvl_value).group()
+#
+#         outlineLvl_value = int(outlineLvl_value)
+#         title = paragraph.text
+#         if outlineLvl_value < 0:
+#             return 0
+#
+#         if outlineLvl_value == 1:
+#             title_tree[title] = {}
+#         elif outlineLvl_value == 2:
+#             first = list(title_tree.keys())[-1]
+#             title_tree[first]
+#
+#         elif outlineLvl_value == 3:
+#
+#         print(f"文本：{title}-->大纲等级：{outlineLvl_value}")
+#         return {'title': title, 'level': outlineLvl_value}
+
+
+def read_word():
+    import docx
+    doc = docx.Document('../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.docx')
+    root = TitleNode("ROOT", level=0)
+    stack = deque([root])
+
+    for block in iter_block_items(doc):
+        if isinstance(block, Paragraph):
+            xml = block._p.xml
+            title = block.text
+            # get title rank
+            if xml.find('<w:outlineLvl') > 0:
+                start_index = xml.find('<w:outlineLvl')
+                end_index = xml.find('>', start_index)
+                outlineLvl_value = xml[start_index:end_index + 1]
+                outlineLvl_value = re.search("\d+", xml[start_index:end_index + 1]).group()
+
+                outlineLvl_value = int(outlineLvl_value)
+                new_node = TitleNode(title, level=outlineLvl_value)
+                while stack[-1].level >= outlineLvl_value:
+                    stack.pop()
+
+
+
+            # print("text", [block.text])
+        elif isinstance(block, Table):
+            # print("table", read_table(block))
+            ...
+
+
 if __name__ == '__main__':
-    # from langchain_text_splitters import MarkdownHeaderTextSplitter
-
-    # doc = pymupdf4llm.to_markdown('../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
-    # print(doc)
-
-    # from marker.converters.pdf import PdfConverter
-    # from marker.models import create_model_dict
-    # from marker.output import text_from_rendered
-    #
-    # converter = PdfConverter(artifact_dict=create_model_dict())
-    # rendered = converter("../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf")
-    # text, _, images = text_from_rendered(rendered)
-    # print(text)
-    #
-    # # 定义要分割的标题级别
-    # headers_to_split_on = [
-    #     ("#", "Header 1"),
-    #     ("##", "Header 2"),
-    #     ("###", "Header 3"),
-    #     ("####", "Header 4"),
-    # ]
-    #
-    # # 创建分割器
-    # markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on, strip_headers=False)
-    # document = markdown_splitter.split_text(text)
-    # page_count = 1
-    # for doc in document:
-    #     print('分页', page_count)
-    #     print(doc.page_content)
-    #     page_count += 1
-    # import pymupdf4llm
-    # doc = pymupdf4llm.to_markdown('../../files/比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
-    # print(doc)
-    text = ''
-    with pdfplumber.open("../../files/比亚迪股份有限公司 2023年第一季度报告（2023-04-27）.pdf") as pdf:
-        for page in pdf.pages:
-            text += page.extract_text() + '/n'
-    print(text)
-
-    # os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
-    # deepseek = DeepSeek()
-    # # deepseek prompt
-    # ds_messages = [
-    #     {'role': 'user', 'content':  '精确提取文件主要的多级大标题层级，需要按照顺序提取多级标题且严格按照原文内容提取，最终只输出标题结构(#为一级标题以此类推)' + f'```{text}```'}
-    # ]
-    # print(deepseek.chat(ds_messages)[0])
+    read_word()
