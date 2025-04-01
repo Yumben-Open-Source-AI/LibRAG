@@ -180,7 +180,7 @@ class DocumentSelector(BaseSelector):
         self.documents = self.get_layer_data()
 
     def get_layer_data(self):
-        with open('data/byd_info.json', 'r', encoding='utf-8') as f:
+        with open(r'D:\xqm\python\project\llm\start-map\data\byd_info.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         return data
@@ -202,4 +202,4 @@ class DocumentSelector(BaseSelector):
         ]
         response_chat = self.llm.chat(DOCUMENT_SYSTEM_MESSAGES + DOCUMENT_FEW_SHOT_MESSAGES + user_messages)
         content, total_tokens = response_chat
-        return self.llm.literal_eval(content)['selected_documents']
+        return content['selected_documents']

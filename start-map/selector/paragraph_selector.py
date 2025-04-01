@@ -150,7 +150,7 @@ class ParagraphSelector(BaseSelector):
         self.paragraphs = self.get_layer_data()
 
     def get_layer_data(self):
-        with open('data/byd_info.json', 'r', encoding='utf-8') as f:
+        with open(r'D:\xqm\python\project\llm\start-map\data\byd_info.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         return data
@@ -185,7 +185,7 @@ class ParagraphSelector(BaseSelector):
         ]
         response_chat = self.llm.chat(PARAGRAPH_SYSTEM_MESSAGES + PARAGRAPH_FEW_SHOT_MESSAGES + user_messages)
         content, total_token = response_chat
-        self.selected_paragraphs = self.llm.literal_eval(content)['selected_documents']
+        self.selected_paragraphs = content['selected_documents']
         return self
 
     def collate_select_result(self) -> List:
