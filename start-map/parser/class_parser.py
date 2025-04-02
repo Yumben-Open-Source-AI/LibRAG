@@ -32,7 +32,7 @@ CATEGORY_PARSE_SYSTEM_MESSAGES = [
             ## Workflows
             1. 接收输入：
                 - 文档内容或描述（如摘要、标题）
-                - 已知分类列表（JSON数组，包含 class_name, class_id, description 等字段）
+                - 已知分类列表（JSON数组，包含 category_name, category_id, description 等字段）
             2. 匹配逻辑：
                 - 首先尝试在已知分类中匹配最相关的类别（按语义、关键词等）。
                 - 如无匹配，再创建新的抽象分类。
@@ -42,7 +42,7 @@ CATEGORY_PARSE_SYSTEM_MESSAGES = [
             ## Example Output
             json
             {
-                "class_name": "", #分类名称
+                "category_name": "", #分类名称
                 "description": "分类描述:<>", #这个分类的描述
                 "metadata": {
                     "关联实体": [] #此分类涉及到的实体信息
@@ -82,7 +82,7 @@ class CategoryParser(BaseParser):
         content = Template(CATEGORY_PARSE_USER_MESSAGES[0]['content'])
         CATEGORY_PARSE_USER_MESSAGES[0]['content'] = content.substitute(description=str(parse_params))
         category_content = self.llm.chat(CATEGORY_PARSE_SYSTEM_MESSAGES + CATEGORY_PARSE_USER_MESSAGES)[0]
-        category_content['category'] = str(uuid.uuid4())
+        category_content['category_id'] = str(uuid.uuid4())
         category_content['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         category_content.setdefault('documents', []).append(document_id)
 

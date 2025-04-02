@@ -67,8 +67,8 @@ class DomainParser(BaseParser):
 
     def parse(self, **kwargs):
         cla = kwargs.get('cla')
-        class_name = cla['class_name']
-        class_id = cla['class_id']
+        class_name = cla['category_name']
+        class_id = cla['category_id']
         description = cla['description']
         self.known_domains = self.__get_known_domains()
         parse_params = {
