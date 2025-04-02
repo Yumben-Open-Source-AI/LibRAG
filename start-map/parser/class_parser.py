@@ -130,7 +130,7 @@ class CategoryParser(BaseParser):
             data = json.load(f)
 
         for cla in data:
-            if cla['class_id'] == self.cla['class_id']:
+            if cla['category_id'] == self.category['category_id']:
                 data.remove(cla)
                 data.append(cla)
 

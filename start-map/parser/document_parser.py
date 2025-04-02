@@ -94,5 +94,5 @@ class DocumentParser(BaseParser):
             f.write(json.dumps(data, ensure_ascii=False))
 
     def back_fill_parent(self, parent):
-        self.document.setdefault('parent', []).append(parent['class_id'])
+        self.document.setdefault('parent', []).append(parent['category_id'])
         self.document['parent_description'] = parent['description']
