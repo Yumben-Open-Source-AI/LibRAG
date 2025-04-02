@@ -72,7 +72,7 @@ class ParagraphParser(BaseParser):
         self.paragraphs = []
 
     def parse(self, **kwargs):
-        file_path = kwargs.get('file_path')
+        file_path = kwargs.get('path')
         doc = fitz.open(file_path)
         all_paragraphs = []
         page_count = 1

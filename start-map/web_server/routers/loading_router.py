@@ -10,7 +10,9 @@ from docx.oxml.text.paragraph import CT_P
 from docx.table import _Cell, Table
 from docx.text.paragraph import Paragraph
 
+from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
+from parser.domain_parser import DomainParser
 from parser.paragraph_parser import ParagraphParser
 
 
@@ -23,55 +25,44 @@ def loading_data(filename: str, base_dir: str = '../../files/'):
     qwen = Qwen()
 
     par_parser = ParagraphParser(qwen)
-    all_paragraphs = par_parser.parse(**{'file_path': file_path})
+    paragraph_params = {
+        'path': file_path
+    }
+    all_paragraphs = par_parser.parse(**paragraph_params)
 
     doc_parser = DocumentParser(qwen)
-    document = doc_parser.parse(**{'paragraphs': all_paragraphs, 'path': file_path})
+    document_params = {
+        'paragraphs': all_paragraphs,
+        'path': file_path
+    }
+    document = doc_parser.parse(**document_params)
 
     # back fill paragraph parent data
     par_parser.back_fill_parent(document)
     par_parser.storage_parser_data()
+
+    category_parser = CategoryParser(qwen)
+    category_params = {
+        'document': document,
+    }
+    category = category_parser.parse(**category_params)
+
+    # back fill document parent data
+    doc_parser.back_fill_parent(category)
     doc_parser.storage_parser_data()
 
-    # # 生成全文总结
-    # system_prompt = """
-    #             # Roles:文档总结专家
-    #             - language：中文
-    #             - description：你擅长根据文档段落内容进行概括，用户会提供一篇文章的段落信息，理解段落内容且进行充分总结概括涉及的主要业务领域信息及时间维度信息。
-    #
-    #             # Skill:
-    #             - 擅长概括文档所属的领域信息且生成简洁总结性内容。
-    #
-    #             # Rules:
-    #             - 以叙述的语义进行总结表述。
-    #             - 仅概括文档所属的业务领域以及时间维度信息，不需要生成具体数值。
-    #             - 根据文档内容生成相关时间维度信息的陈述。
-    #             - 概括至少20个字，且需要概括所有文档中实际出现的业务领域，确保不存在遗漏业务领域情况。
-    #
-    #             # Workflows:
-    #             1. 获取段落内容。
-    #             2. 理解所有段落内容。
-    #             3. 仅精准概括文中所属什么业务领域，且概括的业务领域概念定义清晰，具备行业专业性。
-    #             4. 最终输出概括，确保准确性、简洁性以及时间维度的完整性。
-    #
-    #             # Example output
-    #             这是XXX年XXX文档，文档内容涵盖了XXXX业务领域信息。
-    #             """
-    # completion = create_llm_completion(remote_llm, 'qwen2.5-72b-instruct', [
-    #     {'role': 'system', 'content': system_prompt},
-    #     {'role': 'user', 'content': str(
-    #         page_content) + '\n根据文档段落内容生成一句话的简洁精准概括'}
-    # ], max_token=8192, timeout=120000)
-    # result['overall_description'] = completion
-    #
-    # # summary更新段落描述
-    # for content in result['content']:
-    #     content['summary'] = f'段落来源描述:{result["overall_description"]};段落内容描述:{content["summary"]}'
-    #
-    # # 根据页码重排序段落
-    # result['content'] = sorted(result['content'], key=lambda x: x['page_number'])
-    #
-    # return 'success'
+    domain_parser = DomainParser(qwen)
+    domain_params = {
+        'cla': category
+    }
+    domain = domain_parser.parse(**domain_params)
+
+    # back fill cla parent data
+    if category['new_classification'] == 'true':
+        category_parser.back_fill_parent(domain)
+        category_parser.storage_parser_data()
+
+    domain_parser.storage_parser_data()
 
 
 class TitleNode:

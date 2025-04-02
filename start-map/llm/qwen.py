@@ -25,7 +25,6 @@ class Qwen(BaseLLM):
         )
         content = completion.choices[0].message.content
         usage_token = completion.usage.total_tokens
-        # print(content)
         content = self.literal_eval(content)
 
         return content, usage_token
