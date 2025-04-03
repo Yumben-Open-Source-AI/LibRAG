@@ -5,7 +5,7 @@ from llm.base import BaseLLM
 
 
 class DeepSeek(BaseLLM):
-    def __init__(self, model='qwen2.5-72b-instruct', **kwargs):
+    def __init__(self, model='deepseek-r1-distill-qwen-32b', **kwargs):
         """
         Initialize the large language model client and parameters
         :param model: Qwen model

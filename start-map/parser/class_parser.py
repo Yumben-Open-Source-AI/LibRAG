@@ -44,6 +44,7 @@ CATEGORY_PARSE_SYSTEM_MESSAGES = [
             {
                 "category_name": "", #分类名称
                 "description": "分类描述:<>", #这个分类的描述
+                "category_id": "",
                 "metadata": {
                     "关联实体": [] #此分类涉及到的实体信息
                 },
@@ -56,9 +57,7 @@ CATEGORY_PARSE_SYSTEM_MESSAGES = [
 CATEGORY_PARSE_USER_MESSAGES = [
     {
         'role': 'user',
-        'content': """
-            读取文档，使用中文生成这段文本的分类以及分类描述，最终按照Example Output样例生成完整json格式数据```<文档描述:<$description>>```
-        """
+        'content': """读取文档，使用中文生成这段文本的分类以及分类描述，最终按照Example Output样例生成完整json格式数据```<文档描述:<$description>>```"""
     }
 ]
 
@@ -69,6 +68,7 @@ class CategoryParser(BaseParser):
         self.category = {}
         self.known_categories = []
         self.category_doc_dict = {}
+        self.new_classification = 'true'
 
     def parse(self, **kwargs):
         document = kwargs.get('document')
@@ -81,19 +81,20 @@ class CategoryParser(BaseParser):
         }
         content = Template(CATEGORY_PARSE_USER_MESSAGES[0]['content'])
         CATEGORY_PARSE_USER_MESSAGES[0]['content'] = content.substitute(description=str(parse_params))
-        category_content = self.llm.chat(CATEGORY_PARSE_SYSTEM_MESSAGES + CATEGORY_PARSE_USER_MESSAGES)[0]
-        category_content['category_id'] = str(uuid.uuid4())
-        category_content['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        category_content.setdefault('documents', []).append(document_id)
-
+        self.category = self.llm.chat(CATEGORY_PARSE_SYSTEM_MESSAGES + CATEGORY_PARSE_USER_MESSAGES)[0]
+        new_classification = self.category['new_classification']
         # llm judgments this document is not an added type
-        if category_content['new_classification'] == 'false':
-            documents = self.category_doc_dict[category_content['category_name']]
+        if new_classification == 'false':
+            # update documents
+            documents = self.category_doc_dict[self.category['category_name']]
             documents.append(document_id)
-            category_content['documents'] = documents
-            self.update_storage_data()
-        self.category = category_content
-        return category_content
+            self.category['documents'] = documents
+        else:
+            self.category['category_id'] = str(uuid.uuid4())
+            self.category.setdefault('documents', []).append(document_id)
+        self.category['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.new_classification = new_classification
+        return self.category
 
     def back_fill_parent(self, parent):
         self.category['parent'] = parent['domain_id']
@@ -103,7 +104,7 @@ class CategoryParser(BaseParser):
         """
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
-        with open(r'D:\xqm\python\project\llm\start-map\data\class_info.json', 'r', encoding='utf-8') as f:
+        with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
             categories = json.load(f)
 
         for category in categories:
@@ -116,23 +117,23 @@ class CategoryParser(BaseParser):
         return categories
 
     def storage_parser_data(self):
-        del self.category['new_classification']
-        with open(r'D:\xqm\python\project\llm\start-map\data\class_info.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            data.append(self.category)
+        if self.new_classification == 'true':
+            del self.category['new_classification']
+            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                data.append(self.category)
 
-        with open(r'D:\xqm\python\project\llm\start-map\data\class_info.json', 'w+', encoding='utf-8') as f:
-            f.write(json.dumps(data, ensure_ascii=False))
+            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'w+', encoding='utf-8') as f:
+                f.write(json.dumps(data, ensure_ascii=False))
+        else:
+            del self.category['new_classification']
+            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
+                data = json.load(f)
 
-    def update_storage_data(self):
-        del self.category['new_classification']
-        with open(r'D:\xqm\python\project\llm\start-map\data\class_info.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            for cla in data:
+                if cla['category_id'] == self.category['category_id']:
+                    cla['documents'] = self.category['documents']
+                    cla['metadata'] = self.category['metadata']
 
-        for cla in data:
-            if cla['category_id'] == self.category['category_id']:
-                data.remove(cla)
-                data.append(cla)
-
-        with open(r'D:\xqm\python\project\llm\start-map\data\class_info.json', 'w+', encoding='utf-8') as f:
-            f.write(json.dumps(data, ensure_ascii=False))
+            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'w+', encoding='utf-8') as f:
+                f.write(json.dumps(data, ensure_ascii=False))

@@ -3,6 +3,7 @@ import re
 from collections import deque
 import os
 
+from llm.deepseek import DeepSeek
 from llm.qwen import Qwen
 from docx.document import Document
 from docx.oxml.table import CT_Tbl
@@ -36,6 +37,7 @@ def loading_data(filename: str, base_dir: str = '../../files/'):
         'path': file_path
     }
     document = doc_parser.parse(**document_params)
+    print('document', document)
 
     # back fill paragraph parent data
     par_parser.back_fill_parent(document)
@@ -46,22 +48,27 @@ def loading_data(filename: str, base_dir: str = '../../files/'):
         'document': document,
     }
     category = category_parser.parse(**category_params)
+    print('category', category)
 
     # back fill document parent data
     doc_parser.back_fill_parent(category)
     doc_parser.storage_parser_data()
 
-    domain_parser = DomainParser(qwen)
+    domain_parser = DomainParser(Qwen())
     domain_params = {
         'cla': category
     }
     domain = domain_parser.parse(**domain_params)
+    print('domain', domain)
 
-    # back fill cla parent data
-    if category['new_classification'] == 'true':
+    # back fill category parent data
+    if category_parser.new_classification == 'true':
         category_parser.back_fill_parent(domain)
-        category_parser.storage_parser_data()
+    category_parser.storage_parser_data()
 
+    # back fill domain parent data
+    if domain_parser.new_domain == 'true':
+        domain_parser.back_fill_parent(None)
     domain_parser.storage_parser_data()
 
 
@@ -186,7 +193,7 @@ def extract_subtitles(data):
 
 
 if __name__ == '__main__':
-    loading_data(filename='比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf')
+    loading_data(filename='比亚迪股份有限公司 2023年第三季度报告（2023-10-30）.pdf')
     # title_tree = [tree_to_dict(node) for node in title_tree]
     # merge_tree = merge_nodes(title_tree)
     #
