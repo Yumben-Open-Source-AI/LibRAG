@@ -3,7 +3,6 @@ import re
 from collections import deque
 import os
 
-from llm.deepseek import DeepSeek
 from llm.qwen import Qwen
 from docx.document import Document
 from docx.oxml.table import CT_Tbl
@@ -193,7 +192,7 @@ def extract_subtitles(data):
 
 
 if __name__ == '__main__':
-    loading_data(filename='比亚迪股份有限公司 2023年第三季度报告（2023-10-30）.pdf')
+    loading_data(filename='重庆长安汽车股份有限公司2023年第三季度报告.pdf')
     # title_tree = [tree_to_dict(node) for node in title_tree]
     # merge_tree = merge_nodes(title_tree)
     #

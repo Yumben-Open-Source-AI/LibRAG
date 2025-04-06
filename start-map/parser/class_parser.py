@@ -104,7 +104,7 @@ class CategoryParser(BaseParser):
         """
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
-        with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
+        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
             categories = json.load(f)
 
         for category in categories:
@@ -119,15 +119,15 @@ class CategoryParser(BaseParser):
     def storage_parser_data(self):
         if self.new_classification == 'true':
             del self.category['new_classification']
-            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 data.append(self.category)
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'w+', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\category_info.json', 'w+', encoding='utf-8') as f:
                 f.write(json.dumps(data, ensure_ascii=False))
         else:
             del self.category['new_classification']
-            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\category_info.json', 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
             for cla in data:
@@ -135,5 +135,5 @@ class CategoryParser(BaseParser):
                     cla['documents'] = self.category['documents']
                     cla['metadata'] = self.category['metadata']
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\category_info.json', 'w+', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\category_info.json', 'w+', encoding='utf-8') as f:
                 f.write(json.dumps(data, ensure_ascii=False))

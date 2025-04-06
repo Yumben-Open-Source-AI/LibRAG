@@ -86,11 +86,11 @@ class DocumentParser(BaseParser):
         return document_content
 
     def storage_parser_data(self):
-        with open(r'D:\xqm\python\project\llm\start-map\data\document_info.json', 'r', encoding='utf-8') as f:
+        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\document_info.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
             data.append(self.document)
 
-        with open(r'D:\xqm\python\project\llm\start-map\data\document_info.json', 'w+', encoding='utf-8') as f:
+        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\document_info.json', 'w+', encoding='utf-8') as f:
             f.write(json.dumps(data, ensure_ascii=False))
 
     def back_fill_parent(self, parent):

@@ -80,14 +80,12 @@ class DomainParser(BaseParser):
         }
         content = Template(DOMAIN_PARSE_USER_MESSAGES[0]['content'])
         DOMAIN_PARSE_USER_MESSAGES[0]['content'] = content.substitute(cla=str(parse_params))
-        print(DOMAIN_PARSE_USER_MESSAGES[0]['content'])
         self.domain = self.llm.chat(DOMAIN_PARSE_SYSTEM_MESSAGES + DOMAIN_PARSE_USER_MESSAGES)[0]
-        print(self.domain)
         # llm judgments this document is not an added domain
         if self.domain['new_domain'] == 'false':
             sub_categories = self.domain_cla_dic[self.domain['domain_name']]
-            # TODO 唯一性校验
-            sub_categories.append(class_id)
+            if not any(class_id == category for category in sub_categories):
+                sub_categories.append(class_id)
             self.domain['sub_categories'] = sub_categories
         else:
             self.domain['domain_id'] = str(uuid.uuid4())
@@ -101,7 +99,7 @@ class DomainParser(BaseParser):
         """
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
-        with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r', encoding='utf-8') as f:
+        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'r', encoding='utf-8') as f:
             domains = json.load(f)
 
         for domain in domains:
@@ -117,16 +115,19 @@ class DomainParser(BaseParser):
         if self.new_domain == 'true':
             del self.domain['new_domain']
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'r',
+                      encoding='utf-8') as f:
                 data = json.load(f)
                 data.append(self.domain)
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'w+', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'w+',
+                      encoding='utf-8') as f:
                 f.write(json.dumps(data, ensure_ascii=False))
         else:
             del self.domain['new_domain']
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'r',
+                      encoding='utf-8') as f:
                 domains = json.load(f)
 
             for domain in domains:
@@ -134,7 +135,8 @@ class DomainParser(BaseParser):
                     domain['sub_categories'] = self.domain['sub_categories']
                     domain['metadata'] = self.domain['metadata']
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'w+', encoding='utf-8') as f:
+            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'w+',
+                      encoding='utf-8') as f:
                 f.write(json.dumps(domains, ensure_ascii=False))
 
     def back_fill_parent(self, parent):
