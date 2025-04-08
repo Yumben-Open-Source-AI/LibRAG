@@ -99,6 +99,8 @@ class ParagraphParser(BaseParser):
         file_path = kwargs.get('path')
         if file_path.endswith('.pdf'):
             return self.pdf_parse(file_path)
+        elif file_path.endswith('.docx'):
+            ...
 
     def storage_parser_data(self):
         with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\paragraph_info.json', 'r', encoding='utf-8') as f:
