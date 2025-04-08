@@ -71,6 +71,9 @@ class ParagraphParser(BaseParser):
         self.llm = llm
         self.paragraphs = []
 
+    def pdf_parse(self):
+        ...
+
     def parse(self, **kwargs):
         file_path = kwargs.get('path')
         doc = fitz.open(file_path)
@@ -101,7 +104,8 @@ class ParagraphParser(BaseParser):
             data = json.load(f)
             data.extend(self.paragraphs)
 
-        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\paragraph_info.json', 'w+', encoding='utf-8') as f:
+        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\paragraph_info.json', 'w+',
+                  encoding='utf-8') as f:
             f.write(json.dumps(data, ensure_ascii=False))
 
     def back_fill_parent(self, parent):

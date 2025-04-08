@@ -1,6 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
-from web_server.routers.online_router import router as query_router
+from web_server.routers.ai_router import router as query_router
 
 app = FastAPI()
 app.include_router(query_router)
