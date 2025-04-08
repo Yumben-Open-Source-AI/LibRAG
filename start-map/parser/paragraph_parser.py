@@ -71,11 +71,7 @@ class ParagraphParser(BaseParser):
         self.llm = llm
         self.paragraphs = []
 
-    def pdf_parse(self):
-        ...
-
-    def parse(self, **kwargs):
-        file_path = kwargs.get('path')
+    def pdf_parse(self, file_path):
         doc = fitz.open(file_path)
         all_paragraphs = []
         page_count = 1
@@ -98,6 +94,11 @@ class ParagraphParser(BaseParser):
         # deepcopy
         self.paragraphs = copy.deepcopy(all_paragraphs)
         return all_paragraphs
+
+    def parse(self, **kwargs):
+        file_path = kwargs.get('path')
+        if file_path.endswith('.pdf'):
+            return self.pdf_parse(file_path)
 
     def storage_parser_data(self):
         with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\paragraph_info.json', 'r', encoding='utf-8') as f:
