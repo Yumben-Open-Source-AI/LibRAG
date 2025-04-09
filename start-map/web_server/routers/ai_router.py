@@ -4,6 +4,7 @@ import re
 from collections import deque
 import os
 
+# from llm.deepseek import DeepSeek
 from llm.qwen import Qwen
 from fastapi import APIRouter
 from docx.document import Document
@@ -55,7 +56,7 @@ async def get_meta_data(meta_type: str):
     return data
 
 
-def loading_data(filename: str, base_dir: str = '../../files/'):
+def loading_data(filename: str, base_dir: str = r"D:\WeChat Files\wxid_fohbbc6swku621\FileStorage\File\2025-04\公开文件和公告\\"):
     # TODO feat config system
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
     os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
@@ -231,7 +232,14 @@ def extract_subtitles(data):
 
 
 if __name__ == '__main__':
-    loading_data(filename='大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.pdf')
+    loading_data(filename='贵阳农村商业银行股份有限公司关于完成注册资本工商变更登记的公告.pdf')
+    # file_path = r'D:\WeChat Files\wxid_fohbbc6swku621\FileStorage\File\2025-04\公开文件和公告\贵阳农村商业银行股份有限公司2024年二季度一般关联交易信息披露报告（披露）.pdf'
+    # import fitz
+    # doc = fitz.open(file_path)
+    # print(doc)
+    #
+    # for page in doc:
+    #     print(page.get_text())
     # import docx
     # doc = docx.Document(
     #     r'F:\Python\Project\LLM\llm_star_map\start-map\files\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.doc')
