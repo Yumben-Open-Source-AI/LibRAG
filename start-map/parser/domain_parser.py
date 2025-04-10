@@ -46,6 +46,8 @@ DOMAIN_PARSE_SYSTEM_MESSAGES = [
                 "new_domain": 'true'/'false' #是否为新领域
             }
             ```
+            Warning:
+            -输出不要增加额外字段，严格按照Example Output结构输出。
         """
     }
 ]
@@ -53,7 +55,7 @@ DOMAIN_PARSE_SYSTEM_MESSAGES = [
 DOMAIN_PARSE_USER_MESSAGES = [
     {
         'role': 'user',
-        'content': """读取分类信息，使用中文生成此分类所属的领域以及领域描述，最终按照Example Output样例生成完整json格式数据```<分类信息:<$cla>>```"""
+        'content': """读取文档，使用中文生成或选择此分类所属的领域以及领域描述，最终按照Example Output样例生成完整json格式数据```<分类信息:<$cla>>```"""
     }
 ]
 
@@ -99,7 +101,7 @@ class DomainParser(BaseParser):
         """
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
-        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'r', encoding='utf-8') as f:
+        with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r', encoding='utf-8') as f:
             domains = json.load(f)
 
         for domain in domains:
@@ -115,18 +117,18 @@ class DomainParser(BaseParser):
         if self.new_domain == 'true':
             del self.domain['new_domain']
 
-            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'r',
+            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r',
                       encoding='utf-8') as f:
                 data = json.load(f)
                 data.append(self.domain)
 
-            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'w+',
+            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'w+',
                       encoding='utf-8') as f:
                 f.write(json.dumps(data, ensure_ascii=False))
         else:
             del self.domain['new_domain']
 
-            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'r',
+            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r',
                       encoding='utf-8') as f:
                 domains = json.load(f)
 
@@ -135,7 +137,7 @@ class DomainParser(BaseParser):
                     domain['sub_categories'] = self.domain['sub_categories']
                     domain['metadata'] = self.domain['metadata']
 
-            with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\domain_info.json', 'w+',
+            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'w+',
                       encoding='utf-8') as f:
                 f.write(json.dumps(domains, ensure_ascii=False))
 

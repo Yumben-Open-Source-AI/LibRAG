@@ -5,9 +5,8 @@ import fitz
 import datetime
 from llm.base import BaseLLM
 from parser.base import BaseParser
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-PARAGRAPH_PARSE_SYSTEM_MESSAGES = [
+PARAGRAPH_PARSE_MESSAGES = [
     {
         'role': 'system',
         'content': """
@@ -52,16 +51,73 @@ PARAGRAPH_PARSE_SYSTEM_MESSAGES = [
             Warning:
             -summary必须列出所有指标字段，禁止使用```等```字眼省略指标项，但不需要数值数据。
             -content必须列出所有指标及数值数据，不能省略。  
+            -输出不要增加额外字段，严格按照Example Output结构输出。
         """
-    }
-]
-
-PARAGRAPH_PARSE_USER_MESSAGES = [
+    },
     {
         'role': 'user',
         'content': """
             读取文档，使用中文生成这段文本的描述以及总结，最终按照Example Output样例生成完整json格式数据
         """
+    }
+]
+
+PARAGRAPH_JUDGE_MESSAGES = [
+    {
+        'role': 'system',
+        'content': """
+            # Role: 跨页文档连续性判别助手
+            
+            ## Profile
+            - **Author**: LangGPT  
+            - **Version**: 1.0  
+            - **Language**: 中文 / 英文  
+            - **Description**: 你是一位专业的跨页文档解析助手，负责基于内容功能块的变化来判断跨页文本是否连续。哪怕文本围绕同一主体对象（如同一家公司），只要内容功能块发生变化（如从“战略创新”切换到“公司治理”），也需准确识别并判定为不连续。
+            
+            ## Skills
+            1. 深度理解文档内容，精准识别文本功能/话题块。  
+            2. 忽略主体对象的一致性（同公司或同人），专注于内容功能块的变化。  
+            3. 仅依据内容块的功能划分来判断连续性。  
+            4. 输出简洁、结构化的连续性判断结果。
+            
+            ## Background
+            在长篇文档中，哪怕内容都与同一家公司相关，也可能在不同部分呈现截然不同的功能块（例如：公司概述、战略创新、公司治理、荣誉奖项等）。一旦前后页面功能块不同，即可判定为不连续。
+            
+            ## Goals
+            1. 严格基于内容块 / 功能块的变化来判断页面间的连续性。  
+            2. 忽略是否属于同一主体，只关注内容在功能和逻辑上的划分。  
+            3. 提供明确且结构化的输出结果，以支持后续文档处理流程。
+            
+            ## Rules
+            1. **理解文本内容**，并识别功能或话题变化。  
+            2. 如果上一页与当前页属于同一功能块：  
+                - 若上一页结尾内容尚未结束、当前页顺势衔接，为 **full_continuation**。  
+                - 若上一页已完整阐述一个小结，当前页在同一功能块下继续展开，为 **partial_continuation**。  
+                - 以上两种情形下，`is_continuous` 均为 **true**。  
+            3. 如果当前页开始了新的功能块或话题（如从“公司战略”切换到“公司治理”），则 `is_continuous` 为 **false**，并判定为 **independent**。  
+            4. 标题变化可作为参考线索，但最终判断需结合内容块的实际变化。  
+            5. 解释部分力求简明扼要，概括出主要依据。
+            
+            ## Workflows
+            1. **输入**：上一页（`previous_page_text`）与当前页（`current_page_text`）文本内容。  
+            2. **识别**：深入理解两段文本所属的功能块或话题类型。  
+            3. **判定**：若两页功能块相同 → `is_continuous` = true；否则 → `is_continuous` = false。  
+                - **true** → 根据内容连贯程度判定为 `full_continuation` 或 `partial_continuation`。  
+                - **false** → 判定为 `independent`。  
+            4. **输出**：返回 JSON 格式结果，包含 `is_continuous`、`continuity_type`、`explanation` 三个字段。
+            
+            ## Example Output
+            ```json
+            {
+               "is_continuous": "true" or "false",
+               "continuity_type": "full_continuation" | "partial_continuation" | "independent",
+               "explanation": "简要说明本次判定的主要逻辑，如话题是否连续、段落是否承接等。"
+            }
+            ```
+            """
+    },
+    {
+        'role': 'user'
     }
 ]
 
@@ -74,24 +130,38 @@ class ParagraphParser(BaseParser):
     def pdf_parse(self, file_path):
         doc = fitz.open(file_path)
         all_paragraphs = []
-        page_count = 1
-        with ThreadPoolExecutor(max_workers=25) as executor:
-            tasks_page = []
-            for page in doc:
-                doc_markdown = page.get_text()
-                user_message = copy.deepcopy(PARAGRAPH_PARSE_USER_MESSAGES)
-                user_message[0]['content'] += f"```<当前页:{page_count}, 段落原文:{doc_markdown}>```"
-                task = executor.submit(self.llm.chat, PARAGRAPH_PARSE_SYSTEM_MESSAGES + user_message)
-                tasks_page.append(task)
-                page_count += 1
+        index = 0
+        page_contents = [page.get_text() for page in doc.pages()]
 
-            for task in as_completed(tasks_page):
-                paragraph_content = task.result()[0]
-                paragraph_content['paragraph_id'] = str(uuid.uuid4())
-                paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                all_paragraphs.append(paragraph_content)
+        # 上下文连贯判断
+        while index < len(page_contents):
+            cur_index = index
+            previous_page_text = page_contents[index]
+            next_index = index + 1
+            while next_index < len(page_contents):
+                current_page_text = page_contents[next_index]
+                user_content = f'previous_page_text:{previous_page_text}\n current_page_text:{current_page_text}'
+                PARAGRAPH_JUDGE_MESSAGES[1]['content'] = user_content
+                judge_result = self.llm.chat(PARAGRAPH_JUDGE_MESSAGES)[0]
+                print(judge_result)
+                if judge_result['is_continuous'] == 'false':
+                    index = next_index
+                    break
 
-        # deepcopy
+                previous_page_text += current_page_text
+                next_index += 1
+
+            parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
+            parse_messages[1]['content'] += f"```<当前:{cur_index}至{next_index}页, 段落原文:{previous_page_text}>```"
+            paragraph_content = self.llm.chat(parse_messages)[0]
+            paragraph_content['paragraph_id'] = str(uuid.uuid4())
+            paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            print(paragraph_content)
+            all_paragraphs.append(paragraph_content)
+            # 截止文件尾部
+            if next_index == len(page_contents):
+                break
+
         self.paragraphs = copy.deepcopy(all_paragraphs)
         return all_paragraphs
 
@@ -103,11 +173,11 @@ class ParagraphParser(BaseParser):
             ...
 
     def storage_parser_data(self):
-        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\paragraph_info.json', 'r', encoding='utf-8') as f:
+        with open(r'D:\xqm\python\project\llm\start-map\data\paragraph_info.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
             data.extend(self.paragraphs)
 
-        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\paragraph_info.json', 'w+',
+        with open(r'D:\xqm\python\project\llm\start-map\data\paragraph_info.json', 'w+',
                   encoding='utf-8') as f:
             f.write(json.dumps(data, ensure_ascii=False))
 

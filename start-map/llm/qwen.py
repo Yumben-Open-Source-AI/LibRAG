@@ -21,7 +21,8 @@ class Qwen(BaseLLM):
     def chat(self, messages: List[Dict]):
         completion = self.client.chat.completions.create(
             model=self.model,
-            messages=messages
+            messages=messages,
+            temperature=0.7
         )
         content = completion.choices[0].message.content
         usage_token = completion.usage.total_tokens

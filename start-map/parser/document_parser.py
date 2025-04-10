@@ -46,6 +46,7 @@ DOCUMENT_PARSE_SYSTEM_MESSAGES = [
             ```
             Warning:
             -description禁止使用```等```字眼省略指标项，但不需要数值数据。
+            -输出不要增加额外字段，严格按照Example Output结构输出。
         """
     }
 ]
@@ -77,6 +78,7 @@ class DocumentParser(BaseParser):
             del paragraph['metadata']
             paragraph_ids.append(paragraph['paragraph_id'])
         content = Template(DOCUMENT_PARSE_USER_MESSAGES[0]['content'])
+        print(paragraphs)
         DOCUMENT_PARSE_USER_MESSAGES[0]['content'] = content.substitute(paragraphs=paragraphs, path=path)
         document_content = self.llm.chat(DOCUMENT_PARSE_SYSTEM_MESSAGES + DOCUMENT_PARSE_USER_MESSAGES)[0]
         document_content['document_id'] = str(uuid.uuid4())
@@ -86,11 +88,11 @@ class DocumentParser(BaseParser):
         return document_content
 
     def storage_parser_data(self):
-        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\document_info.json', 'r', encoding='utf-8') as f:
+        with open(r'D:\xqm\python\project\llm\start-map\data\document_info.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
             data.append(self.document)
 
-        with open(r'F:\Python\Project\LLM\llm_star_map\start-map\data\document_info.json', 'w+', encoding='utf-8') as f:
+        with open(r'D:\xqm\python\project\llm\start-map\data\document_info.json', 'w+', encoding='utf-8') as f:
             f.write(json.dumps(data, ensure_ascii=False))
 
     def back_fill_parent(self, parent):

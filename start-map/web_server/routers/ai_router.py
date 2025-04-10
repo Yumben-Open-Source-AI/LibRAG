@@ -4,6 +4,9 @@ import re
 from collections import deque
 import os
 
+import fitz
+
+from llm.deepseek import DeepSeek
 # from llm.deepseek import DeepSeek
 from llm.qwen import Qwen
 from fastapi import APIRouter
@@ -40,7 +43,8 @@ async def query_with_llm(question: str):
 
 @router.get('/meta_data')
 async def get_meta_data(meta_type: str):
-    base_dir = r'F:\Python\Project\LLM\llm_star_map\start-map\data'
+    data = []
+    base_dir = r'D:\xqm\python\project\llm\start-map\data'
     all_parser = {
         'paragraph': 'paragraph_info.json',
         'document': 'document_info.json',
@@ -50,18 +54,19 @@ async def get_meta_data(meta_type: str):
     if meta_type in all_parser:
         file_name = all_parser[meta_type]
         file_path = os.path.join(base_dir, file_name)
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
     return data
 
 
-def loading_data(filename: str, base_dir: str = r"D:\WeChat Files\wxid_fohbbc6swku621\FileStorage\File\2025-04\公开文件和公告\\"):
+def loading_data(filename: str, base_dir: str = '../../files/公开文件和公告/'):
     # TODO feat config system
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
     os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 
     file_path = os.path.join(base_dir, filename)
+    deepseek = DeepSeek()
     qwen = Qwen()
 
     par_parser = ParagraphParser(qwen)
@@ -70,45 +75,45 @@ def loading_data(filename: str, base_dir: str = r"D:\WeChat Files\wxid_fohbbc6sw
     }
     all_paragraphs = par_parser.parse(**paragraph_params)
 
-    doc_parser = DocumentParser(qwen)
-    document_params = {
-        'paragraphs': all_paragraphs,
-        'path': file_path
-    }
-    document = doc_parser.parse(**document_params)
-    print('document', document)
-
-    # back fill paragraph parent data
-    par_parser.back_fill_parent(document)
-    par_parser.storage_parser_data()
-
-    category_parser = CategoryParser(qwen)
-    category_params = {
-        'document': document,
-    }
-    category = category_parser.parse(**category_params)
-    print('category', category)
-
-    # back fill document parent data
-    doc_parser.back_fill_parent(category)
-    doc_parser.storage_parser_data()
-
-    domain_parser = DomainParser(Qwen())
-    domain_params = {
-        'cla': category
-    }
-    domain = domain_parser.parse(**domain_params)
-    print('domain', domain)
-
-    # back fill category parent data
-    if category_parser.new_classification == 'true':
-        category_parser.back_fill_parent(domain)
-    category_parser.storage_parser_data()
-
-    # back fill domain parent data
-    if domain_parser.new_domain == 'true':
-        domain_parser.back_fill_parent(None)
-    domain_parser.storage_parser_data()
+    # doc_parser = DocumentParser(qwen)
+    # document_params = {
+    #     'paragraphs': all_paragraphs,
+    #     'path': file_path
+    # }
+    # document = doc_parser.parse(**document_params)
+    # print('document', document)
+    #
+    # # back fill paragraph parent data
+    # par_parser.back_fill_parent(document)
+    # par_parser.storage_parser_data()
+    #
+    # category_parser = CategoryParser(qwen)
+    # category_params = {
+    #     'document': document,
+    # }
+    # category = category_parser.parse(**category_params)
+    # print('category', category)
+    #
+    # # back fill document parent data
+    # doc_parser.back_fill_parent(category)
+    # doc_parser.storage_parser_data()
+    #
+    # domain_parser = DomainParser(Qwen())
+    # domain_params = {
+    #     'cla': category
+    # }
+    # domain = domain_parser.parse(**domain_params)
+    # print('domain', domain)
+    #
+    # # back fill category parent data
+    # if category_parser.new_classification == 'true':
+    #     category_parser.back_fill_parent(domain)
+    # category_parser.storage_parser_data()
+    #
+    # # back fill domain parent data
+    # if domain_parser.new_domain == 'true':
+    #     domain_parser.back_fill_parent(None)
+    # domain_parser.storage_parser_data()
 
 
 class TitleNode:
@@ -162,33 +167,33 @@ def tree_to_dict(tree: TitleNode):
 def read_word():
     import docx
     doc = docx.Document(
-        r'C:\Users\Xman\Downloads\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.docx')
-    # root = TitleNode("ROOT", level=-1)
-    # stack = deque([root])
+        r'C:\Users\yumben\Documents\WeChat Files\wxid_fohbbc6swku621\FileStorage\File\2025-04\贵阳农商银行超值宝3年28期理财产品2024年年度报告.docx')
+    root = TitleNode("ROOT", level=-1)
+    stack = deque([root])
     doc_str = ''
 
     for block in iter_block_items(doc):
         if isinstance(block, Paragraph):
-            # xml = block._p.xml
-            # title = block.text
-            # # get title rank
-            # if xml.find('<w:outlineLvl') > 0:
-            #     start_index = xml.find('<w:outlineLvl')
-            #     end_index = xml.find('>', start_index)
-            #     outline_xml = xml[start_index:end_index + 1]
-            #     outline_value = int(re.search("\d+", outline_xml).group())
-            #
-            #     if outline_value <= 0:
-            #         continue
-            #     new_node = TitleNode(title, level=outline_value)
-            #     while stack[-1].level >= outline_value:
-            #         stack.pop()
-            #     stack[-1].children.append(new_node)
-            #     stack.append(new_node)
+            xml = block._p.xml
+            title = block.text
+            # get title rank
+            if xml.find('<w:outlineLvl') > 0:
+                start_index = xml.find('<w:outlineLvl')
+                end_index = xml.find('>', start_index)
+                outline_xml = xml[start_index:end_index + 1]
+                outline_value = int(re.search("\d+", outline_xml).group())
+
+                if outline_value <= 0:
+                    continue
+                new_node = TitleNode(title, level=outline_value)
+                while stack[-1].level >= outline_value:
+                    stack.pop()
+                stack[-1].children.append(new_node)
+                stack.append(new_node)
             doc_str += block.text
         elif isinstance(block, Table):
             doc_str += read_table(block)
-    return root.children, doc_str
+    return root, doc_str
 
 
 def merge_nodes(nodes):
@@ -232,20 +237,6 @@ def extract_subtitles(data):
 
 
 if __name__ == '__main__':
-    loading_data(filename='贵阳农村商业银行股份有限公司关于完成注册资本工商变更登记的公告.pdf')
-    # file_path = r'D:\WeChat Files\wxid_fohbbc6swku621\FileStorage\File\2025-04\公开文件和公告\贵阳农村商业银行股份有限公司2024年二季度一般关联交易信息披露报告（披露）.pdf'
-    # import fitz
-    # doc = fitz.open(file_path)
-    # print(doc)
-    #
-    # for page in doc:
-    #     print(page.get_text())
-    # import docx
-    # doc = docx.Document(
-    #     r'F:\Python\Project\LLM\llm_star_map\start-map\files\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.doc')
-    #
-    # print(len(doc.sections))
-    # title_tree = [tree_to_dict(node) for node in title_tree]
-    # merge_tree = merge_nodes(title_tree)
-    #
-    # print(extract_subtitles(merge_tree))
+    loading_data(filename='贵阳农村商业银行股份有限公司2022年度社会责任报告.pdf')
+    # for file in os.listdir(r'D:\xqm\python\project\llm\start-map\files\公开文件和公告'):
+    #     print(file)

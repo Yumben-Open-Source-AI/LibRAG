@@ -5,7 +5,7 @@ from llm.base import BaseLLM
 
 
 class DeepSeek(BaseLLM):
-    def __init__(self, model='deepseek-r1-distill-qwen-32b', **kwargs):
+    def __init__(self, model='deepseek-r1-distill-llama-70b', **kwargs):
         """
         Initialize the large language model client and parameters
         :param model: Qwen model
@@ -22,6 +22,11 @@ class DeepSeek(BaseLLM):
         completion = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
+            temperature=0.7,
+            timeout=120000
         )
+        content = completion.choices[0].message.content
+        usage_token = completion.usage.total_tokens
+        content = self.literal_eval(content)
 
-        return completion.choices[0].message.content, completion.usage.total_tokens
+        return content, usage_token
