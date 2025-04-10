@@ -7,7 +7,6 @@ import os
 import fitz
 
 from llm.deepseek import DeepSeek
-# from llm.deepseek import DeepSeek
 from llm.qwen import Qwen
 from fastapi import APIRouter
 from docx.document import Document
@@ -30,8 +29,6 @@ from selector.paragraph_selector import ParagraphSelector
 
 @router.get('/query')
 async def query_with_llm(question: str):
-    os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
-
     qwen = Qwen()
     document_selector = DocumentSelector(qwen)
     selected_documents = document_selector.collate_select_params().start_select(question)
@@ -44,7 +41,8 @@ async def query_with_llm(question: str):
 @router.get('/meta_data')
 async def get_meta_data(meta_type: str):
     data = []
-    base_dir = r'D:\xqm\python\project\llm\start-map\data'
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data'))
+
     all_parser = {
         'paragraph': 'paragraph_info.json',
         'document': 'document_info.json',
@@ -60,11 +58,47 @@ async def get_meta_data(meta_type: str):
     return data
 
 
-def loading_data(filename: str, base_dir: str = '../../files/公开文件和公告/'):
-    # TODO feat config system
-    os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
-    os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+@router.get('/rebuild')
+async def rebuild_data():
+    """
+    重建domain领域以及category分类索引
+    """
+    deepseek = Qwen()
 
+    documents = await get_meta_data(meta_type='document')
+    for document in documents:
+        doc_parser = DocumentParser(deepseek)
+        doc_parser.document = document
+        category_parser = CategoryParser(deepseek)
+        category_params = {
+            'document': document,
+        }
+        category = category_parser.parse(**category_params)
+        print('category', category)
+
+        # back fill document parent data
+        doc_parser.back_fill_parent(category, True)
+        doc_parser.storage_parser_data()
+
+        domain_parser = DomainParser(Qwen())
+        domain_params = {
+            'cla': category
+        }
+        domain = domain_parser.parse(**domain_params)
+        print('domain', domain)
+
+        # back fill category parent data
+        if category_parser.new_classification == 'true':
+            category_parser.back_fill_parent(domain)
+        category_parser.storage_parser_data()
+
+        # back fill domain parent data
+        if domain_parser.new_domain == 'true':
+            domain_parser.back_fill_parent(None)
+        domain_parser.storage_parser_data()
+
+
+def loading_data(filename: str, base_dir: str = '../../files/公开文件和公告/'):
     file_path = os.path.join(base_dir, filename)
     deepseek = DeepSeek()
     qwen = Qwen()

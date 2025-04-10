@@ -1,11 +1,13 @@
+import copy
 import json
+import os
 import uuid
 import datetime
 from string import Template
 from llm.base import BaseLLM
 from parser.base import BaseParser
 
-DOMAIN_PARSE_SYSTEM_MESSAGES = [
+DOMAIN_PARSE_MESSAGES = [
     {
         'role': 'system',
         'content': """
@@ -49,10 +51,7 @@ DOMAIN_PARSE_SYSTEM_MESSAGES = [
             Warning:
             -输出不要增加额外字段，严格按照Example Output结构输出。
         """
-    }
-]
-
-DOMAIN_PARSE_USER_MESSAGES = [
+    },
     {
         'role': 'user',
         'content': """读取文档，使用中文生成或选择此分类所属的领域以及领域描述，最终按照Example Output样例生成完整json格式数据```<分类信息:<$cla>>```"""
@@ -67,22 +66,22 @@ class DomainParser(BaseParser):
         self.known_domains = []
         self.domain_cla_dic = {}
         self.new_domain = 'true'
+        self.save_path = os.path.join(self.base_path, 'domain_info.json')
 
     def parse(self, **kwargs):
         cla = kwargs.get('cla')
         class_name = cla['category_name']
         class_id = cla['category_id']
         description = cla['description']
-        self.known_domains = self.__get_known_domains()
-        print(self.known_domains)
         parse_params = {
             'class_name': class_name,
             'description': description,
-            'known_domains': self.known_domains
+            'known_domains': self.__get_known_domains()
         }
-        content = Template(DOMAIN_PARSE_USER_MESSAGES[0]['content'])
-        DOMAIN_PARSE_USER_MESSAGES[0]['content'] = content.substitute(cla=str(parse_params))
-        self.domain = self.llm.chat(DOMAIN_PARSE_SYSTEM_MESSAGES + DOMAIN_PARSE_USER_MESSAGES)[0]
+        parse_messages = copy.deepcopy(DOMAIN_PARSE_MESSAGES)
+        content = Template(parse_messages[1]['content'])
+        parse_messages[1]['content'] = content.substitute(cla=str(parse_params))
+        self.domain = self.llm.chat(parse_messages)[0]
         # llm judgments this document is not an added domain
         if self.domain['new_domain'] == 'false':
             sub_categories = self.domain_cla_dic[self.domain['domain_name']]
@@ -101,7 +100,7 @@ class DomainParser(BaseParser):
         """
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
-        with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r', encoding='utf-8') as f:
+        with open(self.save_path, 'r', encoding='utf-8') as f:
             domains = json.load(f)
 
         for domain in domains:
@@ -117,19 +116,16 @@ class DomainParser(BaseParser):
         if self.new_domain == 'true':
             del self.domain['new_domain']
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r',
-                      encoding='utf-8') as f:
+            with open(self.save_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 data.append(self.domain)
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'w+',
-                      encoding='utf-8') as f:
+            with open(self.save_path, 'w+', encoding='utf-8') as f:
                 f.write(json.dumps(data, ensure_ascii=False))
         else:
             del self.domain['new_domain']
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'r',
-                      encoding='utf-8') as f:
+            with open(self.save_path, 'r', encoding='utf-8') as f:
                 domains = json.load(f)
 
             for domain in domains:
@@ -137,8 +133,7 @@ class DomainParser(BaseParser):
                     domain['sub_categories'] = self.domain['sub_categories']
                     domain['metadata'] = self.domain['metadata']
 
-            with open(r'D:\xqm\python\project\llm\start-map\data\domain_info.json', 'w+',
-                      encoding='utf-8') as f:
+            with open(self.save_path, 'w+', encoding='utf-8') as f:
                 f.write(json.dumps(domains, ensure_ascii=False))
 
     def back_fill_parent(self, parent):

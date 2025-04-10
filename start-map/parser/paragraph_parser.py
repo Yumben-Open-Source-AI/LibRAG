@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import uuid
 import fitz
 import datetime
@@ -126,6 +127,7 @@ class ParagraphParser(BaseParser):
     def __init__(self, llm: BaseLLM):
         self.llm = llm
         self.paragraphs = []
+        self.save_path = os.path.join(self.base_path, 'paragraph.json')
 
     def pdf_parse(self, file_path):
         doc = fitz.open(file_path)
@@ -173,11 +175,11 @@ class ParagraphParser(BaseParser):
             ...
 
     def storage_parser_data(self):
-        with open(r'D:\xqm\python\project\llm\start-map\data\paragraph_info.json', 'r', encoding='utf-8') as f:
+        with open(self.save_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             data.extend(self.paragraphs)
 
-        with open(r'D:\xqm\python\project\llm\start-map\data\paragraph_info.json', 'w+',
+        with open(self.save_path, 'w+',
                   encoding='utf-8') as f:
             f.write(json.dumps(data, ensure_ascii=False))
 
