@@ -28,6 +28,7 @@ PARAGRAPH_PARSE_MESSAGES = [
             Rules
             - 描述与总结不能省略内容。
             - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx第xxx页的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
+            - summary必须声明页码和段落类型这两个属性。
             - 每个content至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
             - 严格生成结构化不带有转义的JSON数据的总结及描述。
             - 总结和描述仅使用文本格式呈现。
@@ -50,7 +51,7 @@ PARAGRAPH_PARSE_MESSAGES = [
             }
             ```
             Warning:
-            -summary必须列出所有指标字段，禁止使用```等```字眼省略指标项，但不需要数值数据。
+            -summary必须列出所有指标字段包括页码说明，禁止使用```等```字眼省略指标项，但不需要数值数据。
             -content必须列出所有指标及数值数据，不能省略。  
             -输出不要增加额外字段，严格按照Example Output结构输出。
         """
@@ -62,33 +63,32 @@ PARAGRAPH_PARSE_MESSAGES = [
         """
     }
 ]
-
 PARAGRAPH_JUDGE_MESSAGES = [
     {
         'role': 'system',
         'content': """
             # Role: 跨页文档连续性判别助手
-            
+
             ## Profile
             - **Author**: LangGPT  
             - **Version**: 1.0  
             - **Language**: 中文 / 英文  
             - **Description**: 你是一位专业的跨页文档解析助手，负责基于内容功能块的变化来判断跨页文本是否连续。哪怕文本围绕同一主体对象（如同一家公司），只要内容功能块发生变化（如从“战略创新”切换到“公司治理”），也需准确识别并判定为不连续。
-            
+
             ## Skills
             1. 深度理解文档内容，精准识别文本功能/话题块。  
             2. 忽略主体对象的一致性（同公司或同人），专注于内容功能块的变化。  
             3. 仅依据内容块的功能划分来判断连续性。  
             4. 输出简洁、结构化的连续性判断结果。
-            
+
             ## Background
             在长篇文档中，哪怕内容都与同一家公司相关，也可能在不同部分呈现截然不同的功能块（例如：公司概述、战略创新、公司治理、荣誉奖项等）。一旦前后页面功能块不同，即可判定为不连续。
-            
+
             ## Goals
             1. 严格基于内容块 / 功能块的变化来判断页面间的连续性。  
             2. 忽略是否属于同一主体，只关注内容在功能和逻辑上的划分。  
             3. 提供明确且结构化的输出结果，以支持后续文档处理流程。
-            
+
             ## Rules
             1. **理解文本内容**，并识别功能或话题变化。  
             2. 如果上一页与当前页属于同一功能块：  
@@ -98,7 +98,7 @@ PARAGRAPH_JUDGE_MESSAGES = [
             3. 如果当前页开始了新的功能块或话题（如从“公司战略”切换到“公司治理”），则 `is_continuous` 为 **false**，并判定为 **independent**。  
             4. 标题变化可作为参考线索，但最终判断需结合内容块的实际变化。  
             5. 解释部分力求简明扼要，概括出主要依据。
-            
+
             ## Workflows
             1. **输入**：上一页（`previous_page_text`）与当前页（`current_page_text`）文本内容。  
             2. **识别**：深入理解两段文本所属的功能块或话题类型。  
@@ -106,7 +106,7 @@ PARAGRAPH_JUDGE_MESSAGES = [
                 - **true** → 根据内容连贯程度判定为 `full_continuation` 或 `partial_continuation`。  
                 - **false** → 判定为 `independent`。  
             4. **输出**：返回 JSON 格式结果，包含 `is_continuous`、`continuity_type`、`explanation` 三个字段。
-            
+
             ## Example Output
             ```json
             {
@@ -130,10 +130,51 @@ class ParagraphParser(BaseParser):
         self.save_path = os.path.join(self.base_path, 'paragraph.json')
 
     def pdf_parse(self, file_path):
-        doc = fitz.open(file_path)
+        pdf_content = fitz.open(file_path)
+        all_paragraphs = self.__automate_judgment_split(pdf_content)
+        self.paragraphs = copy.deepcopy(all_paragraphs)
+        return all_paragraphs
+
+    def parse(self, **kwargs):
+        file_path = kwargs.get('path')
+        if file_path.endswith('.pdf'):
+            return self.pdf_parse(file_path)
+        elif file_path.endswith('.docx'):
+            ...
+
+    def storage_parser_data(self):
+        with open(self.save_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            data.extend(self.paragraphs)
+
+        with open(self.save_path, 'w+', encoding='utf-8') as f:
+            f.write(json.dumps(data, ensure_ascii=False))
+
+    def back_fill_parent(self, parent):
+        parent_id = parent['document_id']
+        parent_description = parent['description']
+        for paragraph in self.paragraphs:
+            paragraph['parent'] = parent_id
+            paragraph['parent_description'] = f'此段落来源描述:<{parent_description}>'
+
+    def __catalog_split(self, content):
+        """
+        文本切割策略-目录
+        按照目录切割
+        场景: 目录层级不多优先
+        """
+        all_paragraphs = []
+        page_contents = '\n'.join([page.get_text() for page in content.pages()])
+
+    def __automate_judgment_split(self, content):
+        """
+        文本切割策略-轮询自动判断
+        按页轮询自主判断上下文
+        场景: 目录层级多、文件结构复杂优先
+        """
         all_paragraphs = []
         index = 0
-        page_contents = [page.get_text() for page in doc.pages()]
+        page_contents = [page.get_text() for page in content.pages()]
 
         # 上下文连贯判断
         while index < len(page_contents):
@@ -158,34 +199,8 @@ class ParagraphParser(BaseParser):
             paragraph_content = self.llm.chat(parse_messages)[0]
             paragraph_content['paragraph_id'] = str(uuid.uuid4())
             paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-            print(paragraph_content)
             all_paragraphs.append(paragraph_content)
             # 截止文件尾部
             if next_index == len(page_contents):
                 break
-
-        self.paragraphs = copy.deepcopy(all_paragraphs)
         return all_paragraphs
-
-    def parse(self, **kwargs):
-        file_path = kwargs.get('path')
-        if file_path.endswith('.pdf'):
-            return self.pdf_parse(file_path)
-        elif file_path.endswith('.docx'):
-            ...
-
-    def storage_parser_data(self):
-        with open(self.save_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            data.extend(self.paragraphs)
-
-        with open(self.save_path, 'w+',
-                  encoding='utf-8') as f:
-            f.write(json.dumps(data, ensure_ascii=False))
-
-    def back_fill_parent(self, parent):
-        parent_id = parent['document_id']
-        parent_description = parent['description']
-        for paragraph in self.paragraphs:
-            paragraph['parent'] = parent_id
-            paragraph['parent_description'] = f'此段落来源描述:<{parent_description}>'

@@ -37,6 +37,9 @@ class BaseLLM:
                 # handler json
                 if '```json' in response_content:
                     response_content = response_content[7:-3]
+                # handler markdown
+                if '```markdown' in response_content:
+                    response_content = response_content[11:-3]
 
             result = ast.literal_eval(response_content)
         except Exception as e:
