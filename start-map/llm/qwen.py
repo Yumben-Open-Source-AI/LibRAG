@@ -19,13 +19,17 @@ class Qwen(BaseLLM):
         self.client = OpenAI_(api_key=api_key, base_url=base_url, **kwargs)
 
     def chat(self, messages: List[Dict]):
-        completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.7
-        )
-        content = completion.choices[0].message.content
-        usage_token = completion.usage.total_tokens
-        content = self.literal_eval(content)
-
-        return content, usage_token
+        retries = 0
+        while retries < 3:
+            try:
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.7
+                )
+                content = completion.choices[0].message.content
+                usage_token = completion.usage.total_tokens
+                content = self.literal_eval(content)
+                return content, usage_token
+            except Exception as e:
+                retries += 1

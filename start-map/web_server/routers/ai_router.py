@@ -60,12 +60,13 @@ async def rebuild_data():
     重建domain领域以及category分类索引
     """
     deepseek = DeepSeek()
+    qwen = Qwen()
 
     documents = await get_meta_data(meta_type='document')
     for document in documents:
         doc_parser = DocumentParser(deepseek)
         doc_parser.document = document
-        category_parser = CategoryParser(deepseek)
+        category_parser = CategoryParser(qwen)
         category_params = {
             'document': document,
         }
@@ -76,7 +77,7 @@ async def rebuild_data():
         doc_parser.back_fill_parent(category, True)
         doc_parser.storage_parser_data()
 
-        domain_parser = DomainParser(Qwen())
+        domain_parser = DomainParser(qwen)
         domain_params = {
             'cla': category
         }
