@@ -33,21 +33,27 @@ class BaseLLM:
             response_content = response_content[think_id:]
 
         try:
-            if response_content.startswith('```') and response_content.endswith('```'):
+            if response_content.startswith("```") and response_content.endswith("```"):
+                # handler python
+                if response_content.startswith("```python"):
+                    response_content = response_content[9:-3]
                 # handler json
-                if '```json' in response_content:
+                elif response_content.startswith("```json"):
                     response_content = response_content[7:-3]
-                # handler markdown
-                if '```markdown' in response_content:
-                    response_content = response_content[11:-3]
-
-            result = ast.literal_eval(response_content)
+                # handler str
+                elif response_content.startswith("```str"):
+                    response_content = response_content[6:-3]
+                elif response_content.startswith("```\n"):
+                    response_content = response_content[4:-3]
+                else:
+                    raise ValueError("Invalid code block format")
+            result = ast.literal_eval(response_content.strip())
         except Exception as e:
             print(response_content)
             import re
 
-            json_match = re.findall(r"\{.*\}", response_content, re.DOTALL)
-            if len(json_match) <= 0:
+            json_match = re.findall(r'(\[.*?\]|\{.*?\})', response_content, re.DOTALL)
+            if len(json_match) != 1:
                 raise Exception('the response is invalid JSON content, please try again')
 
             result = ast.literal_eval(json_match[0])

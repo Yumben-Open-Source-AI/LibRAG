@@ -14,19 +14,6 @@
     "parent_description": null
   },
   {
-    "domain_name": "项目管理",
-    "domain_id": "01c60cbc-2b1e-4974-aac9-7bdaac601c04",
-    "description": "领域描述:涵盖与项目相关的文件，包括项目投标文件、管理方案、技术要求、实施计划等内容。",
-    "sub_categories": [
-      "9af6d6ff-2944-422e-ac93-bb4087d06cb9"
-    ],
-    "metadata": {
-      "最后更新时间": "2025-04-13 21:58:29"
-    },
-    "parent": null,
-    "parent_description": null
-  },
-  {
     "domain_name": "理财产品公告",
     "domain_id": "d7405bb2-5d8e-457b-8401-ed0723515850",
     "description": "领域描述:涵盖公司发布的理财产品相关公告，包括理财产品的基本信息、产品代码、成立日期、业绩比较基准调整、变更生效日期等内容。",
@@ -74,7 +61,7 @@
       "6b3af15d-963b-475b-8d25-9988ff3b4380"
     ],
     "metadata": {
-      "最后更新时间": "2025-04-13 22:57:26"
+      "最后更新时间": "2025-04-14 14:43:43"
     },
     "parent": null,
     "parent_description": null
@@ -87,7 +74,20 @@
       "abc7c717-fe5f-4e68-8b53-3256e1cd1641"
     ],
     "metadata": {
-      "最后更新时间": "2025-04-13 23:51:01"
+      "最后更新时间": "2025-04-14 11:42:49"
+    },
+    "parent": null,
+    "parent_description": null
+  },
+  {
+    "domain_name": "工程投标文件",
+    "domain_id": "b7c84c59-071f-4740-a986-0ced3301d634",
+    "description": "领域描述: 包括与工程项目投标相关的文件，涵盖项目信息、技术方案、报价、服务承诺等内容。",
+    "sub_categories": [
+      "2831a97e-0d1f-4800-8e72-721dfb8fe9ac"
+    ],
+    "metadata": {
+      "最后更新时间": "2025-04-14 17:56:52"
     },
     "parent": null,
     "parent_description": null

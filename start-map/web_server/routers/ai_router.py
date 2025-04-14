@@ -94,12 +94,24 @@ async def rebuild_data():
         domain_parser.storage_parser_data()
 
 
-def loading_data(filename: str, base_dir: str = '../../files/'):
+def test_loading_data(filename: str, base_dir: str = 'files/'):
     file_path = os.path.join(base_dir, filename)
     deepseek = DeepSeek()
     qwen = Qwen()
 
-    par_parser = ParagraphParser(deepseek, qwen)
+    par_parser = ParagraphParser(qwen)
+    paragraph_params = {
+        'path': file_path
+    }
+    all_paragraphs = par_parser.parse(**paragraph_params)
+    print('paragraph', all_paragraphs)
+
+
+def loading_data(filename: str, base_dir: str = '../../files/'):
+    file_path = os.path.join(base_dir, filename)
+    qwen = Qwen()
+
+    par_parser = ParagraphParser(qwen)
     paragraph_params = {
         'path': file_path
     }
@@ -118,7 +130,7 @@ def loading_data(filename: str, base_dir: str = '../../files/'):
     par_parser.back_fill_parent(document)
     par_parser.storage_parser_data()
 
-    category_parser = CategoryParser(deepseek)
+    category_parser = CategoryParser(qwen)
     category_params = {
         'document': document,
     }
@@ -129,7 +141,7 @@ def loading_data(filename: str, base_dir: str = '../../files/'):
     doc_parser.back_fill_parent(category)
     doc_parser.storage_parser_data()
 
-    domain_parser = DomainParser(deepseek)
+    domain_parser = DomainParser(qwen)
     domain_params = {
         'cla': category
     }
@@ -270,5 +282,6 @@ def extract_subtitles(data):
 if __name__ == '__main__':
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
     os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-    loading_data(filename='贵阳农村商业银行股份有限公司重大关联交易信息披露报告（2025.2.26）.pdf')
+    loading_data(filename='大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.pdf')
+
     # deepseek = DeepSeek()

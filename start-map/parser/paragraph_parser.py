@@ -97,21 +97,21 @@ PARAGRAPH_JUDGE_MESSAGES = [
             3. 提供明确且结构化的输出结果，以支持后续文档处理流程。
 
             ## Rules
-            1. **理解文本内容**，并识别功能或话题变化。  
+            1. 理解文本内容，并识别功能或话题变化。  
             2. 如果上一页与当前页属于同一功能块：  
-                - 若上一页结尾内容尚未结束、当前页顺势衔接，为 **full_continuation**。  
-                - 若上一页已完整阐述一个小结，当前页在同一功能块下继续展开，为 **partial_continuation**。  
-                - 以上两种情形下，`is_continuous` 均为 **true**。  
-            3. 如果当前页开始了新的功能块或话题（如从“公司战略”切换到“公司治理”），则 `is_continuous` 为 **false**，并判定为 **independent**。  
+                - 若上一页结尾内容尚未结束、当前页顺势衔接，为 full_continuation。  
+                - 若上一页已完整阐述一个小结，当前页在同一功能块下继续展开，为 partial_continuation。  
+                - 以上两种情形下，`is_continuous` 均为 'true'。  
+            3. 如果当前页开始了新的功能块或话题（如从“公司战略”切换到“公司治理”），则 `is_continuous` 为 'false'，并判定为 'independent'。  
             4. 标题变化可作为参考线索，但最终判断需结合内容块的实际变化。  
             5. 解释部分力求简明扼要，概括出主要依据。
 
             ## Workflows
             1. **输入**：上一页（`previous_page_text`）与当前页（`current_page_text`）文本内容。  
             2. **识别**：深入理解两段文本所属的功能块或话题类型。  
-            3. **判定**：若两页功能块相同 → `is_continuous` = true；否则 → `is_continuous` = false。  
-                - **true** → 根据内容连贯程度判定为 `full_continuation` 或 `partial_continuation`。  
-                - **false** → 判定为 `independent`。  
+            3. **判定**：若两页功能块相同 → `is_continuous` = 'true'；否则 → `is_continuous` = 'false'。  
+                - 'true' → 根据内容连贯程度判定为 `full_continuation` 或 `partial_continuation`。  
+                - 'false' → 判定为 `independent`。  
             4. **输出**：返回 JSON 格式结果，包含 `is_continuous`、`continuity_type`、`explanation` 三个字段。
 
             ## Example Output
@@ -131,10 +131,9 @@ PARAGRAPH_JUDGE_MESSAGES = [
 
 
 class ParagraphParser(BaseParser):
-    def __init__(self, llm: BaseLLM, parse_llm: BaseLLM = None):
+    def __init__(self, llm: BaseLLM):
         self.llm = llm
         self.paragraphs = []
-        self.parse_llm = parse_llm
         self.save_path = os.path.join(self.base_path, 'paragraph_info.json')
 
     def pdf_parse(self, file_path):
@@ -167,7 +166,7 @@ class ParagraphParser(BaseParser):
     def chat_parse_paragraph(self, cur_index, next_index, page_text):
         parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
         parse_messages[1]['content'] += f"```<当前:{cur_index}至{next_index}页, 段落原文:{page_text}>```"
-        paragraph_content = self.parse_llm.chat(parse_messages)[0]
+        paragraph_content = self.llm.chat(parse_messages)[0]
         paragraph_content['paragraph_id'] = str(uuid.uuid4())
         paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         return paragraph_content
@@ -245,12 +244,7 @@ class ParagraphParser(BaseParser):
 
         def preprocess_markdown_titles(markdown_titles):
             """预处理Markdown格式的标题列表，去除#符号和空格"""
-            import re
-            processed = []
-            for title in markdown_titles:
-                # 去除Markdown标题符号和前后空格
-                clean_title = re.sub(r'^#+\s*', '', title.strip())
-                processed.append(clean_title)
+            processed = markdown_titles
             return processed
 
         def split_markdown_structured_document(full_text, markdown_titles):
@@ -276,11 +270,17 @@ class ParagraphParser(BaseParser):
             # 验证标题顺序
             for i, pattern in enumerate(patterns):
                 match = re.search(pattern, full_text[last_pos:], flags=re.MULTILINE)
+                # 标题带着'#'进行初次匹配
                 if not match:
-                    expected_title = clean_titles[i]
-                    found_titles = '\n'.join(clean_titles[:i])
-                    raise ValueError(f"标题 '{expected_title}' 未找到，请确认：\n"
-                                     f"1.标题顺序是否正确\n2.是否缺少必要标题\n3.已匹配标题列表：\n{found_titles}")
+                    # 标题去掉'#'字符进行二次匹配
+                    clean_titles[i] = re.sub(r'^#+\s*', '', clean_titles[i].strip())
+                    match = re.search(re.escape(clean_titles[i]) + r'(?:。\s*|\s*\n|\Z)', full_text[last_pos:],
+                                      flags=re.MULTILINE)
+                    if not match:
+                        expected_title = clean_titles[i]
+                        found_titles = '\n'.join(clean_titles[:i])
+                        raise ValueError(f"标题 '{expected_title}' 未找到，请确认：\n"
+                                         f"1.标题顺序是否正确\n2.是否缺少必要标题\n3.已匹配标题列表：\n{found_titles}")
                 start = last_pos + match.start()
                 end = last_pos + match.end()
                 matches.append((start, end))
@@ -335,11 +335,12 @@ class ParagraphParser(BaseParser):
                 content = source_content.replace(' ', '').replace('\n', '')
                 cur_index = find_text_page(content[:20])
                 next_index = find_text_page(content[-10:]) if find_text_page(content[-10:]) != -1 else cur_index
-                if cur_index != -1 and next_index != -1:
+                if len(content) > 0:
                     print(cur_index)
                     print(next_index)
                     paragraph_content = self.chat_parse_paragraph(cur_index, next_index, source_content)
-                    all_paragraphs.append(paragraph_content)
+                    if paragraph_content:
+                        all_paragraphs.append(paragraph_content)
 
             return all_paragraphs
         except ValueError as e:
@@ -369,15 +370,17 @@ class ParagraphParser(BaseParser):
                 PARAGRAPH_JUDGE_MESSAGES[1]['content'] = user_content
                 judge_result = self.llm.chat(PARAGRAPH_JUDGE_MESSAGES)[0]
                 print(judge_result)
-                if judge_result['is_continuous'] == 'false':
+                if 'is_continuous' in judge_result and judge_result['is_continuous'] == 'false':
                     index = next_index
                     break
 
                 previous_page_text += current_page_text
+                index = next_index
                 next_index += 1
-
-            paragraph_content = self.chat_parse_paragraph(cur_index, next_index, previous_page_text)
+            paragraph_content = self.chat_parse_paragraph(cur_index + 1, next_index, previous_page_text)
             all_paragraphs.append(paragraph_content)
+            print(cur_index + 1, next_index)
+            print(all_paragraphs)
             # 截止至文件尾部
             if next_index == len(page_contents):
                 break
