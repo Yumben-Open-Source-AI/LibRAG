@@ -33,7 +33,7 @@ class BaseLLM:
             response_content = response_content[think_id:]
 
         try:
-            if '```' in response_content:
+            if response_content.startswith('```') and response_content.endswith('```'):
                 # handler json
                 if '```json' in response_content:
                     response_content = response_content[7:-3]
@@ -43,10 +43,11 @@ class BaseLLM:
 
             result = ast.literal_eval(response_content)
         except Exception as e:
+            print(response_content)
             import re
 
             json_match = re.findall(r"\{.*\}", response_content, re.DOTALL)
-            if len(json_match) < 0:
+            if len(json_match) <= 0:
                 raise Exception('the response is invalid JSON content, please try again')
 
             result = ast.literal_eval(json_match[0])

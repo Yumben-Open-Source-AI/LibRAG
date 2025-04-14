@@ -2,8 +2,9 @@ import copy
 import json
 import os
 import uuid
-import fitz
 import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from string import Template
 from llm.base import BaseLLM
 from parser.base import BaseParser
 
@@ -47,7 +48,7 @@ PARAGRAPH_PARSE_MESSAGES = [
                 "summary": "段落描述:<>",
                 "content": "",
                 "keywords": [],#关键词
-                "position":""，#段落在文中的位置
+                "position":""，#段落在文中的页数
             }
             ```
             Warning:
@@ -61,6 +62,12 @@ PARAGRAPH_PARSE_MESSAGES = [
         'content': """
             读取文档，使用中文生成这段文本的描述以及总结，最终按照Example Output样例生成完整json格式数据
         """
+    }
+]
+PARAGRAPH_CATALOG_MESSAGES = [
+    {
+        'role': 'user',
+        'content': '解析文本且提取文中所有标题结构，最终只需返回字符串形式大纲保留文中实际出现的标题不需要具体内容(#表示一级标题以此类推)，生成之后需要自己检查一遍是否是文中实际标题<$content>, 输出样例: {"catalogs": ""}'
     }
 ]
 PARAGRAPH_JUDGE_MESSAGES = [
@@ -124,14 +131,14 @@ PARAGRAPH_JUDGE_MESSAGES = [
 
 
 class ParagraphParser(BaseParser):
-    def __init__(self, llm: BaseLLM):
+    def __init__(self, llm: BaseLLM, parse_llm: BaseLLM = None):
         self.llm = llm
         self.paragraphs = []
-        self.save_path = os.path.join(self.base_path, 'paragraph.json')
+        self.parse_llm = parse_llm
+        self.save_path = os.path.join(self.base_path, 'paragraph_info.json')
 
     def pdf_parse(self, file_path):
-        pdf_content = fitz.open(file_path)
-        all_paragraphs = self.__automate_judgment_split(pdf_content)
+        all_paragraphs = self.__catalog_split(file_path)
         self.paragraphs = copy.deepcopy(all_paragraphs)
         return all_paragraphs
 
@@ -157,24 +164,199 @@ class ParagraphParser(BaseParser):
             paragraph['parent'] = parent_id
             paragraph['parent_description'] = f'此段落来源描述:<{parent_description}>'
 
-    def __catalog_split(self, content):
+    def chat_parse_paragraph(self, cur_index, next_index, page_text):
+        parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
+        parse_messages[1]['content'] += f"```<当前:{cur_index}至{next_index}页, 段落原文:{page_text}>```"
+        paragraph_content = self.parse_llm.chat(parse_messages)[0]
+        paragraph_content['paragraph_id'] = str(uuid.uuid4())
+        paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        return paragraph_content
+
+    def __catalog_split(self, file_path):
         """
         文本切割策略-目录
         按照目录切割
         场景: 目录层级不多优先
         """
-        all_paragraphs = []
-        page_contents = '\n'.join([page.get_text() for page in content.pages()])
 
-    def __automate_judgment_split(self, content):
+        def find_text_page(target_text):
+            """ 查找文本所在PDF中的页码 """
+            import fitz
+            doc = fitz.open(file_path)
+
+            for page_num in range(len(doc)):
+                text = doc.load_page(page_num).get_text().replace('\n', '').replace(' ', '')
+
+                if target_text in text:
+                    return page_num + 1
+
+            return -1
+
+        def miner_parse_pdf():
+            """
+            文档解析PDF转化为机器可读格式的工具 pdf to markdown
+            """
+            import os
+
+            from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
+            from magic_pdf.data.dataset import PymuDocDataset
+            from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
+            from magic_pdf.config.enums import SupportedPdfParseMethod
+
+            # args
+            pdf_file_name = os.path.abspath(file_path)
+            name_without_suffix = pdf_file_name.split(".")[0]
+
+            # prepare env
+            local_image_dir, local_md_dir = "output/images", "output"
+            image_dir = str(os.path.basename(local_image_dir))
+
+            os.makedirs(local_image_dir, exist_ok=True)
+
+            image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(
+                local_md_dir
+            )
+
+            # read bytes
+            reader1 = FileBasedDataReader("")
+            pdf_bytes = reader1.read(pdf_file_name)  # read the pdf content
+
+            # proc
+            ## Create Dataset Instance
+            ds = PymuDocDataset(pdf_bytes)
+
+            ## inference
+            if ds.classify() == SupportedPdfParseMethod.OCR:
+                ds.apply(doc_analyze, ocr=True).pipe_ocr_mode(image_writer).dump_md(
+                    md_writer, f"{name_without_suffix}.md", image_dir
+                )
+
+                with open(f'{name_without_suffix}.md', 'r', encoding='utf-8') as file:
+                    data = file.read()
+            else:
+                ds.apply(doc_analyze, ocr=False).pipe_txt_mode(image_writer).dump_md(
+                    md_writer, f"{name_without_suffix}.md", image_dir
+                )
+
+                with open(f'{name_without_suffix}.md', 'r', encoding='utf-8') as file:
+                    data = file.read()
+
+            return data
+
+        def preprocess_markdown_titles(markdown_titles):
+            """预处理Markdown格式的标题列表，去除#符号和空格"""
+            import re
+            processed = []
+            for title in markdown_titles:
+                # 去除Markdown标题符号和前后空格
+                clean_title = re.sub(r'^#+\s*', '', title.strip())
+                processed.append(clean_title)
+            return processed
+
+        def split_markdown_structured_document(full_text, markdown_titles):
+            """
+            根据Markdown格式的目录结构切割文档
+            :param full_text: 完整文档文本
+            :param markdown_titles: 包含Markdown标记的标题列表
+            :return: 按结构分割的字典 {处理后的标题: 内容}
+            """
+            import re
+            clean_titles = preprocess_markdown_titles(markdown_titles)
+
+            patterns = []
+            for title in clean_titles:
+                # 转义特殊字符，匹配标题行（可能包含换行）
+                pattern = re.escape(title) + r'(?:\s*\n|\Z)'
+                patterns.append(pattern)
+
+            # 查找所有标题的起始位置
+            matches = []
+            last_pos = 0
+
+            # 验证标题顺序
+            for i, pattern in enumerate(patterns):
+                match = re.search(pattern, full_text[last_pos:], flags=re.MULTILINE)
+                if not match:
+                    expected_title = clean_titles[i]
+                    found_titles = '\n'.join(clean_titles[:i])
+                    raise ValueError(f"标题 '{expected_title}' 未找到，请确认：\n"
+                                     f"1.标题顺序是否正确\n2.是否缺少必要标题\n3.已匹配标题列表：\n{found_titles}")
+                start = last_pos + match.start()
+                end = last_pos + match.end()
+                matches.append((start, end))
+                last_pos = start  # 允许重叠匹配
+
+            # 添加文档结束位置
+            matches.append((len(full_text), len(full_text)))
+
+            # 提取内容块
+            sections = {}
+            for i in range(len(clean_titles)):
+                title_start, title_end = matches[i]
+                content_start = title_end
+                content_end = matches[i + 1][0]
+
+                # 提取原始标题（保留文档中的实际格式）
+                raw_title = full_text[title_start:title_end].strip('\n')
+
+                # 提取内容（保留原始换行符）
+                content = full_text[content_start:content_end].strip('\n')
+
+                # 存储到字典（使用清洗后的标题作为键）
+                sections[clean_titles[i]] = {
+                    'raw_title': raw_title,  # 文档中实际存在的标题
+                    'content': content
+                }
+
+            return sections
+
+        all_paragraphs = []
+        pdf_content = miner_parse_pdf()
+        print(pdf_content)
+
+        template = Template(PARAGRAPH_CATALOG_MESSAGES[0]['content'])
+        PARAGRAPH_CATALOG_MESSAGES[0]['content'] = template.substitute(content=pdf_content)
+        parse_result = self.llm.chat(PARAGRAPH_CATALOG_MESSAGES)[0]
+        catalogs = parse_result['catalogs']
+        titles = catalogs
+        if isinstance(parse_result['catalogs'], str):
+            titles = catalogs.split('\n')
+        print(titles)
+        try:
+            result = split_markdown_structured_document(pdf_content, titles)
+
+            # 打印切割结果
+            for original_title in titles:
+                clean_title = preprocess_markdown_titles([original_title])[0]
+                print(f"【Markdown标题】{original_title}")
+                print(f"【实际匹配标题】{result[clean_title]['raw_title']}")
+                print(f"【内容片段】\n{result[clean_title]['content']}\n")
+                source_content = result[clean_title]['content']
+                content = source_content.replace(' ', '').replace('\n', '')
+                cur_index = find_text_page(content[:20])
+                next_index = find_text_page(content[-10:]) if find_text_page(content[-10:]) != -1 else cur_index
+                if cur_index != -1 and next_index != -1:
+                    print(cur_index)
+                    print(next_index)
+                    paragraph_content = self.chat_parse_paragraph(cur_index, next_index, source_content)
+                    all_paragraphs.append(paragraph_content)
+
+            return all_paragraphs
+        except ValueError as e:
+            print(str(e))
+
+    def __automate_judgment_split(self, file_path):
         """
         文本切割策略-轮询自动判断
-        按页轮询自主判断上下文
+        按页轮询自主大模型判断上下文
         场景: 目录层级多、文件结构复杂优先
         """
+        import fitz
+
+        pdf_content = fitz.open(file_path)
         all_paragraphs = []
         index = 0
-        page_contents = [page.get_text() for page in content.pages()]
+        page_contents = [page.get_text() for page in pdf_content.pages()]
 
         # 上下文连贯判断
         while index < len(page_contents):
@@ -194,13 +376,36 @@ class ParagraphParser(BaseParser):
                 previous_page_text += current_page_text
                 next_index += 1
 
-            parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
-            parse_messages[1]['content'] += f"```<当前:{cur_index}至{next_index}页, 段落原文:{previous_page_text}>```"
-            paragraph_content = self.llm.chat(parse_messages)[0]
-            paragraph_content['paragraph_id'] = str(uuid.uuid4())
-            paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            paragraph_content = self.chat_parse_paragraph(cur_index, next_index, previous_page_text)
             all_paragraphs.append(paragraph_content)
-            # 截止文件尾部
+            # 截止至文件尾部
             if next_index == len(page_contents):
                 break
+        return all_paragraphs
+
+    def __page_split(self, file_path):
+        """
+        文本切割策略-按页切割
+        场景: 目录层级多、文件结构复杂优先
+        """
+        import fitz
+        doc = fitz.open(file_path)
+        all_paragraphs = []
+        page_count = 1
+        with ThreadPoolExecutor(max_workers=25) as executor:
+            tasks_page = []
+            for page in doc.pages():
+                doc_markdown = page.get_text()
+                parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
+                parse_messages[1]['content'] += f"```<当前页:{page_count}, 段落原文:{doc_markdown}>```"
+                task = executor.submit(self.llm.chat, parse_messages)
+                tasks_page.append(task)
+                page_count += 1
+
+            for task in as_completed(tasks_page):
+                paragraph_content = task.result()[0]
+                paragraph_content['paragraph_id'] = str(uuid.uuid4())
+                paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                all_paragraphs.append(paragraph_content)
+
         return all_paragraphs

@@ -91,7 +91,7 @@ class DocumentParser(BaseParser):
             for document in data:
                 if document['document_id'] == self.document['document_id']:
                     data.remove(document)
-                    data.append(self.document)
+            data.append(self.document)
 
         with open(self.save_path, 'w+', encoding='utf-8') as f:
             f.write(json.dumps(data, ensure_ascii=False))
