@@ -23,8 +23,8 @@
       "8c3d6877-81d1-489f-af14-c6a532aee6c0",
       "411191d6-9c35-4ef6-a52e-c9439127d2e1"
     ],
-    "parent": "e5248baf-06d8-49d2-aa16-f2c4deba7e66",
-    "parent_description": "领域描述:涵盖金融行业的各种活动，包括交易、投资、风险管理、信贷服务等。"
+    "parent": "4ad0a94f-e151-436c-9392-f526384bfbae",
+    "parent_description": "领域描述:涵盖金融机构的各种业务活动，如授信、贷款、投资等，以及相关的管理流程和定价策略。"
   },
   {
     "category_name": "公司变更公告",
@@ -43,8 +43,8 @@
       "ee3fa149-a1e5-4920-85d9-b89e84642197",
       "3a6f75a6-62ad-4b66-b74a-1d5515fb095a"
     ],
-    "parent": "e5248baf-06d8-49d2-aa16-f2c4deba7e66",
-    "parent_description": "领域描述:涵盖金融行业的各种活动，包括交易、投资、风险管理、信贷服务等。"
+    "parent": "50eb4bd0-59b3-4c8f-ba22-fbd5f3121952",
+    "parent_description": "领域描述:涉及企业的内部治理结构、政策、法规遵从性、股东权益保护等方面的内容。"
   },
   {
     "category_name": "公司会议决议公告",
@@ -59,8 +59,8 @@
     "documents": [
       "19b92c14-90ee-4dd4-bd18-e11a5260445e"
     ],
-    "parent": "621be1b1-b833-40ff-be63-ae0cb81cde67",
-    "parent_description": "领域描述:涵盖法律法规、司法程序、合同协议、企业合规等内容。"
+    "parent": "50eb4bd0-59b3-4c8f-ba22-fbd5f3121952",
+    "parent_description": "领域描述:涉及企业的内部治理结构、政策、法规遵从性、股东权益保护等方面的内容。"
   },
   {
     "category_name": "项目投标文件",
@@ -76,8 +76,8 @@
     "documents": [
       "24736415-ebc7-4658-b1cd-ab6b693bbeae"
     ],
-    "parent": "621be1b1-b833-40ff-be63-ae0cb81cde67",
-    "parent_description": "领域描述:涵盖法律法规、司法程序、合同协议、企业合规等内容。"
+    "parent": "740fd7d9-0137-471e-aca8-9db09f38311b",
+    "parent_description": "领域描述:涉及企业与外部市场、合作伙伴或客户的商业互动，包括项目投标、合同谈判、市场营销等活动。"
   },
   {
     "category_name": "公司财务报告",
@@ -85,9 +85,9 @@
     "category_id": "6c814bea-9f41-4283-a954-d7ace9d96540",
     "metadata": {
       "关联实体": [
-        "比亚迪股份有限公司"
+        "贵阳农村商业银行"
       ],
-      "最后更新时间": "2025-04-14 21:03:52"
+      "最后更新时间": "2025-04-15 16:45:58"
     },
     "documents": [
       "f09dafbc-f4b5-4fd1-aa03-ebd3b1fc1b93",
@@ -96,9 +96,10 @@
       "7dc3838f-59dd-4f82-b88b-a730d9cc4db2",
       "9e2e1c73-68cd-4d32-add4-6cf0b469fdb0",
       "74295c79-653b-4804-9999-63e5d94223fb",
-      "0b00ef44-dccd-411a-b640-9afeb3220930"
+      "0b00ef44-dccd-411a-b640-9afeb3220930",
+      "989366a6-01f1-4ea1-84de-6aa7be88672e"
     ],
-    "parent": "e5248baf-06d8-49d2-aa16-f2c4deba7e66",
-    "parent_description": "领域描述:涵盖金融行业的各种活动，包括交易、投资、风险管理、信贷服务等。"
+    "parent": "4ad0a94f-e151-436c-9392-f526384bfbae",
+    "parent_description": "领域描述:涵盖金融机构的各种业务活动，如授信、贷款、投资等，以及相关的管理流程和定价策略。"
   }
 ]

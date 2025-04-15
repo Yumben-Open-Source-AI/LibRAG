@@ -103,21 +103,8 @@ class CategoryParser(BaseParser):
         self.category['parent'] = parent['domain_id']
         self.category['parent_description'] = parent['description']
 
-    def __get_known_categories(self):
-        """
-        Getting Known Categories to Aid in Classification Selection for Large Language Models
-        """
-        with open(self.save_path, 'r', encoding='utf-8') as f:
-            categories = json.load(f)
-
-        for category in categories:
-            self.category_doc_dict[category['category_name']] = category['documents']
-            del category['metadata']
-            del category['documents']
-            del category['parent']
-            del category['parent_description']
-
-        return categories
+    def rebuild_domain(self):
+        ...
 
     def storage_parser_data(self):
         if self.new_classification == 'true':
@@ -140,3 +127,19 @@ class CategoryParser(BaseParser):
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
                 f.write(json.dumps(data, ensure_ascii=False))
+
+    def __get_known_categories(self):
+        """
+        Getting Known Categories to Aid in Classification Selection for Large Language Models
+        """
+        with open(self.save_path, 'r', encoding='utf-8') as f:
+            categories = json.load(f)
+
+        for category in categories:
+            self.category_doc_dict[category['category_name']] = category['documents']
+            del category['metadata']
+            del category['documents']
+            del category['parent']
+            del category['parent_description']
+
+        return categories

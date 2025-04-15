@@ -32,4 +32,5 @@ class Qwen(BaseLLM):
                 content = self.literal_eval(content)
                 return content, usage_token
             except Exception as e:
+                print(e)
                 retries += 1

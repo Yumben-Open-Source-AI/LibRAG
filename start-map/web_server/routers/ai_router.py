@@ -55,44 +55,66 @@ async def get_meta_data(meta_type: str):
 
 
 @router.get('/rebuild')
-async def rebuild_data():
+async def rebuild_data(meta_type: str):
     """
     重建domain领域以及category分类索引
     """
     deepseek = DeepSeek()
     qwen = Qwen()
 
-    documents = await get_meta_data(meta_type='document')
-    for document in documents:
-        doc_parser = DocumentParser(deepseek)
-        doc_parser.document = document
-        category_parser = CategoryParser(qwen)
-        category_params = {
-            'document': document,
-        }
-        category = category_parser.parse(**category_params)
-        print('category', category)
+    # TODO 调整重建domain & category索引接口
+    if meta_type == 'category':
+        documents = await get_meta_data(meta_type='document')
+        # TODO 清空category & domain 数据文件
+        for document in documents:
+            doc_parser = DocumentParser(deepseek)
+            doc_parser.document = document
+            category_parser = CategoryParser(qwen)
+            category_params = {
+                'document': document,
+            }
+            category = category_parser.parse(**category_params)
+            print('category', category)
 
-        # back fill document parent data
-        doc_parser.back_fill_parent(category, True)
-        doc_parser.storage_parser_data()
+            # back fill document parent data
+            doc_parser.back_fill_parent(category, True)
+            doc_parser.storage_parser_data()
 
-        domain_parser = DomainParser(qwen)
-        domain_params = {
-            'cla': category
-        }
-        domain = domain_parser.parse(**domain_params)
-        print('domain', domain)
+            domain_parser = DomainParser(qwen)
+            domain_params = {
+                'cla': category
+            }
+            domain = domain_parser.parse(**domain_params)
+            print('domain', domain)
 
-        # back fill category parent data
-        if category_parser.new_classification == 'true':
+            # back fill category parent data
+            if category_parser.new_classification == 'true':
+                category_parser.back_fill_parent(domain)
+            category_parser.storage_parser_data()
+
+            # back fill domain parent data
+            if domain_parser.new_domain == 'true':
+                domain_parser.back_fill_parent(None)
+            domain_parser.storage_parser_data()
+    elif meta_type == 'domain':
+        categories = await get_meta_data(meta_type='category')
+        for category in categories:
+            category_parser = CategoryParser(qwen)
+            category_parser.category = category
+            domain_parser = DomainParser(qwen)
+            domain_params = {
+                'cla': category
+            }
+            domain = domain_parser.parse(**domain_params)
+            print('domain', domain)
+
             category_parser.back_fill_parent(domain)
-        category_parser.storage_parser_data()
+            category_parser.storage_parser_data()
 
-        # back fill domain parent data
-        if domain_parser.new_domain == 'true':
-            domain_parser.back_fill_parent(None)
-        domain_parser.storage_parser_data()
+            # back fill domain parent data
+            if domain_parser.new_domain == 'true':
+                domain_parser.back_fill_parent(None)
+            domain_parser.storage_parser_data()
 
 
 def test_loading_data(filename: str, base_dir: str = 'files/'):
@@ -108,13 +130,14 @@ def test_loading_data(filename: str, base_dir: str = 'files/'):
     print('paragraph', all_paragraphs)
 
 
-def loading_data(filename: str, base_dir: str = '../../files/'):
+def loading_data(filename: str, policy_type, base_dir: str = '../../files/'):
     file_path = os.path.join(base_dir, filename)
     qwen = Qwen()
 
     par_parser = ParagraphParser(qwen)
     paragraph_params = {
-        'path': file_path
+        'path': file_path,
+        'policy_type': policy_type
     }
     all_paragraphs = par_parser.parse(**paragraph_params)
     print('paragraph', all_paragraphs)
@@ -283,6 +306,7 @@ def extract_subtitles(data):
 if __name__ == '__main__':
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
     os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-    loading_data(filename='大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.pdf')
-
-    # deepseek = DeepSeek()
+    # page_split
+    # catalog_split
+    # automate_judgment_split
+    loading_data('超值宝定开1年12期理财产品销售文件.pdf', 'catalog_split')

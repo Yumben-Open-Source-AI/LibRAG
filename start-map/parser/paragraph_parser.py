@@ -136,15 +136,24 @@ class ParagraphParser(BaseParser):
         self.paragraphs = []
         self.save_path = os.path.join(self.base_path, 'paragraph_info.json')
 
-    def pdf_parse(self, file_path):
-        all_paragraphs = self.__catalog_split(file_path)
+    def pdf_parse(self, file_path, policy_type='automate_judgment_split'):
+        policies = {
+            'page_split': self.__page_split,
+            'catalog_split': self.__catalog_split,
+            'automate_judgment_split': self.__automate_judgment_split,
+        }
+        if policy_type not in policies:
+            raise ValueError('异常的文本切割策略，请提供正确的文本分割策略')
+
+        all_paragraphs = policies[policy_type](file_path)
         self.paragraphs = copy.deepcopy(all_paragraphs)
         return all_paragraphs
 
     def parse(self, **kwargs):
         file_path = kwargs.get('path')
+        policy_type = kwargs.get('policy_type')
         if file_path.endswith('.pdf'):
-            return self.pdf_parse(file_path)
+            return self.pdf_parse(file_path, policy_type)
         elif file_path.endswith('.docx'):
             ...
 
@@ -255,7 +264,7 @@ class ParagraphParser(BaseParser):
             :return: 按结构分割的字典 {处理后的标题: 内容}
             """
             import re
-            clean_titles = preprocess_markdown_titles(markdown_titles)
+            clean_titles = markdown_titles
 
             patterns = []
             for title in clean_titles:
@@ -328,17 +337,19 @@ class ParagraphParser(BaseParser):
             # 打印切割结果
             for original_title in titles:
                 clean_title = preprocess_markdown_titles([original_title])[0]
+                raw_title = result[clean_title]['raw_title']
+                raw_content = result[clean_title]['content']
                 print(f"【Markdown标题】{original_title}")
-                print(f"【实际匹配标题】{result[clean_title]['raw_title']}")
+                print(f"【实际匹配标题】{raw_title}")
                 print(f"【内容片段】\n{result[clean_title]['content']}\n")
-                source_content = result[clean_title]['content']
-                content = source_content.replace(' ', '').replace('\n', '')
+                content = raw_content.replace(' ', '').replace('\n', '')
                 cur_index = find_text_page(content[:20])
                 next_index = find_text_page(content[-10:]) if find_text_page(content[-10:]) != -1 else cur_index
                 if len(content) > 0:
                     print(cur_index)
                     print(next_index)
-                    paragraph_content = self.chat_parse_paragraph(cur_index, next_index, source_content)
+                    page_text = f'标题({raw_title}) 内容({raw_content})'
+                    paragraph_content = self.chat_parse_paragraph(cur_index, next_index, page_text)
                     if paragraph_content:
                         all_paragraphs.append(paragraph_content)
 
