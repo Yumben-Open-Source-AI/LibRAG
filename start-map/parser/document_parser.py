@@ -48,6 +48,7 @@ DOCUMENT_PARSE_MESSAGES = [
             Warning:
             -description禁止使用```等```字眼省略指标项，但不需要数值数据。
             -输出不要增加额外字段，严格按照Example Output结构输出。
+            -不要解释行为。
         """
     },
     {

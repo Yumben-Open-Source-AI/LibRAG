@@ -117,20 +117,7 @@ async def rebuild_data(meta_type: str):
             domain_parser.storage_parser_data()
 
 
-def test_loading_data(filename: str, base_dir: str = 'files/'):
-    file_path = os.path.join(base_dir, filename)
-    deepseek = DeepSeek()
-    qwen = Qwen()
-
-    par_parser = ParagraphParser(qwen)
-    paragraph_params = {
-        'path': file_path
-    }
-    all_paragraphs = par_parser.parse(**paragraph_params)
-    print('paragraph', all_paragraphs)
-
-
-def loading_data(filename: str, policy_type, base_dir: str = '../../files/'):
+def loading_data(filename: str, policy_type, base_dir: str = ''):
     file_path = os.path.join(base_dir, filename)
     qwen = Qwen()
 
@@ -142,45 +129,45 @@ def loading_data(filename: str, policy_type, base_dir: str = '../../files/'):
     all_paragraphs = par_parser.parse(**paragraph_params)
     print('paragraph', all_paragraphs)
 
-    doc_parser = DocumentParser(qwen)
-    document_params = {
-        'paragraphs': all_paragraphs,
-        'path': file_path
-    }
-    document = doc_parser.parse(**document_params)
-    print('document', document)
-
-    # 段落解析器回填上级文档数据
-    par_parser.back_fill_parent(document)
-    par_parser.storage_parser_data()
-
-    category_parser = CategoryParser(qwen)
-    category_params = {
-        'document': document,
-    }
-    category = category_parser.parse(**category_params)
-    print('category', category)
-
-    # 文档解析器回填上级分类数据
-    doc_parser.back_fill_parent(category)
-    doc_parser.storage_parser_data()
-
-    domain_parser = DomainParser(qwen)
-    domain_params = {
-        'cla': category
-    }
-    domain = domain_parser.parse(**domain_params)
-    print('domain', domain)
-
-    # 若生成新分类数据则回填上级领域数据
-    if category_parser.new_classification == 'true':
-        category_parser.back_fill_parent(domain)
-    category_parser.storage_parser_data()
-
-    # 若生成新领域数据则回填上级数据
-    if domain_parser.new_domain == 'true':
-        domain_parser.back_fill_parent(None)
-    domain_parser.storage_parser_data()
+    # doc_parser = DocumentParser(qwen)
+    # document_params = {
+    #     'paragraphs': all_paragraphs,
+    #     'path': file_path
+    # }
+    # document = doc_parser.parse(**document_params)
+    # print('document', document)
+    #
+    # # 段落解析器回填上级文档数据
+    # par_parser.back_fill_parent(document)
+    # par_parser.storage_parser_data()
+    #
+    # category_parser = CategoryParser(qwen)
+    # category_params = {
+    #     'document': document,
+    # }
+    # category = category_parser.parse(**category_params)
+    # print('category', category)
+    #
+    # # 文档解析器回填上级分类数据
+    # doc_parser.back_fill_parent(category)
+    # doc_parser.storage_parser_data()
+    #
+    # domain_parser = DomainParser(qwen)
+    # domain_params = {
+    #     'cla': category
+    # }
+    # domain = domain_parser.parse(**domain_params)
+    # print('domain', domain)
+    #
+    # # 若生成新分类数据则回填上级领域数据
+    # if category_parser.new_classification == 'true':
+    #     category_parser.back_fill_parent(domain)
+    # category_parser.storage_parser_data()
+    #
+    # # 若生成新领域数据则回填上级数据
+    # if domain_parser.new_domain == 'true':
+    #     domain_parser.back_fill_parent(None)
+    # domain_parser.storage_parser_data()
 
 
 class TitleNode:
@@ -303,10 +290,37 @@ def extract_subtitles(data):
     return result
 
 
+from markdownify import MarkdownConverter
+
+
+class NoEscapeConverter(MarkdownConverter):
+    """ 重写MarkdownConverter更改转义策略 """
+
+    def escape(self, text):
+        # 直接返回原始文本，不做任何转义
+        return text
+
+
 if __name__ == '__main__':
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
     os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     # page_split
     # catalog_split
     # automate_judgment_split
-    loading_data('超值宝定开1年12期理财产品销售文件.pdf', 'catalog_split')
+    # loading_data(r'D:\xqm\python\project\llm\start-map\files\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件_34.pdf', 'automate_judgment_split')
+
+    with open(r'D:\xqm\python\project\llm\start-map\files\超值宝定开1年12期理财产品销售文件.md', 'r',
+              encoding='utf-8') as f:
+        text = f.read()
+
+    import re
+
+    pattern = '<!--.*?-->|<html[^>]*>[\s\S]*?</html>'
+    htmls = re.findall(pattern, text)
+    print(htmls)
+    print(len(htmls))
+
+    for html in htmls:
+        markdown_text = NoEscapeConverter().convert(html)
+        r
+        print(markdown_text)

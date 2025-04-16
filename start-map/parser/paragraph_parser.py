@@ -1,12 +1,14 @@
 import copy
 import json
 import os
+import re
 import uuid
 import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from string import Template
 from llm.base import BaseLLM
 from parser.base import BaseParser
+from markdownify import MarkdownConverter
 
 PARAGRAPH_PARSE_MESSAGES = [
     {
@@ -31,6 +33,7 @@ PARAGRAPH_PARSE_MESSAGES = [
             - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx第xxx页的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
             - summary必须声明页码和段落类型这两个属性。
             - 每个content至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
+            - 允许根据上下文内容智能分割，生成多个paragraph。
             - 严格生成结构化不带有转义的JSON数据的总结及描述。
             - 总结和描述仅使用文本格式呈现。
 
@@ -43,18 +46,21 @@ PARAGRAPH_PARSE_MESSAGES = [
 
             Example Output
             ```json
-            {
-                "paragraph_name": "",#填写章节或段落名称,
-                "summary": "段落描述:<>",
-                "content": "",
-                "keywords": [],#关键词
-                "position":""，#段落在文中的页数
-            }
+            [
+                {
+                    "paragraph_name": "",#填写章节或段落名称,
+                    "summary": "段落描述:<>",
+                    "content": "",
+                    "keywords": [],#关键词
+                    "position":"",# 段落在文中的位置，如第几页，第几章
+                }
+            ]
             ```
             Warning:
             -summary必须列出所有指标字段包括页码说明，禁止使用```等```字眼省略指标项，但不需要数值数据。
             -content必须列出所有指标及数值数据，不能省略。  
             -输出不要增加额外字段，严格按照Example Output结构输出。
+            -不要解释行为。
         """
     },
     {
@@ -65,6 +71,36 @@ PARAGRAPH_PARSE_MESSAGES = [
     }
 ]
 PARAGRAPH_CATALOG_MESSAGES = [
+    {
+        'role': 'system',
+        'content': """
+            # Role: 文本标题结构提取器
+            
+            ## Profile
+            - author: LangGPT
+            - version: 1.0
+            - language: 中文
+            - description: 从任意格式文本中**仅**提取文中实际存在的一至三级大标题（跳过四级及以下标题），最终使用 Markdown 风格的 `#`（#、##、###）表示标题层级并将结果结构化为 JSON 输出。
+            
+            ## Skills
+            1. 能基于多种线索（编号、缩进、格式、类型等）准确识别**一二三级标题**。
+            2. 标题可为任意长度，保留标题全部原文与顺序。
+            3. 忽略正文以及**四级及以下标题**（即`####` 及更多井号、或示例“1.1.1.1”、编号、缩进、标记等其他类似深度层次等）。
+            4. 使用 Markdown 的 `#`（#、##、###）表示层级并保持原顺序。
+            
+            ## Rules
+            1. 仅提取一、二、三级标题，**禁止**提取四级及以下标题；若检测到 `####` 及更多井号，或编号/缩进/标记中存在四级及更深层次时，直接跳过不输出。
+            2. 标题内容保持不变，不做任何精简或修改，并保持原顺序。
+            3. 忽略正文（普通文本）和其他无关元素，仅输出标题结构。
+            4. 最终结果只输出为以下 JSON 结构，**键名固定**为 `"catalogs"`：
+            
+            ## Example Output
+            ```json
+            {
+                "catalogs": "<用 Markdown 形式的标题串>"
+            }
+        """
+    },
     {
         'role': 'user',
         'content': '解析文本且提取文中所有标题结构，最终只需返回字符串形式大纲保留文中实际出现的标题不需要具体内容(#表示一级标题以此类推)，生成之后需要自己检查一遍是否是文中实际标题<$content>, 输出样例: {"catalogs": ""}'
@@ -117,17 +153,24 @@ PARAGRAPH_JUDGE_MESSAGES = [
             ## Example Output
             ```json
             {
-               "is_continuous": "true" or "false",
-               "continuity_type": "full_continuation" | "partial_continuation" | "independent",
-               "explanation": "简要说明本次判定的主要逻辑，如话题是否连续、段落是否承接等。"
+                "is_continuous": "true" or "false",
+                "continuity_type": "full_continuation" | "partial_continuation" | "independent",
+                "explanation": "简要说明本次判定的主要逻辑，如话题是否连续、段落是否承接等。"
             }
-            ```
             """
     },
     {
         'role': 'user'
     }
 ]
+
+
+class NoEscapeConverter(MarkdownConverter):
+    """ 重写MarkdownConverter更改转义策略 """
+
+    def escape(self, text):
+        # 直接返回原始文本，不做任何转义
+        return text
 
 
 class ParagraphParser(BaseParser):
@@ -145,8 +188,8 @@ class ParagraphParser(BaseParser):
         if policy_type not in policies:
             raise ValueError('异常的文本切割策略，请提供正确的文本分割策略')
 
-        all_paragraphs = policies[policy_type](file_path)
-        self.paragraphs = copy.deepcopy(all_paragraphs)
+        policies[policy_type](file_path)
+        all_paragraphs = copy.deepcopy(self.paragraphs)
         return all_paragraphs
 
     def parse(self, **kwargs):
@@ -176,9 +219,15 @@ class ParagraphParser(BaseParser):
         parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
         parse_messages[1]['content'] += f"```<当前:{cur_index}至{next_index}页, 段落原文:{page_text}>```"
         paragraph_content = self.llm.chat(parse_messages)[0]
-        paragraph_content['paragraph_id'] = str(uuid.uuid4())
-        paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        return paragraph_content
+        if isinstance(paragraph_content, dict):
+            paragraph_content['paragraph_id'] = str(uuid.uuid4())
+            paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            self.paragraphs.append(paragraph_content)
+        elif isinstance(paragraph_content, list):
+            for paragraph in paragraph_content:
+                paragraph['paragraph_id'] = str(uuid.uuid4())
+                paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            self.paragraphs.extend(paragraph_content)
 
     def __catalog_split(self, file_path):
         """
@@ -251,8 +300,15 @@ class ParagraphParser(BaseParser):
 
             return data
 
+        def html_to_markdown(pages):
+            """ html形式table转化为markdown """
+            pattern = '<!--.*?-->|<html[^>]*>[\s\S]*?</html>'
+            htmls = re.findall(pattern, pages)
+            for html in htmls:
+                NoEscapeConverter().convert(html)
+
         def preprocess_markdown_titles(markdown_titles):
-            """预处理Markdown格式的标题列表，去除#符号和空格"""
+            """ 预处理Markdown格式的标题列表，去除#符号和空格 """
             processed = markdown_titles
             return processed
 
@@ -319,7 +375,6 @@ class ParagraphParser(BaseParser):
 
             return sections
 
-        all_paragraphs = []
         pdf_content = miner_parse_pdf()
         print(pdf_content)
 
@@ -349,11 +404,7 @@ class ParagraphParser(BaseParser):
                     print(cur_index)
                     print(next_index)
                     page_text = f'标题({raw_title}) 内容({raw_content})'
-                    paragraph_content = self.chat_parse_paragraph(cur_index, next_index, page_text)
-                    if paragraph_content:
-                        all_paragraphs.append(paragraph_content)
-
-            return all_paragraphs
+                    self.chat_parse_paragraph(cur_index, next_index, page_text)
         except ValueError as e:
             print(str(e))
 
@@ -366,7 +417,6 @@ class ParagraphParser(BaseParser):
         import fitz
 
         pdf_content = fitz.open(file_path)
-        all_paragraphs = []
         index = 0
         page_contents = [page.get_text() for page in pdf_content.pages()]
 
@@ -377,8 +427,11 @@ class ParagraphParser(BaseParser):
             next_index = index + 1
             while next_index < len(page_contents):
                 current_page_text = page_contents[next_index]
-                user_content = f'previous_page_text:{previous_page_text}\n current_page_text:{current_page_text}'
-                PARAGRAPH_JUDGE_MESSAGES[1]['content'] = user_content
+                user_content = {
+                    'previous_page_text': f'```{previous_page_text}```',
+                    'current_page_text': f'```{current_page_text}```',
+                }
+                PARAGRAPH_JUDGE_MESSAGES[1]['content'] = str(user_content)
                 judge_result = self.llm.chat(PARAGRAPH_JUDGE_MESSAGES)[0]
                 print(judge_result)
                 if 'is_continuous' in judge_result and judge_result['is_continuous'] == 'false':
@@ -388,14 +441,12 @@ class ParagraphParser(BaseParser):
                 previous_page_text += current_page_text
                 index = next_index
                 next_index += 1
-            paragraph_content = self.chat_parse_paragraph(cur_index + 1, next_index, previous_page_text)
-            all_paragraphs.append(paragraph_content)
+            self.chat_parse_paragraph(cur_index + 1, next_index, previous_page_text)
             print(cur_index + 1, next_index)
-            print(all_paragraphs)
+            print(self.paragraphs)
             # 截止至文件尾部
             if next_index == len(page_contents):
                 break
-        return all_paragraphs
 
     def __page_split(self, file_path):
         """

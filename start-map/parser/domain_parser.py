@@ -29,7 +29,7 @@ DOMAIN_PARSE_MESSAGES = [
             1. 类别归属应尽量与已有领域匹配，避免无意义的新建。
             2. 优先匹配用户提供的 `known_domains` 分类列表。
             3. 匹配时需严格判断语义场景，对于具有明显对内或对外属性的类别，应避免将其归入语义方向不符的领域，例如对外交流、合同、投标等业务行为不应归类到强调内部结构或管理的信息类领域。
-            4. 若无明确匹配领域或已知领域语义不符，返回新建领域标记 `new_domain: true`。
+            4. 若无明确匹配领域或已知领域语义不符，返回新建领域标记 `new_domain: 'true'`。
             5. 进行匹配时优先关注`description`而不是`domain_name`，但应结合实际业务场景进行语义逻辑判断。
             
             ## Workflows
@@ -39,7 +39,7 @@ DOMAIN_PARSE_MESSAGES = [
                 - known_domains（已知领域列表，含 domain_name, domain_id, description 等）
             2. 解析分类的语义特征，优先匹配已有领域（按语义相关度）。
             3. 若描述明显涉及对外活动、文件交付或客户互动，应优先排除“内部管理”类领域匹配。
-            4. 若匹配成功，返回匹配领域及 `new_domain: false`，否则构建新领域结构。
+            4. 若匹配成功，返回匹配领域及 `new_domain: 'false'`，否则构建新领域结构。
             5. 输出 JSON 格式的领域信息结构。
             
             ## Example Output

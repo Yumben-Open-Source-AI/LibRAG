@@ -17,27 +17,34 @@ CATEGORY_PARSE_MESSAGES = [
             - author: LangGPT 
             - version: 1.1
             - language: 中文
-            - description: 能根据文档内容与语义抽象出其所属的标准类别，优先从用户提供的分类列表中进行匹配，若无匹配则生成新的抽象分类，并输出结构化 JSON。
+            - description: 能根据文档内容与语义抽象出其所属的标准类别，优先从用户提供的分类列表中进行匹配，若无匹配或用户提供的分类列表分类描述不够准确和完善则生成新的抽象分类，并输出结构化 JSON。
 
             ## Skills
             1. 基于文档内容提炼核心语义，抽象归类。
-            2. 优先匹配“已知分类列表”中的类名与描述。
-            3. 若无合适类别，能自动生成合理的新类别。
-            4. 输出结构规范、字段注释完整，适配分类系统集成。
+            2. 优先匹配“已知分类列表”中的分类名称与分类描述。
+            3. 若匹配分类存在但描述范围不够清晰明确，优化描述后输出。
+            4. 若无合适类别，能自动生成合理的新类别。
+            5. 输出结构规范、字段注释完整，适配分类系统集成。
 
             ## Rules
             1. 类别命名需具备**抽象性与通用性**，避免将具体文档当作类名。
-            3. 优先匹配用户提供的 known_categories 分类列表。
+            2. 优先匹配用户提供的 known_categories 分类列表。
+            3. 若无匹配或用户提供的分类列表分类描述不够准确和完善则生成新的抽象分类。
+            4. 若匹配的分类描述不足/不够清晰明确，优化其描述后输出。
             5. metadata 字段需涵盖：更新时间、关联组织。
             6. 若无明确匹配类别，返回新建分类标记 new_classification: 'true'
+            7. 生成新的分类时description应尽可能宽泛与抽象以覆盖更广泛的内容。
+            8. 优化后的description应包含原先的描述内容，仅针对新的文档描述补充该分类描述。
 
             ## Workflows
             1. 接收输入：
-                - 文档内容或描述（如摘要、标题）
-                - 已知分类列表（JSON数组，包含 category_name, category_id, description 等字段）
+            - 文档内容或描述（如摘要、标题）
+            - 已知分类列表（JSON数组，包含category_name，category_id, description 等字段）
             2. 匹配逻辑：
-                - 首先尝试在已知分类中匹配最相关的类别（按语义、关键词等）。
-                - 如无匹配，再创建新的抽象分类。
+            - 首先尝试使用文档描述在已知分类中匹配最相关的类别（按语义、关键词等）。
+            - 使用文档描述应优先匹配分类名称，其次是分类描述。
+            - 如无匹配，再创建新的抽象分类。
+            - 如匹配成功但描述不足/不够清晰明确，优化其描述后输出。
             3. 若匹配成功，返回匹配分类及 new_classification: 'false'，否则构建新分类结构。
             4. 输出结构化分类 JSON，包括所有必要字段与注释说明。
 
@@ -55,11 +62,12 @@ CATEGORY_PARSE_MESSAGES = [
 
             Warning:
             -输出不要增加额外字段，严格按照Example Output结构输出。
+            -不要解释行为。
         """
     },
     {
         'role': 'user',
-        'content': """读取文档，使用中文生成或选择这段文本的分类以及分类描述，最终按照Example Output样例生成完整json格式数据```<文档描述:<$description>>```"""
+        'content': """读取文档，使用中文生成或选择这段文本的分类以及分类描述，最终按照Example Output样例生成完整json格式数据``<$description>```"""
     }
 ]
 
@@ -84,6 +92,7 @@ class CategoryParser(BaseParser):
         parse_message = copy.deepcopy(CATEGORY_PARSE_MESSAGES)
         content = Template(parse_message[1]['content'])
         parse_message[1]['content'] = content.substitute(description=str(parse_params))
+        print(parse_message[1]['content'])
         self.category = self.llm.chat(parse_message)[0]
         new_classification = self.category['new_classification']
         # llm judgments this document is not an added type
@@ -123,6 +132,7 @@ class CategoryParser(BaseParser):
             for cla in data:
                 if cla['category_id'] == self.category['category_id']:
                     cla['documents'] = self.category['documents']
+                    cla['description'] = self.category['description']
                     cla['metadata'] = self.category['metadata']
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
