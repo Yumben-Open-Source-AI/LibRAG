@@ -33,7 +33,7 @@ PARAGRAPH_PARSE_MESSAGES = [
             - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx第xxx页的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
             - summary必须声明页码和段落类型这两个属性。
             - 每个content至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
-            - 允许根据上下文内容智能分割，生成多个paragraph。
+            - 允许根据上下文内容智能分割，生成多个paragraph
             - 严格生成结构化不带有转义的JSON数据的总结及描述。
             - 总结和描述仅使用文本格式呈现。
 
@@ -48,11 +48,11 @@ PARAGRAPH_PARSE_MESSAGES = [
             ```json
             [
                 {
-                    "paragraph_name": "",#填写章节或段落名称,
-                    "summary": "段落描述:<>",
+                    "paragraph_name": "",#填写章节或段落名称
+                    "summary": "<>", #段落描述；
                     "content": "",
                     "keywords": [],#关键词
-                    "position":"",# 段落在文中的位置，如第几页，第几章
+                    "position":""，#段落在文中的位置，如第几页，第几章
                 }
             ]
             ```
@@ -217,7 +217,7 @@ class ParagraphParser(BaseParser):
 
     def chat_parse_paragraph(self, cur_index, next_index, page_text):
         parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
-        parse_messages[1]['content'] += f"```<当前:{cur_index}至{next_index}页, 段落原文:{page_text}>```"
+        parse_messages[1]['content'] += f"```<当前页:{cur_index}至{next_index}, 段落原文:{page_text}>```"
         paragraph_content = self.llm.chat(parse_messages)[0]
         if isinstance(paragraph_content, dict):
             paragraph_content['paragraph_id'] = str(uuid.uuid4())

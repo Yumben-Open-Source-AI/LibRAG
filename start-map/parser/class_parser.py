@@ -33,18 +33,19 @@ CATEGORY_PARSE_MESSAGES = [
             4. 若匹配的分类描述不足/不够清晰明确，优化其描述后输出。
             5. metadata 字段需涵盖：更新时间、关联组织。
             6. 若无明确匹配类别，返回新建分类标记 new_classification: 'true'
-            7. 生成新的分类时description应尽可能宽泛与抽象以覆盖更广泛的内容。
-            8. 优化后的description应包含原先的描述内容，仅针对新的文档描述补充该分类描述。
+            7. 生成新的分类时category_description应尽可能宽泛与抽象以覆盖更广泛的内容。
+            8. 优化后的category_description 应包含原先的描述内容，仅针对新的文档描述补充该分类描述。
 
             ## Workflows
             1. 接收输入：
-            - 文档内容或描述（如摘要、标题）
-            - 已知分类列表（JSON数组，包含category_name，category_id, description 等字段）
+                - document_name文档名称；
+                - document_description 文档内容或描述（如摘要、标题）;
+                - known_categories 已知分类列表（JSON数组，包含category_name,category_id,category_description 等字段）;
             2. 匹配逻辑：
-            - 首先尝试使用文档描述在已知分类中匹配最相关的类别（按语义、关键词等）。
-            - 使用文档描述应优先匹配分类名称，其次是分类描述。
-            - 如无匹配，再创建新的抽象分类。
-            - 如匹配成功但描述不足/不够清晰明确，优化其描述后输出。
+                - 首先尝试使用文档描述在已知分类中匹配最相关的类别（按语义、关键词等）。
+                - 使用文档描述进行分类时应优先匹配分类名称，其次是分类描述。
+                - 如无匹配，再创建新的抽象分类。
+                - 如匹配成功但描述不足/不够清晰明确，优化其描述后输出。
             3. 若匹配成功，返回匹配分类及 new_classification: 'false'，否则构建新分类结构。
             4. 输出结构化分类 JSON，包括所有必要字段与注释说明。
 
@@ -52,8 +53,7 @@ CATEGORY_PARSE_MESSAGES = [
             json
             {
                 "category_name": "", #分类名称
-                "description": "分类描述:<>", #这个分类的描述
-                "category_id": "",
+                "category_description": "<>", #这个分类的描述
                 "metadata": {
                     "关联实体": [] #此分类涉及到的实体信息
                 },
@@ -67,7 +67,7 @@ CATEGORY_PARSE_MESSAGES = [
     },
     {
         'role': 'user',
-        'content': """读取文档，使用中文生成或选择这段文本的分类以及分类描述，最终按照Example Output样例生成完整json格式数据``<$description>```"""
+        'content': """读取文档，使用中文生成或选择这段文本的分类以及分类描述，最终按照Example Output样例生成完整json格式数据``<$parse_info>```"""
     }
 ]
 
@@ -83,15 +83,17 @@ class CategoryParser(BaseParser):
 
     def parse(self, **kwargs):
         document = kwargs.get('document')
-        description = document['description']
+        doc_name = document['document_name']
+        doc_description = document['document_description']
         document_id = document['document_id']
         parse_params = {
-            'document_description': description,
+            'document_name': doc_name,
+            'document_description': doc_description,
             'known_categories': self.__get_known_categories(),
         }
         parse_message = copy.deepcopy(CATEGORY_PARSE_MESSAGES)
         content = Template(parse_message[1]['content'])
-        parse_message[1]['content'] = content.substitute(description=str(parse_params))
+        parse_message[1]['content'] = content.substitute(parse_info=str(parse_params))
         print(parse_message[1]['content'])
         self.category = self.llm.chat(parse_message)[0]
         new_classification = self.category['new_classification']
@@ -110,7 +112,7 @@ class CategoryParser(BaseParser):
 
     def back_fill_parent(self, parent):
         self.category['parent'] = parent['domain_id']
-        self.category['parent_description'] = parent['description']
+        self.category['parent_description'] = f'此分类所属父级领域描述:<{parent["domain_description"]}>'
 
     def rebuild_domain(self):
         ...
@@ -131,9 +133,9 @@ class CategoryParser(BaseParser):
 
             for cla in data:
                 if cla['category_id'] == self.category['category_id']:
-                    cla['documents'] = self.category['documents']
-                    cla['description'] = self.category['description']
                     cla['metadata'] = self.category['metadata']
+                    cla['documents'] = self.category['documents']
+                    cla['category_description'] = self.category['category_description']
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
                 f.write(json.dumps(data, ensure_ascii=False))

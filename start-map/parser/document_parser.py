@@ -25,7 +25,7 @@ DOCUMENT_PARSE_MESSAGES = [
 
             Rules
             - 描述与总结不能省略内容。
-            - 每个description至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出关键指标和对象属性(如:这是xxx文档的xxx，主要内容为xxx),文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
+            - document_description至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出关键指标和对象属性(如:这是xxx文档的xxx，主要内容为xxx),文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
             - 严格生成结构化不带有转义的JSON数据的总结及描述。
             - 总结和描述仅使用文本格式呈现。
 
@@ -39,14 +39,14 @@ DOCUMENT_PARSE_MESSAGES = [
             Example Output
             ```json
             {
-                "document_name": ""#文档名称,
-                "description": "文档描述:<>",
+                "document_name": "",#文档名称;
+                "document_description": "<>", #文档描述；
                 "metadata": {"作者": "", "版本": ""},
-                "file_path": "", #填写文档路径
+                "file_path": ""#填写文档路径;
             }
             ```
             Warning:
-            -description禁止使用```等```字眼省略指标项，但不需要数值数据。
+            -document_description禁止使用```等```字眼省略指标项，但不需要数值数据。
             -输出不要增加额外字段，严格按照Example Output结构输出。
             -不要解释行为。
         """
@@ -101,4 +101,4 @@ class DocumentParser(BaseParser):
         if is_update:
             self.document['parent'] = []
         self.document.setdefault('parent', []).append(parent['category_id'])
-        self.document['parent_description'] = parent['description']
+        self.document['parent_description'] = f'此文档所属父级类别描述:<{parent["category_description"]}>'
