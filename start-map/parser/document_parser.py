@@ -1,3 +1,4 @@
+import copy
 import os
 import datetime
 import json
@@ -72,14 +73,16 @@ class DocumentParser(BaseParser):
         paragraph_ids = []
         for paragraph in paragraphs:
             del paragraph['paragraph_name']
+            del paragraph['parse_strategy']
             del paragraph['content']
             del paragraph['keywords']
             del paragraph['position']
             del paragraph['metadata']
             paragraph_ids.append(paragraph['paragraph_id'])
-        content = Template(DOCUMENT_PARSE_MESSAGES[1]['content'])
-        DOCUMENT_PARSE_MESSAGES[1]['content'] = content.substitute(paragraphs=paragraphs, path=path)
-        document_content = self.llm.chat(DOCUMENT_PARSE_MESSAGES)[0]
+        parse_messages = copy.deepcopy(DOCUMENT_PARSE_MESSAGES)
+        content = Template(parse_messages[1]['content'])
+        parse_messages[1]['content'] = content.substitute(paragraphs=paragraphs, path=path)
+        document_content = self.llm.chat(parse_messages)[0]
         document_content['document_id'] = str(uuid.uuid4())
         document_content['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         document_content['paragraphs'] = paragraph_ids

@@ -15,22 +15,25 @@ DOMAIN_PARSE_MESSAGES = [
             
             ## Profile
             - author: LangGPT 
-            - version: 1.1
+            - version: 1.2
             - language: 中文
-            - description: 能根据文档类别名称与描述判断其所属的标准领域，先从用户提供的已知领域中进行匹配，进行匹配时优先关注`domain_description`而不是`domain_name`，若无法匹配或已知领域不适合该分类则生成新的标准领域结构。
+            - description: 能根据文档类别名称与描述判断其所属的标准领域，先从用户提供的已知领域中进行匹配，匹配时优先关注 `domain_description` 而不是 `domain_name`，若匹配成功但描述不清晰可优化，或已知领域不适合该分类则生成新的标准领域结构，并支持对已有领域描述进行增强与补充。
             
             ## Skills
             1. 从类别语义中抽象提炼其归属领域，支持技术、财务、法律等知识领域。
             2. 优先匹配“已知领域列表”中的领域，避免重复创建相似领域。
-            3. 若无法匹配，或已知领域不适合该分类则生成新的标准领域结构。
-            4. 输出标准领域结构，包括子类、关键词、是否为新建领域等元信息。
+            3. 若匹配成功但领域描述不清晰、范围不够全面，能根据分类描述对领域描述进行合理优化补充。
+            4. 若无法匹配，或已知领域不适合该分类则生成新的标准领域结构。
+            5. 输出标准领域结构，包括子类、关键词、是否为新建领域等元信息。
             
             ## Rules
             1. 类别归属应尽量与已有领域匹配，避免无意义的新建。
             2. 优先匹配用户提供的 `known_domains` 分类列表。
             3. 匹配时需严格判断语义场景，对于具有明显对内或对外属性的类别，应避免将其归入语义方向不符的领域，例如对外交流、合同、投标等业务行为不应归类到强调内部结构或管理的信息类领域。
-            4. 若无明确匹配领域或已知领域语义不符，返回新建领域标记 `new_domain: 'true'`。
-            5. 进行匹配时优先关注`domain_description`而不是`domain_name`，但应结合实际业务场景进行语义逻辑判断。
+            4. 匹配逻辑优先使用 `domain_description` 进行判断，其次考虑 `domain_name`。
+            5. 若无明确匹配领域或者已知领域语义不符或领域数组为空，返回新建领域标记 `new_domain: 'true'`
+            6. 若匹配成功但原有领域描述不够清晰全面，应在保留原始语义的基础上进行补充优化。
+            7. 新建或优化领域时的 `domain_description` 应具备抽象性、可覆盖多个场景，不得冗长或含糊。
             
             ## Workflows
             1. 接收输入：
@@ -39,15 +42,16 @@ DOMAIN_PARSE_MESSAGES = [
                 - known_domains（已知领域列表，含 domain_name, domain_id, domain_description 等）
             2. 解析分类的语义特征，优先匹配已有领域（按语义相关度）。
             3. 若描述明显涉及对外活动、文件交付或客户互动，应优先排除“内部管理”类领域匹配。
-            4. 若匹配成功，返回匹配领域及 `new_domain: 'false'`，否则构建新领域结构。
-            5. 输出 JSON 格式的领域信息结构。
+            4. 匹配成功后，判断当前领域描述是否适配当前分类，若不清晰可进行优化后输出。
+            5. 若匹配失败，则构建新领域结构并标记 `new_domain: 'true'`
+            6. 输出 JSON 格式的领域信息结构，包含是否为新领域与最终描述。
             
             ## Example Output
             ```json
             {
                 "domain_name": "",#填写领域名称；
                 "domain_id": "",
-                "domain_description": "<>", #对应领域的描述信息；
+                "domain_description": "<>", # 对应领域的描述信息，若有优化应包含原始信息的扩展；
                 "new_domain": 'true'/'false' #是否为新领域；
             } 
             Warning:
@@ -124,7 +128,8 @@ class DomainParser(BaseParser):
                 f.write(json.dumps(domains, ensure_ascii=False))
 
     def back_fill_parent(self, parent):
-        if parent is None:
+        # 若生成新领域数据则回填上级数据
+        if self.new_domain == 'true':
             self.domain['parent'] = None
             self.domain['parent_description'] = None
 

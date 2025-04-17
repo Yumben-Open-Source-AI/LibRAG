@@ -20,7 +20,7 @@ PARAGRAPH_PARSE_MESSAGES = [
             - description: 你将得到User输入的一段文本，请详细提取且总结描述其内容，包含必须如实准确提取关键信息如所有指标及其数值数据等，最终按指定格式生成总结及描述。
 
             Skills
-            - 擅长使用面向对象的视角抽取文本内容的对象属性(属性选项:当前页,内容所属类型[摘要/引言/目录/首页/正文/公告/...]。
+            - 擅长使用面向对象的视角抽取文本内容的对象属性(属性项:什么文档,当前页,对象主体,内容所属类型[摘要/引言/目录/首页/正文/公告/...]。
             - 生成详细及信息丰富的描述。
             - 擅长提取文本中的数值数据。
             - 擅长提取文本中所有指标信息。
@@ -30,8 +30,8 @@ PARAGRAPH_PARSE_MESSAGES = [
 
             Rules
             - 描述与总结不能省略内容。
-            - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx第xxx页的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
-            - summary必须声明页码和段落类型这两个属性。
+            - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx(什么文档/章节)第xxx页xxx(对象主体)的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
+            - summary必须声明页码，段落类型，对象主体这三个属性。
             - 每个content至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
             - 允许根据上下文内容智能分割，生成多个paragraph
             - 严格生成结构化不带有转义的JSON数据的总结及描述。
@@ -177,6 +177,7 @@ class ParagraphParser(BaseParser):
     def __init__(self, llm: BaseLLM):
         self.llm = llm
         self.paragraphs = []
+        self.parse_strategy = ''
         self.save_path = os.path.join(self.base_path, 'paragraph_info.json')
 
     def pdf_parse(self, file_path, policy_type='automate_judgment_split'):
@@ -188,6 +189,7 @@ class ParagraphParser(BaseParser):
         if policy_type not in policies:
             raise ValueError('异常的文本切割策略，请提供正确的文本分割策略')
 
+        self.parse_strategy = policy_type
         policies[policy_type](file_path)
         all_paragraphs = copy.deepcopy(self.paragraphs)
         return all_paragraphs
@@ -210,7 +212,7 @@ class ParagraphParser(BaseParser):
 
     def back_fill_parent(self, parent):
         parent_id = parent['document_id']
-        parent_description = parent['description']
+        parent_description = parent['document_description']
         for paragraph in self.paragraphs:
             paragraph['parent'] = parent_id
             paragraph['parent_description'] = f'此段落来源描述:<{parent_description}>'
@@ -221,11 +223,13 @@ class ParagraphParser(BaseParser):
         paragraph_content = self.llm.chat(parse_messages)[0]
         if isinstance(paragraph_content, dict):
             paragraph_content['paragraph_id'] = str(uuid.uuid4())
+            paragraph_content['parse_strategy'] = self.parse_strategy
             paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.append(paragraph_content)
         elif isinstance(paragraph_content, list):
             for paragraph in paragraph_content:
                 paragraph['paragraph_id'] = str(uuid.uuid4())
+                paragraph['parse_strategy'] = self.parse_strategy
                 paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.extend(paragraph_content)
 
@@ -455,22 +459,27 @@ class ParagraphParser(BaseParser):
         """
         import fitz
         doc = fitz.open(file_path)
-        all_paragraphs = []
-        page_count = 1
         with ThreadPoolExecutor(max_workers=25) as executor:
             tasks_page = []
             for page in doc.pages():
                 doc_markdown = page.get_text()
+                page_count = page.number + 1
                 parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
+                # parse_messages[0]['content'] = system_prompt
                 parse_messages[1]['content'] += f"```<当前页:{page_count}, 段落原文:{doc_markdown}>```"
                 task = executor.submit(self.llm.chat, parse_messages)
                 tasks_page.append(task)
-                page_count += 1
 
             for task in as_completed(tasks_page):
                 paragraph_content = task.result()[0]
-                paragraph_content['paragraph_id'] = str(uuid.uuid4())
-                paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                all_paragraphs.append(paragraph_content)
-
-        return all_paragraphs
+                if isinstance(paragraph_content, dict):
+                    paragraph_content['paragraph_id'] = str(uuid.uuid4())
+                    paragraph_content['metadata'] = {
+                        '最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                    self.paragraphs.append(paragraph_content)
+                elif isinstance(paragraph_content, list):
+                    for paragraph in paragraph_content:
+                        paragraph['paragraph_id'] = str(uuid.uuid4())
+                        paragraph['parse_strategy'] = self.parse_strategy
+                        paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                    self.paragraphs.extend(paragraph_content)

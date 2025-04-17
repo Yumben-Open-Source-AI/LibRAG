@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import re
@@ -117,57 +118,57 @@ async def rebuild_data(meta_type: str):
             domain_parser.storage_parser_data()
 
 
-def loading_data(filename: str, policy_type, base_dir: str = ''):
-    file_path = os.path.join(base_dir, filename)
-    qwen = Qwen()
+def loading_data(files: dict, base_dir: str = '../../files/'):
+    for file_name, policy_type in files.items():
+        file_path = os.path.join(base_dir, file_name)
 
-    par_parser = ParagraphParser(qwen)
-    paragraph_params = {
-        'path': file_path,
-        'policy_type': policy_type
-    }
-    all_paragraphs = par_parser.parse(**paragraph_params)
-    print('paragraph', all_paragraphs)
+        print('开始处理' + file_name, datetime.datetime.now())
+        qwen = Qwen()
 
-    # doc_parser = DocumentParser(qwen)
-    # document_params = {
-    #     'paragraphs': all_paragraphs,
-    #     'path': file_path
-    # }
-    # document = doc_parser.parse(**document_params)
-    # print('document', document)
-    #
-    # # 段落解析器回填上级文档数据
-    # par_parser.back_fill_parent(document)
-    # par_parser.storage_parser_data()
-    #
-    # category_parser = CategoryParser(qwen)
-    # category_params = {
-    #     'document': document,
-    # }
-    # category = category_parser.parse(**category_params)
-    # print('category', category)
-    #
-    # # 文档解析器回填上级分类数据
-    # doc_parser.back_fill_parent(category)
-    # doc_parser.storage_parser_data()
-    #
-    # domain_parser = DomainParser(qwen)
-    # domain_params = {
-    #     'cla': category
-    # }
-    # domain = domain_parser.parse(**domain_params)
-    # print('domain', domain)
-    #
-    # # 若生成新分类数据则回填上级领域数据
-    # if category_parser.new_classification == 'true':
-    #     category_parser.back_fill_parent(domain)
-    # category_parser.storage_parser_data()
-    #
-    # # 若生成新领域数据则回填上级数据
-    # if domain_parser.new_domain == 'true':
-    #     domain_parser.back_fill_parent(None)
-    # domain_parser.storage_parser_data()
+        par_parser = ParagraphParser(qwen)
+        paragraph_params = {
+            'path': file_path,
+            'policy_type': policy_type
+        }
+        all_paragraphs = par_parser.parse(**paragraph_params)
+        print('paragraph', all_paragraphs)
+
+        doc_parser = DocumentParser(qwen)
+        document_params = {
+            'paragraphs': all_paragraphs,
+            'path': file_path
+        }
+        document = doc_parser.parse(**document_params)
+        print('document', document)
+
+        # 段落解析器回填上级文档数据
+        par_parser.back_fill_parent(document)
+        par_parser.storage_parser_data()
+
+        category_parser = CategoryParser(qwen)
+        category_params = {
+            'document': document,
+        }
+        category = category_parser.parse(**category_params)
+        print('category', category)
+
+        # 文档解析器回填上级分类数据
+        doc_parser.back_fill_parent(category)
+        doc_parser.storage_parser_data()
+
+        domain_parser = DomainParser(qwen)
+        domain_params = {
+            'cla': category
+        }
+        domain = domain_parser.parse(**domain_params)
+        print('domain', domain)
+
+        category_parser.back_fill_parent(domain)
+        category_parser.storage_parser_data()
+
+        domain_parser.back_fill_parent(None)
+        domain_parser.storage_parser_data()
+        print(file_name + '处理完毕', datetime.datetime.now())
 
 
 class TitleNode:
@@ -307,20 +308,50 @@ if __name__ == '__main__':
     # page_split
     # catalog_split
     # automate_judgment_split
-    # loading_data(r'D:\xqm\python\project\llm\start-map\files\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件\大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件_34.pdf', 'automate_judgment_split')
+    # loading_data({
+    #     '比亚迪股份有限公司 2024年第一季度报告（2024-04-29）.pdf': 'page_split',
+    #     '比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf': 'page_split',
+    #     '比亚迪股份有限公司 2023年第一季度报告（2023-04-27）.pdf': 'page_split',
+    #     '比亚迪股份有限公司 2023年第三季度报告（2023-10-30）.pdf': 'page_split',
+    #     '比亚迪股份有限公司 2022年第一季度季度报告（2022-04-27）.pdf': 'page_split',
+    #     '比亚迪股份有限公司 2022年第三季度季度报告（2022-10-28）.pdf': 'page_split',
+    #     '比亚迪股份有限公司 2021年第三季度报告（2021-10-28）.pdf': 'page_split',
+    #     '贵阳农商银行关于董事、副行长及董事会秘书辞任的公告.pdf': 'page_split',
+    #     '关于“兴银理财丰利悦动稳享1个月最短持有期日开2号固收类理财产品“增设F类产品份额类别的公告.pdf': 'automate_judgment_split',
+    #     '关于“兴银理财丰利悦动稳享7天最短持有期日开1号固收类理财产品”增设C类产品份额类别的公告.pdf': 'automate_judgment_split',
+    #     '关于【兴银理财丰利悦动稳享1个月最短持有期日开2号固收类理财产品】业绩比较基准调整的公告.pdf': 'page_split',
+    #     '兴银理财丰利悦动稳享1个月最短持有期日开2号固收类理财产品【丰利悦动稳享1M持有期（兴普惠）B】估值日公告.pdf': 'page_split',
+    #     '贵阳农村商业银行股份有限公司2021年度股金分红公告.pdf': 'page_split',
+    #     '贵阳农村商业银行股份有限公司2024年一季度一般关联交易信息披露报告.pdf': 'page_split',
+    #     '贵阳农村商业银行股份有限公司2024年三季度一般关联交易信息披露报告.pdf': 'page_split',
+    #     '贵阳农村商业银行股份有限公司2024年二季度一般关联交易信息披露报告（披露）.pdf': 'page_split',
+    #     '贵阳农村商业银行股份有限公司2024年四季度一般关联交易信息披露报告.pdf': 'page_split',
+    #     '贵阳农村商业银行股份有限公司关于变更审计机构的公告.pdf': 'automate_judgment_split',
+    #     '贵阳农村商业银行股份有限公司关于完成注册资本工商变更登记的公告.pdf': 'page_split',
+    #     '贵阳农村商业银行股份有限公司股东大会2024年第一次会议决议公告.pdf': 'page_split',
+    #     '大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.pdf': 'automate_judgment_split',
+    # })
 
-    with open(r'D:\xqm\python\project\llm\start-map\files\超值宝定开1年12期理财产品销售文件.md', 'r',
-              encoding='utf-8') as f:
-        text = f.read()
-
-    import re
-
-    pattern = '<!--.*?-->|<html[^>]*>[\s\S]*?</html>'
-    htmls = re.findall(pattern, text)
-    print(htmls)
-    print(len(htmls))
-
-    for html in htmls:
-        markdown_text = NoEscapeConverter().convert(html)
-        r
-        print(markdown_text)
+    loading_data({
+        '比亚迪股份有限公司 2024年第一季度报告（2024-04-29）.pdf': 'page_split',
+        '比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf': 'page_split',
+        '比亚迪股份有限公司 2023年第一季度报告（2023-04-27）.pdf': 'page_split',
+        '比亚迪股份有限公司 2023年第三季度报告（2023-10-30）.pdf': 'page_split',
+        '比亚迪股份有限公司 2022年第一季度季度报告（2022-04-27）.pdf': 'page_split',
+        '比亚迪股份有限公司 2022年第三季度季度报告（2022-10-28）.pdf': 'page_split',
+        '比亚迪股份有限公司 2021年第三季度报告（2021-10-28）.pdf': 'page_split',
+        '贵阳农商银行关于董事、副行长及董事会秘书辞任的公告.pdf': 'page_split',
+        '关于“兴银理财丰利悦动稳享1个月最短持有期日开2号固收类理财产品“增设F类产品份额类别的公告.pdf': 'automate_judgment_split',
+        '关于“兴银理财丰利悦动稳享7天最短持有期日开1号固收类理财产品”增设C类产品份额类别的公告.pdf': 'automate_judgment_split',
+        '关于【兴银理财丰利悦动稳享1个月最短持有期日开2号固收类理财产品】业绩比较基准调整的公告.pdf': 'page_split',
+        '兴银理财丰利悦动稳享1个月最短持有期日开2号固收类理财产品【丰利悦动稳享1M持有期（兴普惠）B】估值日公告.pdf': 'page_split',
+        '贵阳农村商业银行股份有限公司2021年度股金分红公告.pdf': 'page_split',
+        '贵阳农村商业银行股份有限公司2024年一季度一般关联交易信息披露报告.pdf': 'page_split',
+        '贵阳农村商业银行股份有限公司2024年三季度一般关联交易信息披露报告.pdf': 'page_split',
+        '贵阳农村商业银行股份有限公司2024年二季度一般关联交易信息披露报告（披露）.pdf': 'page_split',
+        '贵阳农村商业银行股份有限公司2024年四季度一般关联交易信息披露报告.pdf': 'page_split',
+        '贵阳农村商业银行股份有限公司关于变更审计机构的公告.pdf': 'automate_judgment_split',
+        '贵阳农村商业银行股份有限公司关于完成注册资本工商变更登记的公告.pdf': 'page_split',
+        '贵阳农村商业银行股份有限公司股东大会2024年第一次会议决议公告.pdf': 'page_split',
+        '大数据应用平台V5.0项目E包-大数据共享系统V2.1功能拓展项目投标文件.pdf': 'automate_judgment_split',
+    })

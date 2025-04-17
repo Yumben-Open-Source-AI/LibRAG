@@ -54,6 +54,7 @@ CATEGORY_PARSE_MESSAGES = [
             {
                 "category_name": "", #分类名称
                 "category_description": "<>", #这个分类的描述
+                "category_id": "",
                 "metadata": {
                     "关联实体": [] #此分类涉及到的实体信息
                 },
@@ -91,11 +92,10 @@ class CategoryParser(BaseParser):
             'document_description': doc_description,
             'known_categories': self.__get_known_categories(),
         }
-        parse_message = copy.deepcopy(CATEGORY_PARSE_MESSAGES)
-        content = Template(parse_message[1]['content'])
-        parse_message[1]['content'] = content.substitute(parse_info=str(parse_params))
-        print(parse_message[1]['content'])
-        self.category = self.llm.chat(parse_message)[0]
+        parse_messages = copy.deepcopy(CATEGORY_PARSE_MESSAGES)
+        content = Template(parse_messages[1]['content'])
+        parse_messages[1]['content'] = content.substitute(parse_info=str(parse_params))
+        self.category = self.llm.chat(parse_messages)[0]
         new_classification = self.category['new_classification']
         # llm judgments this document is not an added type
         if new_classification == 'false':
@@ -111,8 +111,10 @@ class CategoryParser(BaseParser):
         return self.category
 
     def back_fill_parent(self, parent):
-        self.category['parent'] = parent['domain_id']
-        self.category['parent_description'] = f'此分类所属父级领域描述:<{parent["domain_description"]}>'
+        # 若生成新分类数据则回填上级领域数据
+        if self.new_classification == 'true':
+            self.category['parent'] = parent['domain_id']
+            self.category['parent_description'] = f'此分类所属父级领域描述:<{parent["domain_description"]}>'
 
     def rebuild_domain(self):
         ...
