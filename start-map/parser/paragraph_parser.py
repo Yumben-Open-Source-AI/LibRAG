@@ -304,12 +304,15 @@ class ParagraphParser(BaseParser):
 
             return data
 
-        def html_to_markdown(pages):
+        def html_to_markdown(pages: str):
             """ html形式table转化为markdown """
             pattern = '<!--.*?-->|<html[^>]*>[\s\S]*?</html>'
             htmls = re.findall(pattern, pages)
             for html in htmls:
-                NoEscapeConverter().convert(html)
+                markdown_html = NoEscapeConverter().convert(html)
+                pages = pages.replace(html, markdown_html)
+
+            return pages
 
         def preprocess_markdown_titles(markdown_titles):
             """ 预处理Markdown格式的标题列表，去除#符号和空格 """
@@ -380,20 +383,21 @@ class ParagraphParser(BaseParser):
             return sections
 
         pdf_content = miner_parse_pdf()
-        print(pdf_content)
+        pdf_content = html_to_markdown(pdf_content)
 
-        template = Template(PARAGRAPH_CATALOG_MESSAGES[0]['content'])
-        PARAGRAPH_CATALOG_MESSAGES[0]['content'] = template.substitute(content=pdf_content)
-        parse_result = self.llm.chat(PARAGRAPH_CATALOG_MESSAGES)[0]
-        catalogs = parse_result['catalogs']
+        catalog_messages = copy.deepcopy(PARAGRAPH_CATALOG_MESSAGES)
+        template = Template(catalog_messages[1]['content'])
+        catalog_messages[1]['content'] = template.substitute(content=pdf_content)
+        catalog_result = self.llm.chat(catalog_messages)[0]
+        catalogs = catalog_result['catalogs']
         titles = catalogs
-        if isinstance(parse_result['catalogs'], str):
+        if isinstance(catalog_result['catalogs'], str):
             titles = catalogs.split('\n')
         print(titles)
         try:
             result = split_markdown_structured_document(pdf_content, titles)
 
-            # 打印切割结果
+            # 根据目录层级分割文本块
             for original_title in titles:
                 clean_title = preprocess_markdown_titles([original_title])[0]
                 raw_title = result[clean_title]['raw_title']

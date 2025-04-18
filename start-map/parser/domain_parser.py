@@ -121,8 +121,9 @@ class DomainParser(BaseParser):
 
             for domain in domains:
                 if domain['domain_id'] == self.domain['domain_id']:
-                    domain['sub_categories'] = self.domain['sub_categories']
                     domain['metadata'] = self.domain['metadata']
+                    domain['sub_categories'] = self.domain['sub_categories']
+                    domain['domain_description'] = self.domain['domain_description']
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
                 f.write(json.dumps(domains, ensure_ascii=False))
