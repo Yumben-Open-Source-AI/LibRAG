@@ -9,7 +9,7 @@ from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 from docx.table import _Cell, Table
 from docx.text.paragraph import Paragraph
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile
 
 from llm.deepseek import DeepSeek
 from parser.class_parser import CategoryParser
@@ -17,11 +17,11 @@ from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
 from parser.paragraph_parser import ParagraphParser
 
-router = APIRouter(tags=['ai'], prefix='/ai')
-
 from llm.qwen import Qwen
 from selector.document_selector import DocumentSelector
 from selector.paragraph_selector import ParagraphSelector
+
+router = APIRouter(tags=['ai'], prefix='/ai')
 
 
 @router.get('/query')
@@ -291,26 +291,14 @@ def extract_subtitles(data):
     return result
 
 
-from markdownify import MarkdownConverter
-
-
-class NoEscapeConverter(MarkdownConverter):
-    """ 重写MarkdownConverter更改转义策略 """
-
-    def escape(self, text):
-        # 直接返回原始文本，不做任何转义
-        return text
-
-
 if __name__ == '__main__':
     os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
     os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     # page_split
     # catalog_split
     # automate_judgment_split
-
     loading_data(
         {
-            '大数据查询平台_接口文档_1.6.pdf': 'automate_judgment_split'
+            '超值宝定开1年13期理财产品销售文件.pdf': 'catalog_split'
         }
     )

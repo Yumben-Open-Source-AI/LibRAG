@@ -103,7 +103,7 @@ PARAGRAPH_CATALOG_MESSAGES = [
     },
     {
         'role': 'user',
-        'content': '解析文本且提取文中所有标题结构，最终只需返回字符串形式大纲保留文中实际出现的标题不需要具体内容(#表示一级标题以此类推)，生成之后需要自己检查一遍是否是文中实际标题<$content>, 输出样例: {"catalogs": ""}'
+        'content': '解析文本且提取文中所有一二三级标题结构，最终只需返回字符串形式大纲保留文中实际出现的标题不需要具体内容(#表示一级标题以此类推)<$content>, 输出样例: {"catalogs": ""}'
     }
 ]
 PARAGRAPH_JUDGE_MESSAGES = [
@@ -407,7 +407,7 @@ class ParagraphParser(BaseParser):
                 print(f"【内容片段】\n{result[clean_title]['content']}\n")
                 content = raw_content.replace(' ', '').replace('\n', '')
                 cur_index = find_text_page(content[:20])
-                next_index = find_text_page(content[-10:]) if find_text_page(content[-10:]) != -1 else cur_index
+                next_index = find_text_page(content[-20:]) if find_text_page(content[-20:]) != -1 else cur_index
                 if len(content) > 0:
                     print(cur_index)
                     print(next_index)
