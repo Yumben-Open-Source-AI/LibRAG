@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "domain_name": "企业财务管理",
+    "domain_id": "222994e4-1f9a-4301-978a-0f7ae923c84c",
+    "domain_description": "本领域涵盖企业财务状况的分析与报告，包括财务报表、股东持股详情、经营成果、现金流量、重要事项公告、非经常性损益项目及主要会计数据和财务指标等。适用于企业内外部财务信息的编制、审核与发布。",
+    "sub_categories": [
+      "1cc27c2a-2933-4dc6-830c-58dda9a7a862",
+      "dd452bf6-d25e-492c-a6a5-2783905a1b88"
+    ],
+    "metadata": {
+      "最后更新时间": "2025-04-17 18:20:37"
+    },
+    "parent": null,
+    "parent_description": null
+  },
+  {
+    "domain_name": "企业人事管理",
+    "domain_id": "36d40b81-cc58-462a-9c84-041a48cacd14",
+    "domain_description": "本领域涵盖企业内部人力资源管理的相关信息，包括但不限于高级管理人员的人事变动、员工招聘、培训与发展、绩效评估、薪酬福利、劳动关系等。适用于企业内部人事信息的记录、处理与分析。",
+    "sub_categories": [
+      "b4e396c4-ced5-4b0e-9849-a6dad6456bf3"
+    ],
+    "metadata": {
+      "最后更新时间": "2025-04-17 18:19:05"
+    },
+    "parent": null,
+    "parent_description": null
+  },
+  {
+    "domain_name": "企业项目管理",
+    "domain_id": "d06b1153-6b82-4781-b295-5886bcf8d89e",
+    "domain_description": "本领域涵盖企业在参与各类项目管理过程中的所有相关活动，包括但不限于项目投标、合同签订、项目执行、监控与收尾等阶段。涉及的内容有项目计划、风险评估、资源分配、质量控制、沟通协调等，适用于企业内外部项目信息的编制、审核与发布。",
+    "sub_categories": [
+      "73d03dc7-aa6b-407b-98e0-07fe825f9aed"
+    ],
+    "metadata": {
+      "最后更新时间": "2025-04-17 18:46:45"
+    },
+    "parent": null,
+    "parent_description": null
+  }
+]
