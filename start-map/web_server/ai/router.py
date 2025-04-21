@@ -3,13 +3,14 @@ import json
 import os
 import re
 from collections import deque
+from typing import List
 
 from docx.document import Document
 from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 from docx.table import _Cell, Table
 from docx.text.paragraph import Paragraph
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from llm.deepseek import DeepSeek
 from parser.class_parser import CategoryParser
@@ -118,10 +119,29 @@ async def rebuild_data(meta_type: str):
             domain_parser.storage_parser_data()
 
 
-def loading_data(files: dict, base_dir: str = '../../files/'):
-    for file_name, policy_type in files.items():
-        file_path = os.path.join(base_dir, file_name)
+@router.post('/upload')
+async def loading_data(
+        files: List[UploadFile] = File(..., description="文件列表"),
+        policy_types: List[str] = Form(..., description="处理文本策略")
+):
+    # 验证文件和策略类型数量一致
+    if len(files) != len(policy_types):
+        raise HTTPException(
+            status_code=400,
+            detail="文件列表与处理文本策略数量不一致"
+        )
 
+    base_dir: str = './files/'
+    os.makedirs(base_dir, exist_ok=True)
+    for file, policy_type in zip(files, policy_types):
+        file_name = file.filename
+
+        contents = await file.read()
+        file_path = os.path.abspath(os.path.join(base_dir, file_name))
+        with open(file_path, 'wb') as f:
+            f.write(contents)
+
+        # 进行文件预处理
         print('开始处理' + file_name, datetime.datetime.now())
         qwen = Qwen()
 
@@ -297,8 +317,3 @@ if __name__ == '__main__':
     # page_split
     # catalog_split
     # automate_judgment_split
-    loading_data(
-        {
-            '超值宝定开1年13期理财产品销售文件.pdf': 'catalog_split'
-        }
-    )

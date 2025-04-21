@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import re
+import tempfile
 import uuid
 import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -9,6 +10,10 @@ from string import Template
 from llm.base import BaseLLM
 from parser.base import BaseParser
 from markdownify import MarkdownConverter
+
+from pathlib import Path
+
+from parser.load_api import convert_pdf_to_md, convert_file_to_pdf
 
 PARAGRAPH_PARSE_MESSAGES = [
     {
@@ -97,13 +102,15 @@ PARAGRAPH_CATALOG_MESSAGES = [
             ## Example Output
             ```json
             {
-                "catalogs": "<用 Markdown 形式的标题串>"
+                "catalogs":  [] #<用 Markdown 形式的标题串列表>
             }
+            Warning:
+            -最多输出到三级标题###为止，禁止输出四级标题####；
         """
     },
     {
         'role': 'user',
-        'content': '解析文本且提取文中所有一二三级标题结构，最终只需返回字符串形式大纲保留文中实际出现的标题不需要具体内容(#表示一级标题以此类推)<$content>, 输出样例: {"catalogs": ""}'
+        'content': '解析文本且提取文中所有一二三级标题结构，最终只需返回字符串形式大纲保留文中实际出现的标题不需要具体内容(#表示一级标题以此类推)<$content>'
     }
 ]
 PARAGRAPH_JUDGE_MESSAGES = [
@@ -197,10 +204,18 @@ class ParagraphParser(BaseParser):
     def parse(self, **kwargs):
         file_path = kwargs.get('path')
         policy_type = kwargs.get('policy_type')
+        file_obj = Path(file_path)
+
+        # 文件转换为pdf
+        if file_obj.suffix in ['.doc', '.docx']:
+            temp_dir = tempfile.mkdtemp()
+            convert_file_to_pdf(file_path, temp_dir)
+            file_path = f"{temp_dir}\\{file_obj.name.split('.')[0]}.pdf"
+
         if file_path.endswith('.pdf'):
+            # parse_result = self.pdf_parse(file_path, policy_type)
+            # os.remove(file_path)
             return self.pdf_parse(file_path, policy_type)
-        elif file_path.endswith('.docx'):
-            ...
 
     def storage_parser_data(self):
         with open(self.save_path, 'r', encoding='utf-8') as f:
@@ -248,61 +263,10 @@ class ParagraphParser(BaseParser):
             for page_num in range(len(doc)):
                 text = doc.load_page(page_num).get_text().replace('\n', '').replace(' ', '')
 
-                if target_text in text:
+                if target_text in text and page_num >= last_index - 1:
                     return page_num + 1
 
             return -1
-
-        def miner_parse_pdf():
-            """
-            文档解析PDF转化为机器可读格式的工具 pdf to markdown
-            """
-            import os
-
-            from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
-            from magic_pdf.data.dataset import PymuDocDataset
-            from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
-            from magic_pdf.config.enums import SupportedPdfParseMethod
-
-            # args
-            pdf_file_name = os.path.abspath(file_path)
-            name_without_suffix = pdf_file_name.split(".")[0]
-
-            # prepare env
-            local_image_dir, local_md_dir = "output/images", "output"
-            image_dir = str(os.path.basename(local_image_dir))
-
-            os.makedirs(local_image_dir, exist_ok=True)
-
-            image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(
-                local_md_dir
-            )
-
-            # read bytes
-            reader1 = FileBasedDataReader("")
-            pdf_bytes = reader1.read(pdf_file_name)  # read the pdf content
-
-            # proc
-            ## Create Dataset Instance
-            ds = PymuDocDataset(pdf_bytes)
-
-            ## inference
-            if ds.classify() == SupportedPdfParseMethod.OCR:
-                ds.apply(doc_analyze, ocr=True).pipe_ocr_mode(image_writer).dump_md(
-                    md_writer, f"{name_without_suffix}.md", image_dir
-                )
-
-                with open(f'{name_without_suffix}.md', 'r', encoding='utf-8') as file:
-                    data = file.read()
-            else:
-                ds.apply(doc_analyze, ocr=False).pipe_txt_mode(image_writer).dump_md(
-                    md_writer, f"{name_without_suffix}.md", image_dir
-                )
-
-                with open(f'{name_without_suffix}.md', 'r', encoding='utf-8') as file:
-                    data = file.read()
-
-            return data
 
         def html_to_markdown(pages: str):
             """ html形式table转化为markdown """
@@ -382,7 +346,7 @@ class ParagraphParser(BaseParser):
 
             return sections
 
-        pdf_content = miner_parse_pdf()
+        pdf_content = convert_pdf_to_md(file_path)
         pdf_content = html_to_markdown(pdf_content)
 
         catalog_messages = copy.deepcopy(PARAGRAPH_CATALOG_MESSAGES)
@@ -397,6 +361,7 @@ class ParagraphParser(BaseParser):
         try:
             result = split_markdown_structured_document(pdf_content, titles)
 
+            last_index = 0
             # 根据目录层级分割文本块
             for original_title in titles:
                 clean_title = preprocess_markdown_titles([original_title])[0]
@@ -404,10 +369,19 @@ class ParagraphParser(BaseParser):
                 raw_content = result[clean_title]['content']
                 print(f"【Markdown标题】{original_title}")
                 print(f"【实际匹配标题】{raw_title}")
-                print(f"【内容片段】\n{result[clean_title]['content']}\n")
-                content = raw_content.replace(' ', '').replace('\n', '')
+                print(f"【内容片段】\n{raw_content}\n")
+                raw_content = raw_content.replace(' ', '').replace('\n', '')
+                if '|' in raw_content:
+                    raw_content = raw_content.replace('|', '')
+                if '---' in raw_content:
+                    raw_content = raw_content.replace('---', '')
+                if '#' in raw_content:
+                    raw_content = raw_content.replace('#', '')
+                content = raw_content
                 cur_index = find_text_page(content[:20])
-                next_index = find_text_page(content[-20:]) if find_text_page(content[-20:]) != -1 else cur_index
+                next_index = find_text_page(content[-20:])
+                next_index = next_index if next_index != -1 else cur_index
+                last_index = next_index
                 if len(content) > 0:
                     print(cur_index)
                     print(next_index)
