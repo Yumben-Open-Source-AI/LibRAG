@@ -15,16 +15,19 @@ def read_md_file(name_without_suffix):
     return data
 
 
-def convert_file_to_pdf(input_path, output_dir):
+def convert_file_type(input_path, output_dir, convert_type='pdf'):
     if not os.path.isfile(input_path):
         raise FileNotFoundError(f"The input file {input_path} does not exist.")
+
+    if convert_type not in ['pdf', 'docx']:
+        raise SupportedPdfParseMethod
 
     os.makedirs(output_dir, exist_ok=True)
 
     cmd = [
         'soffice',
         '--headless',
-        '--convert-to', 'pdf',
+        '--convert-to', convert_type,
         '--outdir', str(output_dir),
         str(input_path)
     ]

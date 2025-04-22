@@ -3,15 +3,18 @@ import json
 import os
 import re
 from collections import deque
-from typing import List
+from typing import List, Literal, Optional, Annotated
 
 from docx.document import Document
 from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 from docx.table import _Cell, Table
 from docx.text.paragraph import Paragraph
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
+from sqlmodel import select
 
+from db.database import SessionDep
+from web_server.ai.schemas import KbBase, KnowledgeBase
 from llm.deepseek import DeepSeek
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
@@ -122,8 +125,10 @@ async def rebuild_data(meta_type: str):
 @router.post('/upload')
 async def loading_data(
         files: List[UploadFile] = File(..., description="文件列表"),
-        policy_types: List[str] = Form(..., description="处理文本策略")
+        policy_types: List[str] = Form(...,
+                                       description="处理文本策略: 1.page_split(多并发按页分割)、2.catalog_split(识别段落标题自动分割)、3.automate_judgment_split(自动上下文分割)")
 ):
+    policy_types = policy_types[0].split(',')
     # 验证文件和策略类型数量一致
     if len(files) != len(policy_types):
         raise HTTPException(
@@ -189,6 +194,46 @@ async def loading_data(
         domain_parser.back_fill_parent(None)
         domain_parser.storage_parser_data()
         print(file_name + '处理完毕', datetime.datetime.now())
+
+
+@router.post('/knowledge_bases', response_model=KbBase)
+async def create_knowledge_bases(kb: KbBase, session: SessionDep):
+    db_kb = KnowledgeBase.model_validate(kb)
+    session.add(db_kb)
+    session.commit()
+    session.refresh(db_kb)
+    return db_kb
+
+
+@router.get('/knowledge_bases/{kb_id}', response_model=KbBase)
+def read_knowledge_base(kb_id: int, session: SessionDep):
+    kd = session.get(KnowledgeBase, kb_id)
+    if not kd:
+        raise HTTPException(status_code=404, detail="KnowledgeBase not found")
+    return kd
+
+
+@router.get('/knowledge_bases', response_model=list[KnowledgeBase])
+def read_knowledge_bases(
+    session: SessionDep,
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 100,
+):
+    heroes = session.exec(select(KnowledgeBase).offset(offset).limit(limit)).all()
+    return heroes
+
+
+@router.patch('/knowledge_bases/{kb_id}', response_model=KbBase)
+def update_hero(kb_id: int, kb: KbBase, session: SessionDep):
+    kb_db = session.get(KnowledgeBase, kb_id)
+    if not kb_db:
+        raise HTTPException(status_code=404, detail="Hero not found")
+    kb_data = kb.model_dump(exclude_unset=True)
+    kb_db.sqlmodel_update(kb_data)
+    session.add(kb_db)
+    session.commit()
+    session.refresh(kb_db)
+    return kb_db
 
 
 class TitleNode:

@@ -8,6 +8,8 @@ import gradio as gr
 import pandas as pd
 from gradio_modal import Modal
 
+from db.database import create_db_and_tables
+
 # ============ 日志装饰器（打印所有输入 / 输出） ============
 logging.basicConfig(
     level=logging.INFO,
@@ -140,11 +142,13 @@ def recall_test(query, kb_name):
 
 
 # ---------- UI ----------
-with gr.Blocks(title="KB Manager & Recall Test") as demo:
+with gr.Blocks(title="LibRAG") as demo:
+    # TODO feat 读取数据库接口查询
     kb_state = gr.State(kb_state_init.copy())
     kb_selected_idx = gr.State(None)
 
     with gr.Tabs(selected=0):
+        # 知识库管理tab
         with gr.TabItem("知识库管理"):
             with gr.Row():
                 create_btn = gr.Button("创建知识库", variant="primary")
@@ -169,6 +173,7 @@ with gr.Blocks(title="KB Manager & Recall Test") as demo:
                 kb_files_df = gr.Dataframe(interactive=False, max_height=260)
                 add_files_up = gr.File(file_count="multiple", label="追加上传文件", type="filepath")
 
+        # 召回测试tag
         with gr.TabItem("召回测试"):
             with gr.Row():
                 query_tb = gr.Textbox(label="输入内容", placeholder="请输入查询…", lines=1, scale=6)

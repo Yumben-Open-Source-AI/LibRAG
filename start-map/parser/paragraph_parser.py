@@ -13,7 +13,7 @@ from markdownify import MarkdownConverter
 
 from pathlib import Path
 
-from parser.load_api import convert_pdf_to_md, convert_file_to_pdf
+from parser.load_api import convert_pdf_to_md, convert_file_type
 
 PARAGRAPH_PARSE_MESSAGES = [
     {
@@ -209,8 +209,9 @@ class ParagraphParser(BaseParser):
         # 文件转换为pdf
         if file_obj.suffix in ['.doc', '.docx']:
             temp_dir = tempfile.mkdtemp()
-            convert_file_to_pdf(file_path, temp_dir)
+            convert_file_type(file_path, temp_dir)
             file_path = f"{temp_dir}\\{file_obj.name.split('.')[0]}.pdf"
+            print(file_path)
 
         if file_path.endswith('.pdf'):
             # parse_result = self.pdf_parse(file_path, policy_type)
@@ -315,8 +316,10 @@ class ParagraphParser(BaseParser):
                     if not match:
                         expected_title = clean_titles[i]
                         found_titles = '\n'.join(clean_titles[:i])
-                        raise ValueError(f"标题 '{expected_title}' 未找到，请确认：\n"
-                                         f"1.标题顺序是否正确\n2.是否缺少必要标题\n3.已匹配标题列表：\n{found_titles}")
+                        # 二次匹配后依旧不成功跳过处理
+                        continue
+                        # raise ValueError(f"标题 '{expected_title}' 未找到，请确认：\n"
+                        #                  f"1.标题顺序是否正确\n2.是否缺少必要标题\n3.已匹配标题列表：\n{found_titles}")
                 start = last_pos + match.start()
                 end = last_pos + match.end()
                 matches.append((start, end))
