@@ -1,5 +1,18 @@
+<div align="center">
+<img src="./log(500x500).png" width="300px" alt="xorbits" />
+
+<p align="center">
+  <a href="./README.md"><img alt="README in English" src="https://img.shields.io/badge/English-d9d9d9?style=for-the-badge"></a>
+  <a href="./README_zh_CN.md"><img alt="简体中文版自述文件" src="https://img.shields.io/badge/中文介绍-454545?style=for-the-badge"></a>
+  <a href="./README_ja_JP.md"><img alt="日本語のREADME" src="https://img.shields.io/badge/日本語-d9d9d9?style=for-the-badge"></a>
+</p>
+</div>
+<br />
+
+
 # LibRAG
 LibRAG是一款突破传统RAG架构的通用智能内容召回引擎，通过​​全链路模型推理能力​​重构文档预处理与段落召回流程。产品摒弃了嵌入模型、向量数据库等复杂组件，直接利用大语言模型（LLM）的深层语义理解能力实现端到端的精准检索与召回，适用于企业知识管理、专业领域问答、合规性审查、医疗病例检索、金融风控、AI智能体等多种AI应用场景。
+
 
 # 架构概览
 ![image](https://github.com/user-attachments/assets/fdfc14c7-8d39-4fb4-9955-c8f59ca598f8)
