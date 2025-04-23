@@ -17,7 +17,7 @@ LibRAG是一款突破传统RAG架构的通用智能内容召回引擎，通过�
 # 架构概览
 系统采用多级语义解析 + 统一索引技术，将文本转化为可检索的知识单元，并通过语义路由层实现按需精准召回与答案生成。
 
-![image](https://github.com/user-attachments/assets/00f1562b-52bc-480e-b1f4-e08b589db54b)
+![image](./framework.png)  
 
 
 # 核心技术突破
