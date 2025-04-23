@@ -181,8 +181,8 @@ class NoEscapeConverter(MarkdownConverter):
 
 
 class ParagraphParser(BaseParser):
-    def __init__(self, llm: BaseLLM):
-        self.llm = llm
+    def __init__(self, llm: BaseLLM, kb_id):
+        super().__init__(llm, kb_id)
         self.paragraphs = []
         self.parse_strategy = ''
         self.save_path = os.path.join(self.base_path, 'paragraph_info.json')
@@ -238,12 +238,14 @@ class ParagraphParser(BaseParser):
         parse_messages[1]['content'] += f"```<当前页:{cur_index}至{next_index}, 段落原文:{page_text}>```"
         paragraph_content = self.llm.chat(parse_messages)[0]
         if isinstance(paragraph_content, dict):
+            paragraph_content['kb_id'] = self.kb_id
             paragraph_content['paragraph_id'] = str(uuid.uuid4())
             paragraph_content['parse_strategy'] = self.parse_strategy
             paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.append(paragraph_content)
         elif isinstance(paragraph_content, list):
             for paragraph in paragraph_content:
+                paragraph['kb_id'] = self.kb_id
                 paragraph['paragraph_id'] = str(uuid.uuid4())
                 paragraph['parse_strategy'] = self.parse_strategy
                 paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}

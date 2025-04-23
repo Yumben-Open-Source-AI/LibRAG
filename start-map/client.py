@@ -8,13 +8,26 @@ import gradio as gr
 import pandas as pd
 from gradio_modal import Modal
 
-from db.database import create_db_and_tables
+from tools.http_utils import RequestHandler
 
-# ============ 日志装饰器（打印所有输入 / 输出） ============
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
+file_split_state = []
+
+ALL_STRATEGY = {
+    '按页切割': 'page_split',
+    '按目录切割': 'catalog_split',
+    '智能上下文切割': 'automate_judgment_split'
+}
+
+MAX_ROWS = 20
+
+request = RequestHandler('http://127.0.0.1:13113/ai/')
+
+
+# # ============ 日志装饰器（打印所有输入 / 输出） ============
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s | %(levelname)s | %(message)s"
+# )
 
 
 def log_io(func):
@@ -44,10 +57,11 @@ kb_state_init = [
 ]
 
 
-# ---------- 工具函数 ----------
-def kb_table_from_state(state):
+def get_kb_table(include_key=None):
+    all_kbs = request.safe_send_request('knowledge_bases', 'GET')
+
     return pd.DataFrame(
-        [{"知识库名称": kb["name"], "文件数": len(kb["files"])} for kb in state]
+        [{"已有知识库名称": kb['kb_name'], "已有知识库描述": kb['kb_description']} for kb in all_kbs]
     )
 
 
@@ -55,39 +69,74 @@ def file_table_from_kb(kb):
     return pd.DataFrame(kb["files"]) if kb else pd.DataFrame()
 
 
-# ---------- 回调 ----------
-@log_io
-def preview_upload(paths):
-    rows = [
-        {"文件名": os.path.basename(p), "大小(KB)": round(os.path.getsize(p) / 1024, 2)}
-        for p in paths or []
-    ]
-    return pd.DataFrame(rows, columns=["文件名", "大小(KB)"])
+def make_preview_cb():
+    """闭包：动态控制行显隐 + 预览表格"""
+
+    @log_io
+    def preview_upload(paths):
+        # 1) 生成右下 DataFrame 预览
+        df = pd.DataFrame([
+            {"文件名": os.path.basename(p),
+             "大小(KB)": round(os.path.getsize(p) / 1024, 2),
+             "文件类型": os.path.splitext(p)[1][1:]}
+            for p in (paths or [])
+        ])
+        # 2) 更新行组件
+        updates = []
+        for i in range(MAX_ROWS):
+            if paths and i < len(paths):
+                updates += [
+                    gr.Row.update(visible=True),
+                    gr.update(value=os.path.basename(paths[i]),
+                              visible=True, interactive=False),
+                    gr.update(visible=True, interactive=True,
+                              value="智能上下文切割"),
+                ]
+            else:
+                updates += [
+                    gr.Row.update(visible=False),
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                ]
+        return df, *updates
+
+    return preview_upload
 
 
-@log_io
-def submit_create_kb(name: str, paths: list[str], state: list[dict]):
+def submit_create_kb(name, desc, files, *strategies):
+    """保存知识库 + 每个文件的切割策略"""
     if not name.strip():
         gr.Warning("知识库名称不能为空")
-        return state, kb_table_from_state(state), None, pd.DataFrame(), gr.update(
-            choices=[kb["name"] for kb in state]), Modal(visible=False)
-
-    if not paths:
+        return Modal(visible=True)
+    if not desc.strip():
+        gr.Warning("知识库描述不能为空")
+        return Modal(visible=True)
+    if not files:
         gr.Warning("请选择至少一个文件")
-        return state, kb_table_from_state(state), None, pd.DataFrame(), gr.update(
-            choices=[kb["name"] for kb in state]), Modal(visible=False)
+        return Modal(visible=True)
 
-    files_meta = [{"name": os.path.basename(p), "size": round(os.path.getsize(p) / 1024, 2)} for p in paths]
-    state.append({"name": name.strip(), "files": files_meta})
-    gr.Info(f"知识库『{name}』已创建，共 {len(paths)} 个文件")
+    # 新增知识库数据
+    new_kb = request.safe_send_request('knowledge_bases', 'POST', json={
+        'kb_name': name,
+        'kb_description': desc,
+        'keywords': ''
+    })
+    print(new_kb)
 
-    updated_table = kb_table_from_state(state)
-    dd_choices = [kb["name"] for kb in state]
+    for file, strategy in zip(files, strategies):
+        with open(file, 'rb') as f:
+            request.safe_send_request('upload', 'POST', body={
+                'kb_id': new_kb['kb_id'],
+                'policy_type': strategy
+            }, files={'file': f})
 
-    return state, updated_table, None, pd.DataFrame(), gr.update(choices=dd_choices), Modal(visible=False)
+    gr.Info(f"知识库『{name}』已创建，共 {len(files)} 个文件")
+    return (
+        Modal(visible=False),  # 关闭弹窗
+        get_kb_table()  # 刷新左侧总表
+    )
 
 
-@log_io
 def enter_kb(evt: gr.SelectData, state):
     if evt.index is None:
         return None, gr.update(visible=False), pd.DataFrame()
@@ -113,7 +162,6 @@ def enter_kb(evt: gr.SelectData, state):
     )
 
 
-@log_io
 def add_files_to_kb(paths, idx, state):
     if idx is None or idx >= len(state) or not paths:
         return file_table_from_kb(state[idx]) if idx is not None else pd.DataFrame()
@@ -125,7 +173,6 @@ def add_files_to_kb(paths, idx, state):
     return file_table_from_kb(kb)
 
 
-@log_io
 def recall_test(query, kb_name):
     if not query.strip():
         gr.Warning("请输入查询内容")
@@ -133,17 +180,19 @@ def recall_test(query, kb_name):
     if not kb_name:
         gr.Warning("请选择知识库")
         return pd.DataFrame()
-    rows = [
-        {"rank": i, "doc": random.choice(["demo_说明.pdf", "requirements.txt"]),
-         "score": round(random.random(), 4),
-         "snippet": f"『{query}』相关内容片段 #{i}"} for i in range(1, 6)
-    ]
+
+    rows = []
+    for i in range(1, 6):
+        rows.append({
+            "rank": i, "doc": random.choice(["demo_说明.pdf", "requirements.txt"]),
+            "score": round(random.random(), 4),
+            "snippet": f"『{query}』相关内容片段 #{i}"
+        })
     return pd.DataFrame(rows)
 
 
 # ---------- UI ----------
 with gr.Blocks(title="LibRAG") as demo:
-    # TODO feat 读取数据库接口查询
     kb_state = gr.State(kb_state_init.copy())
     kb_selected_idx = gr.State(None)
 
@@ -151,21 +200,40 @@ with gr.Blocks(title="LibRAG") as demo:
         # 知识库管理tab
         with gr.TabItem("知识库管理"):
             with gr.Row():
-                create_btn = gr.Button("创建知识库", variant="primary")
-                kb_df = gr.Dataframe(
-                    value=kb_table_from_state(kb_state_init),
-                    interactive=False,
-                    max_height=260,
-                )
+                with gr.Column(scale=7):
+                    kb_df = gr.Dataframe(
+                        value=get_kb_table,
+                        interactive=False,
+                        max_height=260
+                    )
+
+                with gr.Column(scale=2):
+                    create_btn = gr.Button("创建知识库", variant="primary")
 
             create_modal = Modal(visible=False)
             with create_modal:
-                gr.Markdown("### 创建新知识库")
-                name_tb = gr.Textbox(label="知识库名称")
-                files_up = gr.File(file_count="multiple", label="上传文件（多选）", type="filepath")
+                gr.Markdown("## 创建新知识库")
+                with gr.Row():
+                    name_tb = gr.Textbox(label="知识库名称")
+                    desc_tb = gr.Textbox(label="知识库描述")
+
+                with gr.Row():
+                    with gr.Column(scale=4):
+                        files_up = gr.File(file_count="multiple", label="上传文件（多选）", type="filepath")
+
+                    with gr.Column(scale=4):
+                        row_comps, dd_inputs = [], []
+                        for i in range(MAX_ROWS):
+                            with gr.Row(visible=False) as r:
+                                tb = gr.Textbox(label=f"文件{i + 1}")
+                                dropdown = gr.Dropdown(list(ALL_STRATEGY.keys()), label="切割策略")
+                            row_comps.extend([r, tb, dropdown])
+                            dd_inputs.append(dropdown)
+
+                # 已上传文件预览
                 preview_df = gr.Dataframe(interactive=False, max_height=150)
                 with gr.Row():
-                    submit_btn = gr.Button("提交", variant="primary")
+                    submit_btn = gr.Button("创建知识库并提交文件", variant="primary")
                     cancel_btn = gr.Button("取消")
 
             kb_detail_col = gr.Column(visible=False)
@@ -186,13 +254,18 @@ with gr.Blocks(title="LibRAG") as demo:
     # -- 事件绑定 --
     create_btn.click(lambda: Modal(visible=True), None, create_modal)
     cancel_btn.click(lambda: Modal(visible=False), None, create_modal)
-    files_up.change(preview_upload, files_up, preview_df)
+    files_up.change(
+        make_preview_cb(),
+        inputs=[files_up],  # 只传 uploader
+        outputs=[preview_df, *row_comps]  # 行组件放 outputs 控制显隐
+    )
 
     submit_btn.click(
         submit_create_kb,
-        inputs=[name_tb, files_up, kb_state],
-        outputs=[kb_state, kb_df, files_up, preview_df, kb_select_dd, create_modal],
+        inputs=[name_tb, desc_tb, files_up, *dd_inputs],
+        outputs=[create_modal, kb_df],
     )
+
     kb_df.select(
         enter_kb,
         inputs=[kb_state],

@@ -73,8 +73,8 @@ CATEGORY_PARSE_MESSAGES = [
 
 
 class CategoryParser(BaseParser):
-    def __init__(self, llm: BaseLLM):
-        self.llm = llm
+    def __init__(self, llm: BaseLLM, kb_id):
+        super().__init__(llm, kb_id)
         self.category = {}
         self.known_categories = []
         self.category_doc_dict = {}
@@ -104,6 +104,7 @@ class CategoryParser(BaseParser):
             self.category['documents'] = documents
         else:
             self.category['category_id'] = str(uuid.uuid4())
+            self.category['kb_id'] = self.kb_id
             self.category.setdefault('documents', []).append(document_id)
         self.category['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.new_classification = new_classification

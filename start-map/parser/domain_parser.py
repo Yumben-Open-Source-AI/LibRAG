@@ -67,8 +67,8 @@ DOMAIN_PARSE_MESSAGES = [
 
 
 class DomainParser(BaseParser):
-    def __init__(self, llm: BaseLLM):
-        self.llm = llm
+    def __init__(self, llm: BaseLLM, kb_id):
+        super().__init__(llm, kb_id)
         self.domain = {}
         self.known_domains = []
         self.domain_cla_dic = {}
@@ -96,6 +96,7 @@ class DomainParser(BaseParser):
                 sub_categories.append(category_id)
             self.domain['sub_categories'] = sub_categories
         else:
+            self.domain['kb_id'] = self.kb_id
             self.domain['domain_id'] = str(uuid.uuid4())
             self.domain.setdefault('sub_categories', []).append(category_id)
         self.domain.setdefault('metadata', {})['最后更新时间'] = datetime.datetime.now().strftime(

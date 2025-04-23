@@ -62,14 +62,13 @@ DOCUMENT_PARSE_MESSAGES = [
 
 
 class DocumentParser(BaseParser):
-    def __init__(self, llm: BaseLLM):
-        self.llm = llm
+    def __init__(self, llm: BaseLLM, kb_id):
+        super().__init__(llm, kb_id)
         self.save_path = os.path.join(self.base_path, 'document_info.json')
         self.document = {}
 
-    def parse(self, **kwargs):
-        paragraphs = kwargs.get('paragraphs')
-        path = kwargs.get('path')
+    @staticmethod
+    def tidy_up_data(paragraphs):
         paragraph_ids = []
         for paragraph in paragraphs:
             del paragraph['paragraph_name']
@@ -79,10 +78,16 @@ class DocumentParser(BaseParser):
             del paragraph['position']
             del paragraph['metadata']
             paragraph_ids.append(paragraph['paragraph_id'])
+        return paragraphs, paragraph_ids
+
+    def parse(self, **kwargs):
+        path = kwargs.get('path')
+        paragraphs, paragraph_ids = self.tidy_up_data(kwargs.get('paragraphs'))
         parse_messages = copy.deepcopy(DOCUMENT_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
         parse_messages[1]['content'] = content.substitute(paragraphs=paragraphs, path=path)
         document_content = self.llm.chat(parse_messages)[0]
+        document_content['kb_id'] = self.kb_id
         document_content['document_id'] = str(uuid.uuid4())
         document_content['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         document_content['paragraphs'] = paragraph_ids
