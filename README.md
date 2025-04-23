@@ -16,7 +16,7 @@ LibRAG is a groundbreaking general-purpose intelligent content retrieval engine 
 # Architecture Overview  
 The system employs multi-level semantic parsing + unified indexing technology to transform text into retrievable knowledge units, enabling on-demand precision recall and answer generation through a semantic routing layer.  
 
-![image](https://github.com/user-attachments/assets/00f1562b-52bc-480e-b1f4-e08b589db54b)  
+![image](./framework.png)  
 
 # Core Technological Breakthroughs  
 ## 1. Intelligent Document Preprocessing Engine  
