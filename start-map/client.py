@@ -217,7 +217,7 @@ with gr.Blocks(title="LibRAG") as demo:
                     appends_files_btn = gr.Button('追加新文件', variant='primary', interactive=False)
 
             with gr.Column(visible=True) as kb_detail_col:
-                kb_files_df = gr.Dataframe(interactive=True, max_height=650)
+                kb_files_df = gr.Dataframe(headers=['id', 'name', 'description'], interactive=True, max_height=650)
 
             create_modal = Modal(visible=False)
             with create_modal:
