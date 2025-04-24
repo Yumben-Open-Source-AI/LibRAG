@@ -127,7 +127,7 @@ class CategoryParser(BaseParser):
                 data.append(self.category)
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
-                f.write(json.dumps(data, ensure_ascii=False))
+                json.dump(data, f, ensure_ascii=False, indent=2)
         else:
             del self.category['new_classification']
 
@@ -141,7 +141,7 @@ class CategoryParser(BaseParser):
                     cla['category_description'] = self.category['category_description']
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
-                f.write(json.dumps(data, ensure_ascii=False))
+                json.dump(data, f, ensure_ascii=False, indent=2)
 
     def __get_known_categories(self):
         """

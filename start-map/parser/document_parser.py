@@ -26,7 +26,7 @@ DOCUMENT_PARSE_MESSAGES = [
 
             Rules
             - 描述与总结不能省略内容。
-            - document_description至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出关键指标和对象属性(如:这是xxx文档的xxx，主要内容为xxx),文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
+            - document_description至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出关键指标和对象属性(如:这是xxx(对象主体)xxx(什么时间)的xxx文档，主要内容为xxx),文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
             - 严格生成结构化不带有转义的JSON数据的总结及描述。
             - 总结和描述仅使用文本格式呈现。
 
@@ -40,7 +40,7 @@ DOCUMENT_PARSE_MESSAGES = [
             Example Output
             ```json
             {
-                "document_name": "",#文档名称;
+                "document_name": "",#文档名称(注意提取时间等信息维度);
                 "document_description": "<>", #文档描述；
                 "metadata": {"作者": "", "版本": ""},
                 "file_path": ""#填写文档路径;
@@ -103,7 +103,7 @@ class DocumentParser(BaseParser):
             data.append(self.document)
 
         with open(self.save_path, 'w+', encoding='utf-8') as f:
-            f.write(json.dumps(data, ensure_ascii=False))
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
     def back_fill_parent(self, parent, is_update=False):
         if is_update:

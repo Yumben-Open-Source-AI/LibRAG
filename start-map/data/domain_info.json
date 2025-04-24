@@ -2,16 +2,17 @@
   {
     "domain_name": "企业财务管理",
     "domain_id": "222994e4-1f9a-4301-978a-0f7ae923c84c",
-    "domain_description": "本领域涵盖企业财务状况的分析与报告，包括财务报表、股东持股详情、经营成果、现金流量、重要事项公告、非经常性损益项目及主要会计数据和财务指标等。适用于企业内外部财务信息的编制、审核与发布。",
+    "domain_description": "本领域涵盖企业财务状况的分析与报告，包括财务报表、股东持股详情、经营成果、现金流量、重要事项公告、非经常性损益项目及主要会计数据和财务指标等。适用于企业内外部财务信息的编制、审核与发布。特别涵盖了关联交易的性质、定价原则、审批流程、备案情况，以及各类关联交易的具体数量和金额。此外，还包括企业注册资本变更的相关信息。",
     "sub_categories": [
       "1cc27c2a-2933-4dc6-830c-58dda9a7a862",
       "dd452bf6-d25e-492c-a6a5-2783905a1b88"
     ],
     "metadata": {
-      "最后更新时间": "2025-04-18 12:01:17"
+      "最后更新时间": "2025-04-24 16:07:09"
     },
     "parent": null,
-    "parent_description": null
+    "parent_description": null,
+    "kb_id": 1
   },
   {
     "domain_name": "企业人事管理",
@@ -24,7 +25,8 @@
       "最后更新时间": "2025-04-17 18:19:05"
     },
     "parent": null,
-    "parent_description": null
+    "parent_description": null,
+    "kb_id": 1
   },
   {
     "domain_name": "企业项目管理",
@@ -38,7 +40,8 @@
       "最后更新时间": "2025-04-18 14:59:42"
     },
     "parent": null,
-    "parent_description": null
+    "parent_description": null,
+    "kb_id": 1
   },
   {
     "domain_name": "企业社会责任",
@@ -51,6 +54,7 @@
       "最后更新时间": "2025-04-18 11:13:08"
     },
     "parent": null,
-    "parent_description": null
+    "parent_description": null,
+    "kb_id": 1
   }
 ]

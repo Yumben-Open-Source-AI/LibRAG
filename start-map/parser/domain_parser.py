@@ -113,7 +113,7 @@ class DomainParser(BaseParser):
                 data.append(self.domain)
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
-                f.write(json.dumps(data, ensure_ascii=False))
+                json.dump(data, f, ensure_ascii=False, indent=2)
         else:
             del self.domain['new_domain']
 
@@ -127,7 +127,7 @@ class DomainParser(BaseParser):
                     domain['domain_description'] = self.domain['domain_description']
 
             with open(self.save_path, 'w+', encoding='utf-8') as f:
-                f.write(json.dumps(domains, ensure_ascii=False))
+                json.dump(domains, f, ensure_ascii=False, indent=2)
 
     def back_fill_parent(self, parent):
         # 若生成新领域数据则回填上级数据

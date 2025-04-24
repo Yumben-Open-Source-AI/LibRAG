@@ -1,6 +1,6 @@
 from msilib.schema import File
 
-from fastapi import UploadFile
+from fastapi import UploadFile, Form
 from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
@@ -18,7 +18,7 @@ class KnowledgeBase(KbBase, table=True):
 
 
 class FilePolicy(BaseModel):
-    kb_id: int
-    file: UploadFile
-    policy_type: str
+    kb_id: int = Form()
+    file: UploadFile = File
+    policy_type: str = Form()
 

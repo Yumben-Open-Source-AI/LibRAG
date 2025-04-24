@@ -210,7 +210,8 @@ class ParagraphParser(BaseParser):
         if file_obj.suffix in ['.doc', '.docx']:
             temp_dir = tempfile.mkdtemp()
             convert_file_type(file_path, temp_dir)
-            file_path = f"{temp_dir}\\{file_obj.name.split('.')[0]}.pdf"
+            name = ' '.join(file_obj.name.split('.')[:-1])
+            file_path = f"{temp_dir}\\{name}.pdf"
             print(file_path)
 
         if file_path.endswith('.pdf'):
@@ -224,7 +225,7 @@ class ParagraphParser(BaseParser):
             data.extend(self.paragraphs)
 
         with open(self.save_path, 'w+', encoding='utf-8') as f:
-            f.write(json.dumps(data, ensure_ascii=False))
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
     def back_fill_parent(self, parent):
         parent_id = parent['document_id']
@@ -456,12 +457,14 @@ class ParagraphParser(BaseParser):
             for task in as_completed(tasks_page):
                 paragraph_content = task.result()[0]
                 if isinstance(paragraph_content, dict):
+                    paragraph_content['kb_id'] = self.kb_id
                     paragraph_content['paragraph_id'] = str(uuid.uuid4())
                     paragraph_content['metadata'] = {
                         '最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                     self.paragraphs.append(paragraph_content)
                 elif isinstance(paragraph_content, list):
                     for paragraph in paragraph_content:
+                        paragraph['kb_id'] = self.kb_id
                         paragraph['paragraph_id'] = str(uuid.uuid4())
                         paragraph['parse_strategy'] = self.parse_strategy
                         paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
