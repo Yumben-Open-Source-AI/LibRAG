@@ -14,6 +14,7 @@ from markdownify import MarkdownConverter
 from pathlib import Path
 
 from parser.load_api import convert_pdf_to_md, convert_file_type
+from web_server.ai.models import Document, Paragraph
 
 PARAGRAPH_PARSE_MESSAGES = [
     {
@@ -181,29 +182,27 @@ class NoEscapeConverter(MarkdownConverter):
 
 
 class ParagraphParser(BaseParser):
-    def __init__(self, llm: BaseLLM, kb_id):
-        super().__init__(llm, kb_id)
+    def __init__(self, llm: BaseLLM, kb_id, session):
+        super().__init__(llm, kb_id, session)
         self.paragraphs = []
         self.parse_strategy = ''
         self.save_path = os.path.join(self.base_path, 'paragraph_info.json')
 
-    def pdf_parse(self, file_path, policy_type='automate_judgment_split'):
+    def pdf_parse(self, file_path):
         policies = {
             'page_split': self.__page_split,
             'catalog_split': self.__catalog_split,
             'automate_judgment_split': self.__automate_judgment_split,
         }
-        if policy_type not in policies:
+        if self.parse_strategy not in policies:
             raise ValueError('异常的文本切割策略，请提供正确的文本分割策略')
-
-        self.parse_strategy = policy_type
-        policies[policy_type](file_path)
+        policies[self.parse_strategy](file_path)
         all_paragraphs = copy.deepcopy(self.paragraphs)
         return all_paragraphs
 
     def parse(self, **kwargs):
         file_path = kwargs.get('path')
-        policy_type = kwargs.get('policy_type')
+        self.parse_strategy = kwargs.get('policy_type')
         file_obj = Path(file_path)
 
         # 文件转换为pdf
@@ -217,27 +216,18 @@ class ParagraphParser(BaseParser):
         if file_path.endswith('.pdf'):
             # parse_result = self.pdf_parse(file_path, policy_type)
             # os.remove(file_path)
-            return self.pdf_parse(file_path, policy_type)
+            return self.pdf_parse(file_path)
 
-    def storage_parser_data(self):
-        with open(self.save_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            data.extend(self.paragraphs)
-
-        with open(self.save_path, 'w+', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-
-    def back_fill_parent(self, parent):
-        parent_id = parent['document_id']
-        parent_description = parent['document_description']
+    def storage_parser_data(self, parent):
+        paragraphs = []
         for paragraph in self.paragraphs:
-            paragraph['parent'] = parent_id
-            paragraph['parent_description'] = f'此段落来源描述:<{parent_description}>'
+            # 回填上级数据
+            paragraph['parent'] = parent.document_id
+            paragraph['parent_description'] = f'此段落来源描述:<{parent.document_description}>'
+            paragraphs.append(Paragraph(**paragraph))
+        self.session.add_all(paragraphs)
 
-    def chat_parse_paragraph(self, cur_index, next_index, page_text):
-        parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
-        parse_messages[1]['content'] += f"```<当前页:{cur_index}至{next_index}, 段落原文:{page_text}>```"
-        paragraph_content = self.llm.chat(parse_messages)[0]
+    def collate_paragraphs(self, paragraph_content):
         if isinstance(paragraph_content, dict):
             paragraph_content['kb_id'] = self.kb_id
             paragraph_content['paragraph_id'] = str(uuid.uuid4())
@@ -251,6 +241,12 @@ class ParagraphParser(BaseParser):
                 paragraph['parse_strategy'] = self.parse_strategy
                 paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.extend(paragraph_content)
+
+    def chat_parse_paragraph(self, cur_index, next_index, page_text):
+        parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
+        parse_messages[1]['content'] += f"```<当前页:{cur_index}至{next_index}, 段落原文:{page_text}>```"
+        paragraph_content = self.llm.chat(parse_messages)[0]
+        self.collate_paragraphs(paragraph_content)
 
     def __catalog_split(self, file_path):
         """
@@ -456,16 +452,4 @@ class ParagraphParser(BaseParser):
 
             for task in as_completed(tasks_page):
                 paragraph_content = task.result()[0]
-                if isinstance(paragraph_content, dict):
-                    paragraph_content['kb_id'] = self.kb_id
-                    paragraph_content['paragraph_id'] = str(uuid.uuid4())
-                    paragraph_content['metadata'] = {
-                        '最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                    self.paragraphs.append(paragraph_content)
-                elif isinstance(paragraph_content, list):
-                    for paragraph in paragraph_content:
-                        paragraph['kb_id'] = self.kb_id
-                        paragraph['paragraph_id'] = str(uuid.uuid4())
-                        paragraph['parse_strategy'] = self.parse_strategy
-                        paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                    self.paragraphs.extend(paragraph_content)
+                self.collate_paragraphs(paragraph_content)

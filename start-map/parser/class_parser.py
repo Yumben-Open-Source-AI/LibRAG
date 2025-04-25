@@ -73,8 +73,8 @@ CATEGORY_PARSE_MESSAGES = [
 
 
 class CategoryParser(BaseParser):
-    def __init__(self, llm: BaseLLM, kb_id):
-        super().__init__(llm, kb_id)
+    def __init__(self, llm: BaseLLM, kb_id, session):
+        super().__init__(llm, kb_id, session)
         self.category = {}
         self.known_categories = []
         self.category_doc_dict = {}

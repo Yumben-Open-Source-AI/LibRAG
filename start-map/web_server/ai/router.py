@@ -10,11 +10,11 @@ from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 from docx.table import _Cell, Table
 from docx.text.paragraph import Paragraph
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks, Depends
+from sqlalchemy import Engine
 from sqlmodel import select
 
-from db.database import SessionDep
-from web_server.ai.schemas import KbBase, KnowledgeBase, FilePolicy
+from db.database import SessionDep, get_engine
 from llm.deepseek import DeepSeek
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
@@ -23,6 +23,7 @@ from parser.domain_parser import DomainParser
 from llm.qwen import Qwen
 from selector.document_selector import DocumentSelector
 from selector.paragraph_selector import ParagraphSelector
+from web_server.ai.models import KnowledgeBase, KbBase
 from web_server.ai.views import loading_data
 
 router = APIRouter(tags=['ai'], prefix='/ai')
@@ -127,7 +128,8 @@ async def upload_file(
         background_tasks: BackgroundTasks,
         kb_id: int = Form(...),
         file: UploadFile = File(...),
-        policy_type: str = Form(...)
+        policy_type: str = Form(...),
+        engine=Depends(get_engine)
 ):
     base_dir = './files/'
     os.makedirs(base_dir, exist_ok=True)
@@ -136,7 +138,7 @@ async def upload_file(
     file_path = os.path.abspath(os.path.join(base_dir, file_name))
     with open(file_path, 'wb') as f:
         f.write(await file.read())
-    background_tasks.add_task(loading_data, kb_id, file_name, file_path, policy_type)
+    background_tasks.add_task(loading_data, kb_id, file_name, file_path, policy_type, engine)
     return {'message': '知识库文件加载任务后台处理中'}
 
 

@@ -67,8 +67,8 @@ DOMAIN_PARSE_MESSAGES = [
 
 
 class DomainParser(BaseParser):
-    def __init__(self, llm: BaseLLM, kb_id):
-        super().__init__(llm, kb_id)
+    def __init__(self, llm: BaseLLM, kb_id, session):
+        super().__init__(llm, kb_id, session)
         self.domain = {}
         self.known_domains = []
         self.domain_cla_dic = {}

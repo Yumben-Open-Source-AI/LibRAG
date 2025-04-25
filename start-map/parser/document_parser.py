@@ -6,6 +6,7 @@ import uuid
 from string import Template
 from llm.base import BaseLLM
 from parser.base import BaseParser
+from web_server.ai.models import Document
 
 DOCUMENT_PARSE_MESSAGES = [
     {
@@ -62,8 +63,8 @@ DOCUMENT_PARSE_MESSAGES = [
 
 
 class DocumentParser(BaseParser):
-    def __init__(self, llm: BaseLLM, kb_id):
-        super().__init__(llm, kb_id)
+    def __init__(self, llm: BaseLLM, kb_id, session):
+        super().__init__(llm, kb_id, session)
         self.save_path = os.path.join(self.base_path, 'document_info.json')
         self.document = {}
 
@@ -71,6 +72,7 @@ class DocumentParser(BaseParser):
     def tidy_up_data(paragraphs):
         paragraph_ids = []
         for paragraph in paragraphs:
+            # TODO 代码整理
             del paragraph['paragraph_name']
             del paragraph['parse_strategy']
             del paragraph['content']
@@ -94,7 +96,12 @@ class DocumentParser(BaseParser):
         self.document = document_content
         return document_content
 
-    def storage_parser_data(self):
+    def storage_parser_data(self, parent):
+        self.document.setdefault('parent', []).append(parent['category_id'])
+        self.document['parent_description'] = f'此文档所属父级类别描述:<{parent["category_description"]}>'
+
+        Document(**self.document)
+
         with open(self.save_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             for document in data:

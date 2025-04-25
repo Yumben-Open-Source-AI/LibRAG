@@ -16,6 +16,10 @@ def get_session():
         yield session
 
 
+def get_engine():
+    return engine
+
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
