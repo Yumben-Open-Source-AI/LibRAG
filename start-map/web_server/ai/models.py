@@ -23,8 +23,32 @@ class KnowledgeBase(KbBase, table=True):
 
     kb_id: int | None = Field(default=None, primary_key=True)
 
-    paragraphs: list['Paragraph'] = Relationship(back_populates='know_base')
+    domains: list['Domain'] = Relationship(back_populates='know_base')
+    categories: list['Category'] = Relationship(back_populates='know_base')
     documents: list['Document'] = Relationship(back_populates='know_base')
+    paragraphs: list['Paragraph'] = Relationship(back_populates='know_base')
+
+
+class Domain(SQLModel, table=True):
+    __tablename__ = 'domain'
+
+    domain_id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    document_name: str = Field(default='', sa_column_kwargs={'comment': '文档名称'})
+    document_description: str = Field(default='', sa_column_kwargs={'comment': '文档描述'})
+    file_path: str = Field(default='', sa_column_kwargs={'comment': '文档路径'})
+    meta_data: dict = Field(sa_type=JSON, default={}, sa_column_kwargs={'comment': '元数据'})
+    parent_description: str
+    sub_categories: list['Category'] = Relationship(back_populates='domain')
+    kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
+                              sa_column_kwargs={'comment': '知识库id'})
+    know_base: KnowledgeBase = Relationship(back_populates='documents')
+
+
+class CategoryDocumentLink(SQLModel, table=True):
+    category_id: uuid.UUID | None = Field(default_factory=uuid.uuid4, foreign_key='category.category_id',
+                                          primary_key=True)
+    document_id: uuid.UUID | None = Field(default_factory=uuid.uuid4, foreign_key='document.document_id',
+                                          primary_key=True)
 
 
 class Category(SQLModel, table=True):
@@ -35,7 +59,10 @@ class Category(SQLModel, table=True):
     category_description: str = Field(default='', sa_column_kwargs={'comment': '分类描述'})
     meta_data: dict = Field(sa_type=JSON, default={}, sa_column_kwargs={'comment': '元数据'})
     parent_description: str
-    documents: list['Document'] = Relationship(back_populates='document')
+    # domain_info
+    parent_id: uuid.UUID | None = Field(default=None, foreign_key='domain.domain_id')
+    domain: Domain = Relationship(back_populates='sub_categories')
+    documents: list['Document'] = Relationship(back_populates='categories', link_model=CategoryDocumentLink)
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
                               sa_column_kwargs={'comment': '知识库id'})
     know_base: KnowledgeBase = Relationship(back_populates='documents')
@@ -50,7 +77,7 @@ class Document(SQLModel, table=True):
     file_path: str = Field(default='', sa_column_kwargs={'comment': '文档路径'})
     meta_data: dict = Field(sa_type=JSON, default={}, sa_column_kwargs={'comment': '元数据'})
     parent_description: str
-    parent_id: uuid.UUID | None = Field(foreign_key='document.document_id')
+    categories: list['Category'] = Relationship(back_populates='documents', link_model=CategoryDocumentLink)
     paragraphs: list['Paragraph'] = Relationship(back_populates='document')
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
                               sa_column_kwargs={'comment': '知识库id'})
