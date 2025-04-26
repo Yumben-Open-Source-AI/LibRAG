@@ -5,6 +5,7 @@
 @Author  ：XMAN
 @Date    ：2025/4/25 上午10:21 
 """
+import json
 import uuid
 from sqlmodel import Field, SQLModel, JSON, Relationship
 from sqlalchemy import Column, TEXT
@@ -33,18 +34,18 @@ class Domain(SQLModel, table=True):
     __tablename__ = 'domain'
 
     domain_id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    document_name: str = Field(default='', sa_column_kwargs={'comment': '文档名称'})
-    document_description: str = Field(default='', sa_column_kwargs={'comment': '文档描述'})
-    file_path: str = Field(default='', sa_column_kwargs={'comment': '文档路径'})
+    domain_name: str = Field(default='', sa_column_kwargs={'comment': '领域名称'})
+    domain_description: str = Field(default='', sa_column_kwargs={'comment': '领域描述'})
     meta_data: dict = Field(sa_type=JSON, default={}, sa_column_kwargs={'comment': '元数据'})
-    parent_description: str
     sub_categories: list['Category'] = Relationship(back_populates='domain')
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
                               sa_column_kwargs={'comment': '知识库id'})
-    know_base: KnowledgeBase = Relationship(back_populates='documents')
+    know_base: KnowledgeBase = Relationship(back_populates='domains')
 
 
 class CategoryDocumentLink(SQLModel, table=True):
+    __tablename__ = 'category_document_link'
+
     category_id: uuid.UUID | None = Field(default_factory=uuid.uuid4, foreign_key='category.category_id',
                                           primary_key=True)
     document_id: uuid.UUID | None = Field(default_factory=uuid.uuid4, foreign_key='document.document_id',
@@ -65,7 +66,7 @@ class Category(SQLModel, table=True):
     documents: list['Document'] = Relationship(back_populates='categories', link_model=CategoryDocumentLink)
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
                               sa_column_kwargs={'comment': '知识库id'})
-    know_base: KnowledgeBase = Relationship(back_populates='documents')
+    know_base: KnowledgeBase = Relationship(back_populates='categories')
 
 
 class Document(SQLModel, table=True):

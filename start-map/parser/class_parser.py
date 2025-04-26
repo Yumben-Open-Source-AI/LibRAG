@@ -4,8 +4,12 @@ import os
 import uuid
 import datetime
 from string import Template
+
+from sqlmodel import select
+
 from llm.base import BaseLLM
 from parser.base import BaseParser
+from web_server.ai.models import Category, Domain
 
 CATEGORY_PARSE_MESSAGES = [
     {
@@ -32,7 +36,7 @@ CATEGORY_PARSE_MESSAGES = [
             3. 若已知分类中无覆盖该语义领域的条目，生成具有更高抽象概括力的新类别，并设定 `new_classification: 'true'`。
             4. 若匹配的分类描述存在模糊或内容不充分的情况，进行语义增强与边界清晰化补充后再输出。
             5. 优化后的category_description 应包含原先的描述内容，仅针对新的文档描述补充该分类描述。
-            6. 输出结构中需包括分类基本信息与语义注释（metadata），支持内容映射、更新时间和归属逻辑。
+            6. 输出结构中需包括分类基本信息与语义注释（meta_data），支持内容映射、更新时间和归属逻辑。
             7. 对文档的归类应基于其信息作用/属性与结构特征，如强调技术对接、结构规范、通信协议等，则应优先归入具备系统性、结构性或平台接入特征的抽象语义类，而非归于以事务性或项目执行为核心的范畴。
 
             ## Workflows
@@ -46,15 +50,14 @@ CATEGORY_PARSE_MESSAGES = [
                 - 若无匹配分类，生成新的抽象类别，并命名为能覆盖该类文档集合的类别名。
                 - 若匹配成功但描述不具备泛化能力，则优化扩展其适用语义。
             3. 输出内容：
-                - 使用标准结构输出 `category_name`, `category_id`, `category_description`, `metadata`, `new_classification`
+                - 使用标准结构输出 `category_name`, `category_id`, `category_description`, `meta_data`, `new_classification`
             
             ## Example Output
             json
             {
                 "category_name": "", # 抽象的语义类名
                 "category_description": "", # 分类语义定义与内容适用范围
-                "category_id": "",
-                "metadata": {
+                "meta_data": {
                     "关联实体": [] # 可为空，或包含系统、部门、模块名称等
                 },
                 "new_classification": 'true'/'false'
@@ -75,86 +78,57 @@ CATEGORY_PARSE_MESSAGES = [
 class CategoryParser(BaseParser):
     def __init__(self, llm: BaseLLM, kb_id, session):
         super().__init__(llm, kb_id, session)
-        self.category = {}
+        self.category = None
         self.known_categories = []
-        self.category_doc_dict = {}
         self.new_classification = 'true'
-        self.save_path = os.path.join(self.base_path, 'category_info.json')
 
     def parse(self, **kwargs):
         document = kwargs.get('document')
-        doc_name = document['document_name']
-        doc_description = document['document_description']
-        document_id = document['document_id']
         parse_params = {
-            'document_name': doc_name,
-            'document_description': doc_description,
+            'document_name': document.document_name,
+            'document_description': document.document_description,
             'known_categories': self.__get_known_categories(),
         }
         parse_messages = copy.deepcopy(CATEGORY_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
         parse_messages[1]['content'] = content.substitute(parse_info=str(parse_params))
         self.category = self.llm.chat(parse_messages)[0]
-        new_classification = self.category['new_classification']
-        # llm judgments this document is not an added type
-        if new_classification == 'false':
-            # update documents
-            documents = self.category_doc_dict[self.category['category_name']]
-            documents.append(document_id)
-            self.category['documents'] = documents
-        else:
-            self.category['category_id'] = str(uuid.uuid4())
-            self.category['kb_id'] = self.kb_id
-            self.category.setdefault('documents', []).append(document_id)
-        self.category['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        self.new_classification = new_classification
-        return self.category
-
-    def back_fill_parent(self, parent):
-        # 若生成新分类数据则回填上级领域数据
+        self.new_classification = self.category['new_classification']
         if self.new_classification == 'true':
-            self.category['parent'] = parent['domain_id']
-            self.category['parent_description'] = f'此分类所属父级领域描述:<{parent["domain_description"]}>'
+            self.category['kb_id'] = self.kb_id
+            self.category = Category(**self.category)
+        else:
+            db_category = self.session.get(Category, self.category['category_id'])
+            if not db_category:
+                raise ValueError('new_classification judge is wrong, db category does not exist')
+            db_category.meta_data = self.category['meta_data']
+            db_category.category_description = self.category['category_description']
+            self.category = db_category
+        self.category.meta_data['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return self.category
 
     def rebuild_domain(self):
         ...
 
-    def storage_parser_data(self):
+    def storage_parser_data(self, parent: Domain):
         if self.new_classification == 'true':
-            del self.category['new_classification']
-            with open(self.save_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                data.append(self.category)
+            print(parent)
+            self.category.parent_id = parent.domain_id
+            self.category.parent_description = f'此分类所属父级领域描述:<{parent.domain_description}>'
 
-            with open(self.save_path, 'w+', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        else:
-            del self.category['new_classification']
-
-            with open(self.save_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-
-            for cla in data:
-                if cla['category_id'] == self.category['category_id']:
-                    cla['metadata'] = self.category['metadata']
-                    cla['documents'] = self.category['documents']
-                    cla['category_description'] = self.category['category_description']
-
-            with open(self.save_path, 'w+', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+        self.session.add(self.category)
 
     def __get_known_categories(self):
         """
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
-        with open(self.save_path, 'r', encoding='utf-8') as f:
-            categories = json.load(f)
+        statement = select(Category).where(Category.kb_id == self.kb_id)
+        db_categories = self.session.exec(statement).all()
 
-        for category in categories:
-            self.category_doc_dict[category['category_name']] = category['documents']
-            del category['metadata']
+        for category in db_categories:
+            del category['meta_data']
             del category['documents']
             del category['parent']
             del category['parent_description']
 
-        return categories
+        return db_categories

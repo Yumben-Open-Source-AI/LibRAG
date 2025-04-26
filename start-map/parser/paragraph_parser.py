@@ -214,15 +214,13 @@ class ParagraphParser(BaseParser):
             print(file_path)
 
         if file_path.endswith('.pdf'):
-            # parse_result = self.pdf_parse(file_path, policy_type)
-            # os.remove(file_path)
+            # TODO rm temp_dir
             return self.pdf_parse(file_path)
 
-    def storage_parser_data(self, parent):
+    def storage_parser_data(self, parent: Document):
         paragraphs = []
         for paragraph in self.paragraphs:
-            # 回填上级数据
-            paragraph['parent'] = parent.document_id
+            paragraph['parent_id'] = parent.document_id
             paragraph['parent_description'] = f'此段落来源描述:<{parent.document_description}>'
             paragraphs.append(Paragraph(**paragraph))
         self.session.add_all(paragraphs)
@@ -230,16 +228,14 @@ class ParagraphParser(BaseParser):
     def collate_paragraphs(self, paragraph_content):
         if isinstance(paragraph_content, dict):
             paragraph_content['kb_id'] = self.kb_id
-            paragraph_content['paragraph_id'] = str(uuid.uuid4())
             paragraph_content['parse_strategy'] = self.parse_strategy
-            paragraph_content['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            paragraph_content['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.append(paragraph_content)
         elif isinstance(paragraph_content, list):
             for paragraph in paragraph_content:
                 paragraph['kb_id'] = self.kb_id
-                paragraph['paragraph_id'] = str(uuid.uuid4())
                 paragraph['parse_strategy'] = self.parse_strategy
-                paragraph['metadata'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                paragraph['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.extend(paragraph_content)
 
     def chat_parse_paragraph(self, cur_index, next_index, page_text):

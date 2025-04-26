@@ -4,8 +4,12 @@ import os
 import uuid
 import datetime
 from string import Template
+
+from sqlmodel import select
+
 from llm.base import BaseLLM
 from parser.base import BaseParser
+from web_server.ai.models import Domain
 
 DOMAIN_PARSE_MESSAGES = [
     {
@@ -50,7 +54,6 @@ DOMAIN_PARSE_MESSAGES = [
             ```json
             {
                 "domain_name": "",#填写领域名称；
-                "domain_id": "",
                 "domain_description": "<>", # 对应领域的描述信息，若有优化应包含原始信息的扩展；
                 "new_domain": 'true'/'false' #是否为新领域；
             } 
@@ -69,71 +72,37 @@ DOMAIN_PARSE_MESSAGES = [
 class DomainParser(BaseParser):
     def __init__(self, llm: BaseLLM, kb_id, session):
         super().__init__(llm, kb_id, session)
-        self.domain = {}
+        self.domain = None
         self.known_domains = []
-        self.domain_cla_dic = {}
         self.new_domain = 'true'
         self.save_path = os.path.join(self.base_path, 'domain_info.json')
 
     def parse(self, **kwargs):
-        cla = kwargs.get('cla')
-        category_name = cla['category_name']
-        category_id = cla['category_id']
-        category_description = cla['category_description']
+        category = kwargs.get('category')
         parse_params = {
-            'category_name': category_name,
-            'category_description': category_description,
+            'category_name': category.category_name,
+            'category_description': category.category_description,
             'known_domains': self.__get_known_domains()
         }
         parse_messages = copy.deepcopy(DOMAIN_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
         parse_messages[1]['content'] = content.substitute(cla=str(parse_params))
         self.domain = self.llm.chat(parse_messages)[0]
-        # llm judgments this document is not an added domain
-        if self.domain['new_domain'] == 'false':
-            sub_categories = self.domain_cla_dic[self.domain['domain_name']]
-            if not any(category_id == category for category in sub_categories):
-                sub_categories.append(category_id)
-            self.domain['sub_categories'] = sub_categories
-        else:
-            self.domain['kb_id'] = self.kb_id
-            self.domain['domain_id'] = str(uuid.uuid4())
-            self.domain.setdefault('sub_categories', []).append(category_id)
-        self.domain.setdefault('metadata', {})['最后更新时间'] = datetime.datetime.now().strftime(
-            '%Y-%m-%d %H:%M:%S')
         self.new_domain = self.domain['new_domain']
+        if self.domain['new_domain'] == 'true':
+            self.domain['kb_id'] = self.kb_id
+            self.domain = Domain(**self.domain)
+        else:
+            db_domain = self.session.get(Domain, self.domain['domain_id'])
+            if not db_domain:
+                raise ValueError('new_domain judge is wrong, db domain does not exist')
+            db_domain.meta_data = self.domain['meta_data']
+            db_domain.domain_description = self.domain['domain_description']
+        self.domain.meta_data['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         return self.domain
 
-    def storage_parser_data(self):
-        if self.new_domain == 'true':
-            del self.domain['new_domain']
-
-            with open(self.save_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                data.append(self.domain)
-
-            with open(self.save_path, 'w+', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        else:
-            del self.domain['new_domain']
-
-            with open(self.save_path, 'r', encoding='utf-8') as f:
-                domains = json.load(f)
-
-            for domain in domains:
-                if domain['domain_id'] == self.domain['domain_id']:
-                    domain['metadata'] = self.domain['metadata']
-                    domain['sub_categories'] = self.domain['sub_categories']
-                    domain['domain_description'] = self.domain['domain_description']
-
-            with open(self.save_path, 'w+', encoding='utf-8') as f:
-                json.dump(domains, f, ensure_ascii=False, indent=2)
-
-    def back_fill_parent(self, parent):
-        # 若生成新领域数据则回填上级数据
-        if self.new_domain == 'true':
-            self.domain['parent'] = None
-            self.domain['parent_description'] = None
+    def storage_parser_data(self, parent):
+        self.session.add(self.domain)
 
     def rebuild_domain(self):
         ...
@@ -142,14 +111,13 @@ class DomainParser(BaseParser):
         """
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
-        with open(self.save_path, 'r', encoding='utf-8') as f:
-            domains = json.load(f)
+        statement = select(Domain).where(Domain.kb_id == self.kb_id)
+        db_domain = self.session.exec(statement).all()
 
-        for domain in domains:
-            self.domain_cla_dic[domain['domain_name']] = domain['sub_categories']
+        for domain in db_domain:
             del domain['sub_categories']
             del domain['metadata']
             del domain['parent']
             del domain['parent_description']
 
-        return domains
+        return db_domain

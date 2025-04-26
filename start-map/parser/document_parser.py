@@ -6,7 +6,7 @@ import uuid
 from string import Template
 from llm.base import BaseLLM
 from parser.base import BaseParser
-from web_server.ai.models import Document
+from web_server.ai.models import Document, Category
 
 DOCUMENT_PARSE_MESSAGES = [
     {
@@ -43,7 +43,7 @@ DOCUMENT_PARSE_MESSAGES = [
             {
                 "document_name": "",#文档名称(注意提取时间等信息维度);
                 "document_description": "<>", #文档描述；
-                "metadata": {"作者": "", "版本": ""},
+                "meta_data": {"作者": "", "版本": ""},
                 "file_path": ""#填写文档路径;
             }
             ```
@@ -66,11 +66,10 @@ class DocumentParser(BaseParser):
     def __init__(self, llm: BaseLLM, kb_id, session):
         super().__init__(llm, kb_id, session)
         self.save_path = os.path.join(self.base_path, 'document_info.json')
-        self.document = {}
+        self.document = None
 
     @staticmethod
     def tidy_up_data(paragraphs):
-        paragraph_ids = []
         for paragraph in paragraphs:
             # TODO 代码整理
             del paragraph['paragraph_name']
@@ -78,42 +77,24 @@ class DocumentParser(BaseParser):
             del paragraph['content']
             del paragraph['keywords']
             del paragraph['position']
-            del paragraph['metadata']
-            paragraph_ids.append(paragraph['paragraph_id'])
-        return paragraphs, paragraph_ids
+            del paragraph['meta_data']
+        return paragraphs
 
     def parse(self, **kwargs):
         path = kwargs.get('path')
-        paragraphs, paragraph_ids = self.tidy_up_data(kwargs.get('paragraphs'))
+        paragraphs = self.tidy_up_data(kwargs.get('paragraphs'))
         parse_messages = copy.deepcopy(DOCUMENT_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
         parse_messages[1]['content'] = content.substitute(paragraphs=paragraphs, path=path)
-        document_content = self.llm.chat(parse_messages)[0]
-        document_content['kb_id'] = self.kb_id
-        document_content['document_id'] = str(uuid.uuid4())
-        document_content['metadata']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        document_content['paragraphs'] = paragraph_ids
-        self.document = document_content
-        return document_content
+        self.document = self.llm.chat(parse_messages)[0]
+        self.document['kb_id'] = self.kb_id
+        self.document['meta_data']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.document = Document(**self.document)
+        return self.document
 
-    def storage_parser_data(self, parent):
-        self.document.setdefault('parent', []).append(parent['category_id'])
-        self.document['parent_description'] = f'此文档所属父级类别描述:<{parent["category_description"]}>'
+    def storage_parser_data(self, parent: Category):
+        # 回填上级分类数据
+        self.document.parent_description = f'此文档所属父级类别描述:<{parent.category_description}>'
+        self.document.categories.append(parent)
 
-        Document(**self.document)
-
-        with open(self.save_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            for document in data:
-                if document['document_id'] == self.document['document_id']:
-                    data.remove(document)
-            data.append(self.document)
-
-        with open(self.save_path, 'w+', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-
-    def back_fill_parent(self, parent, is_update=False):
-        if is_update:
-            self.document['parent'] = []
-        self.document.setdefault('parent', []).append(parent['category_id'])
-        self.document['parent_description'] = f'此文档所属父级类别描述:<{parent["category_description"]}>'
+        self.session.add(self.document)
