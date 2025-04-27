@@ -18,7 +18,7 @@ ALL_STRATEGY = {
 
 MAX_ROWS = 20
 
-request = RequestHandler('http://192.168.199.210:13113/ai/')
+request = RequestHandler('http://127.0.0.1:13113/ai/')
 
 
 def log_io(func):
