@@ -1,2 +1,4 @@
 .idea
 *.jpg
+.env
+librag.db
