@@ -5,13 +5,7 @@ import re
 from collections import deque
 from typing import List, Literal, Optional, Annotated
 
-from docx.document import Document
-from docx.oxml.table import CT_Tbl
-from docx.oxml.text.paragraph import CT_P
-from docx.table import _Cell, Table
-from docx.text.paragraph import Paragraph
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks, Depends
-from sqlalchemy import Engine
 from sqlmodel import select
 
 from db.database import SessionDep, get_engine
@@ -23,7 +17,7 @@ from parser.domain_parser import DomainParser
 from llm.qwen import Qwen
 from selector.document_selector import DocumentSelector
 from selector.paragraph_selector import ParagraphSelector
-from web_server.ai.models import KnowledgeBase, KbBase
+from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain
 from web_server.ai.views import loading_data
 
 router = APIRouter(tags=['ai'], prefix='/ai')
@@ -40,24 +34,22 @@ async def query_with_llm(question: str):
     return target_paragraphs
 
 
-@router.get('/meta_data')
-async def get_meta_data(meta_type: str):
-    data = []
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data'))
-
+@router.get('/meta_data/{kb_id}/{meta_type}')
+async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
     all_parser = {
-        'paragraph': 'paragraph_info.json',
-        'document': 'document_info.json',
-        'category': 'category_info.json',
-        'domain': 'domain_info.json',
+        'paragraph': Paragraph,
+        'document': Document,
+        'category': Category,
+        'domain': Domain,
     }
-    if meta_type in all_parser:
-        file_name = all_parser[meta_type]
-        file_path = os.path.join(base_dir, file_name)
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
 
-    return data
+    if meta_type not in all_parser:
+        raise HTTPException(404, 'meta type is not supported')
+
+    target = all_parser[meta_type]
+
+    statement = select(target).where(target.kb_id == kb_id)
+    return session.exec(statement).all()
 
 
 @router.get('/rebuild')
@@ -154,15 +146,13 @@ async def create_knowledge_bases(kb: KbBase, session: SessionDep):
 @router.get('/knowledge_base/{kb_id}')
 async def read_knowledge_base(kb_id: int, session: SessionDep):
     know_base = session.get(KnowledgeBase, kb_id)
+    documents = know_base.documents
     know_base = know_base.dict()
 
     if not know_base:
         raise HTTPException(status_code=404, detail="KnowledgeBase not found")
 
-    with open('data/document_info.json', 'r', encoding='utf-8') as f:
-        documents = json.load(f)
-
-    know_base['documents'] = [document for document in documents if document['kb_id'] == kb_id]
+    know_base['documents'] = documents
     return know_base
 
 

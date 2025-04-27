@@ -48,7 +48,7 @@ def loading_data(
 
             # 解析文档所属分类
             category_parser = CategoryParser(qwen, kb_id, session)
-            category_params = {'document': document, }
+            category_params = {'document': document}
             category = category_parser.parse(**category_params)
             print('category', category)
 

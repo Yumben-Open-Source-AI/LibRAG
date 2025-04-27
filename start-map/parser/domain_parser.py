@@ -53,6 +53,7 @@ DOMAIN_PARSE_MESSAGES = [
             ## Example Output
             ```json
             {
+                "domain_id": ""
                 "domain_name": "",#填写领域名称；
                 "domain_description": "<>", # 对应领域的描述信息，若有优化应包含原始信息的扩展；
                 "new_domain": 'true'/'false' #是否为新领域；
@@ -91,13 +92,14 @@ class DomainParser(BaseParser):
         self.new_domain = self.domain['new_domain']
         if self.domain['new_domain'] == 'true':
             self.domain['kb_id'] = self.kb_id
+            del self.domain['domain_id']
             self.domain = Domain(**self.domain)
         else:
-            db_domain = self.session.get(Domain, self.domain['domain_id'])
+            db_domain = self.session.get(Domain, uuid.UUID(self.domain['domain_id']))
             if not db_domain:
                 raise ValueError('new_domain judge is wrong, db domain does not exist')
-            db_domain.meta_data = self.domain['meta_data']
             db_domain.domain_description = self.domain['domain_description']
+            self.domain = db_domain
         self.domain.meta_data['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         return self.domain
 
@@ -112,12 +114,14 @@ class DomainParser(BaseParser):
         Getting Known Categories to Aid in Classification Selection for Large Language Models
         """
         statement = select(Domain).where(Domain.kb_id == self.kb_id)
-        db_domain = self.session.exec(statement).all()
+        db_domains = self.session.exec(statement).all()
 
-        for domain in db_domain:
-            del domain['sub_categories']
-            del domain['metadata']
-            del domain['parent']
-            del domain['parent_description']
+        known_domains = []
+        for domain in db_domains:
+            known_domains.append({
+                'domain_id': domain.domain_id,
+                'domain_name': domain.domain_name,
+                'domain_description': domain.domain_description
+            })
 
-        return db_domain
+        return known_domains

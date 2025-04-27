@@ -55,6 +55,7 @@ CATEGORY_PARSE_MESSAGES = [
             ## Example Output
             json
             {
+                "category_id": "",
                 "category_name": "", # 抽象的语义类名
                 "category_description": "", # 分类语义定义与内容适用范围
                 "meta_data": {
@@ -96,9 +97,10 @@ class CategoryParser(BaseParser):
         self.new_classification = self.category['new_classification']
         if self.new_classification == 'true':
             self.category['kb_id'] = self.kb_id
+            del self.category['category_id']
             self.category = Category(**self.category)
         else:
-            db_category = self.session.get(Category, self.category['category_id'])
+            db_category = self.session.get(Category, uuid.UUID(self.category['category_id']))
             if not db_category:
                 raise ValueError('new_classification judge is wrong, db category does not exist')
             db_category.meta_data = self.category['meta_data']
@@ -124,11 +126,13 @@ class CategoryParser(BaseParser):
         """
         statement = select(Category).where(Category.kb_id == self.kb_id)
         db_categories = self.session.exec(statement).all()
+        known_categories = []
 
         for category in db_categories:
-            del category['meta_data']
-            del category['documents']
-            del category['parent']
-            del category['parent_description']
+            known_categories.append({
+                'category_id': category.category_id,
+                'category_name': category.category_name,
+                'category_description': category.category_description,
+            })
 
-        return db_categories
+        return known_categories
