@@ -1,4 +1,5 @@
 .idea
+files
 *.jpg
 .env
 librag.db
