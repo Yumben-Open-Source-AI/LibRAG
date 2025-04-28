@@ -214,5 +214,6 @@ class CategorySelector(BaseSelector):
             'categories': self.select_params
         }
         response_chat = llm.chat(CATEGORY_SYSTEM_MESSAGES + CATEGORY_FEW_SHOT_MESSAGES + CATEGORY_USER_MESSAGES)
+        selected_categories = set(response_chat[0]['selected_categories'])
 
-        return response_chat[0]
+        return selected_categories

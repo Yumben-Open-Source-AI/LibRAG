@@ -224,5 +224,6 @@ class DocumentSelector(BaseSelector):
             'documents': self.select_params
         }
         response_chat = llm.chat(DOCUMENT_SYSTEM_MESSAGES + DOCUMENT_FEW_SHOT_MESSAGES + DOCUMENT_USER_PROMPT)
+        selected_documents = set(response_chat[0]['selected_documents'])
 
-        return response_chat[0]
+        return selected_documents

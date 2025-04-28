@@ -209,7 +209,7 @@ class ParagraphSelector(BaseSelector):
             'paragraphs': self.select_params
         }
         response_chat = llm.chat(PARAGRAPH_SYSTEM_MESSAGES + PARAGRAPH_FEW_SHOT_MESSAGES + PARAGRAPH_USER_MESSAGES)
-        self.selected_paragraphs = response_chat[0]['selected_paragraphs']
+        self.selected_paragraphs = set(response_chat[0]['selected_paragraphs'])
 
         return self
 
@@ -218,9 +218,8 @@ class ParagraphSelector(BaseSelector):
             return []
 
         session = self.params.session
-
         result = []
         for paragraph_id in self.selected_paragraphs:
-            result.append(session.get(Paragraph, paragraph_id).dict)
+            result.append(session.get(Paragraph, paragraph_id).dict())
 
-        return resultq
+        return result

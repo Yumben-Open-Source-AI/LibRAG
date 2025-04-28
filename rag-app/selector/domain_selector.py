@@ -170,16 +170,13 @@ class DomainSelector(BaseSelector):
 
     def __init__(self, param):
         super().__init__(param)
-        self.domains = self.get_layer_data()
         self.select_params = []
 
-    def get_layer_data(self) -> Sequence[Domain]:
+    def collate_select_params(self, params: List[Dict] = None):
         kb_id = self.params.kb_id
         statement = select(Domain).where(Domain.kb_id == kb_id)
-        return self.params.session.exec(statement).all()
-
-    def collate_select_params(self, params: List[Dict] = None):
-        for domain in self.domains:
+        db_domains = self.params.session.exec(statement).all()
+        for domain in db_domains:
             self.select_params.append({
                 'domain_id': domain.domain_id,
                 'domain_description': domain.domain_description,
@@ -194,5 +191,6 @@ class DomainSelector(BaseSelector):
             'domains': self.select_params
         }
         response_chat = llm.chat(DOMAIN_SYSTEM_MESSAGES + DOMAIN_FEW_SHOT_MESSAGES + DOMAIN_USER_MESSAGES)
+        selected_domains = set(response_chat[0]['selected_domains'])
 
-        return response_chat[0]
+        return selected_domains
