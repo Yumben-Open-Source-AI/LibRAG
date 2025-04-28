@@ -65,7 +65,6 @@ DOCUMENT_PARSE_MESSAGES = [
 class DocumentParser(BaseParser):
     def __init__(self, llm: BaseLLM, kb_id, session):
         super().__init__(llm, kb_id, session)
-        self.save_path = os.path.join(self.base_path, 'document_info.json')
         self.document = None
 
     @staticmethod

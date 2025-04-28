@@ -186,7 +186,6 @@ class ParagraphParser(BaseParser):
         super().__init__(llm, kb_id, session)
         self.paragraphs = []
         self.parse_strategy = ''
-        self.save_path = os.path.join(self.base_path, 'paragraph_info.json')
 
     def pdf_parse(self, file_path):
         policies = {

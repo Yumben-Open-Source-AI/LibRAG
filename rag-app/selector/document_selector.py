@@ -1,9 +1,12 @@
 import datetime
 import json
-from typing import List, Dict
+from typing import List, Dict, Sequence
+
+from sqlmodel import select
 
 from llm.base import BaseLLM
 from selector.base import BaseSelector
+from web_server.ai.models import Document, Category
 
 # system action
 now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -11,23 +14,43 @@ DOCUMENT_SYSTEM_MESSAGES = [
     {
         'role': 'system',
         'content': f"""
-            ### 当前时间
-            {now}
-            ### 工作描述
-            您是一个智能文档匹配引擎，能够理解用户输入的查询，并在预定义的文档列表中匹配最相关的文档。您的任务是分析用户输入，从中提取关键词，并基于文档描述选择最符合的文档。
-            ### 任务
-            1. **关键词提取**：从用户输入中提取有助于匹配的关键词。
-            2. **文档匹配**：根据提取的关键词，匹配与之最相关的文档。
-            3. **格式化输出**：仅返回 JSON 格式的数据，包括提取的关键词和匹配的文档。
-            ### 输入格式
-            - `input_text`：用户输入的一段自由文本，表示用户的查询需求。
-            - `documents`：可选的文档列表，每个文档包含：
-                - `document_id`（文档唯一标识）
-                - `document_description`（文档描述信息）
-            - `classification_instructions`（可选）：额外的匹配指令（如有）。
-            ### 约束
-            - **仅返回 JSON 格式的响应**，不得包含额外的文本解释。
-            - **不得生成虚假信息**，仅基于已有的 `documents` 进行匹配。
+            # Role: 文档选择器（Document Selector）
+            
+            ## Environment variable
+            - 当前时间: {now}
+            
+            ## Profile
+            - author: LangGPT 
+            - version: 1.1
+            - language: 中文
+            - description: 一个跨领域、多文档类型的智能文档选择系统。能够根据用户的自然语言查询，识别最相关的一个或多个文档，文档可来自财务、人事、政策、科技、医疗、教育等多个领域，内容类型丰富（公告、报告、指南、协议、新闻等）。
+            
+            ## Skills
+            - 从用户输入中提取关键词（主题对象、行为、时间、领域术语等）
+            - 跨领域进行文档匹配，支持多个类型的文档并存（报告、新闻、政策等）
+            - 输出结构化 JSON，便于接入段落选择器或摘要生成器
+            - 支持排序返回多份相关文档
+            
+            ## Rules
+            1. 响应格式必须为 JSON，包含 `selected_documents`数组；
+            2. 匹配依据为 `document_description`，可包括文档主题、内容、发布时间、用途等；
+            3. 支持多文档命中（强相关即可返回），优先包含查询关键词的文档；
+            4. 支持文档类型多样性：如年报、会议纪要、通知公告、技术说明、法律文件等；
+            5. 禁止生成未在文档描述中出现的信息。
+            6.`selected_documents`数组中是`document_id`;
+            
+            ## Workflows
+            1. 解析 input_text，提取关键词（实体名、事件、指标、时间、地域等）；
+            2. 遍历文档列表，结合关键词在 `document_description` 中的语义出现情况排序；
+            3. 返回最相关的一个或多个文档项；
+            4. 格式化输出。
+            
+            ## OutputFormat
+            {{
+                "selected_documents": ["document_idxxx"]
+            }}
+            Warning: 
+            -输出不要增加额外内容，严格按照Example Output结构输出。
         """
     }
 ]
@@ -37,169 +60,169 @@ DOCUMENT_FEW_SHOT_MESSAGES = [
     {
         'role': 'user',
         'content': """{
-            "input_text": "比亚迪2024年第三季度盈利情况如何？",
+            "input_text": "国家出台的双碳目标政策，以及广东省的实施细则和比亚迪的企业响应有哪些？",
             "documents": [
                 {
-                    "document_id": "比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf",
-                    "document_description": "比亚迪2024年03财务报告，涵盖基本概况、主要财务数据、股东结构及高管增持等信息，报告未经审计。"
+                    "document_id": "d101",
+                    "document_description": "《关于完整准确全面贯彻新发展理念做好碳达峰碳中和工作的意见》（国家发改委，2023年3月发布）。"
                 },
                 {
-                    "document_id": "678e2f91-3a3b-4e57-845e-9088e4e438f7",
-                    "document_description": "比亚迪2023年财务报告，包含全年营收、利润、负债情况，数据经审计。"
+                    "document_id": "d102",
+                    "document_description": "广东省生态环境厅2023年发布《双碳行动实施细则》，涵盖工业转型与交通减排目标。"
+                },
+                {
+                    "document_id": "d103",
+                    "document_description": "比亚迪2023年ESG报告披露了碳排放治理策略与电动车产能规划。"
+                },
+                {
+                    "document_id": "d104",
+                    "document_description": "国家能源局2022年氢能指导意见，聚焦能源结构调整。"
+                },
+                {
+                    "document_id": "d105",
+                    "document_description": "深圳市住建局绿色建筑标准指南，聚焦建筑节能。"
                 }
-            ],
-            "classification_instructions": []
+            ]
         }"""
     },
     {
         'role': 'assistant',
         'content': """{
-            "keywords": ["比亚迪", "2024年", "第三季度", "盈利"],
-            "selected_documents": [
-                {
-                    "document_id": "比亚迪股份有限公司 2024年第三季度报告（2024-10-30）.pdf",
-                    "document_description": "比亚迪2024年03财务报告，涵盖基本概况、主要财务数据、股东结构及高管增持等信息，报告未经审计。"
-                }
-            ]
+            "selected_documents": ["d101","d102","d103"]
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "2023年新能源汽车补贴政策调整有哪些？",
+            "input_text": "GPT-5有哪些安全机制方面的提升？",
             "documents": [
                 {
-                    "document_id": "6a9f1a62-d4a5-4c93-872f-2d74b9e2b681",
-                    "document_description": "2023年新能源汽车补贴政策全文，涵盖补贴标准调整、补贴申领流程变更及适用车型范围。"
+                    "document_id": "d01",
+                    "document_description": "OpenAI最新发布的GPT-5模型技术白皮书，涉及模型能力、安全性和训练数据情况。"
                 },
                 {
-                    "document_id": "e3d4a8b9-72cf-46e5-b4f8-f98c612d9e36",
-                    "document_description": "2023年新能源汽车购置税减免政策，适用于特定新能源车型，规定购置税免除标准。"
+                    "document_id": "d02",
+                    "document_description": "Transformer模型原理介绍，重点讨论注意力机制和多层结构。"
                 },
                 {
-                    "document_id": "政策汇编-2022.pdf",
-                    "document_description": "2022年新能源行业相关政策汇编，包括财政补贴、市场监管、税收优惠等。"
+                    "document_id": "d03",
+                    "document_description": "2023年AI伦理与算法治理研讨会记录，包含各方观点与政策建议。"
                 }
-            ],
-            "classification_instructions": []
+            ]
         }"""
     },
     {
         'role': 'assistant',
         'content': """{
-            "keywords": ["新能源汽车", "补贴政策", "2023年", "调整"],
-            "selected_documents": [
-                {
-                    "document_id": "6a9f1a62-d4a5-4c93-872f-2d74b9e2b681",
-                    "document_description": "2023年新能源汽车补贴政策全文，涵盖补贴标准调整、补贴申领流程变更及适用车型范围。"
-                },
-                {
-                    "document_id": "e3d4a8b9-72cf-46e5-b4f8-f98c612d9e36",
-                    "document_description": "2023年新能源汽车购置税减免政策，适用于特定新能源车型，规定购置税免除标准。"
-                }
-            ]
+            "selected_documents": ["d01"]
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "比亚迪最近的高管变动情况？",
+            "input_text": "2024年深圳的小学入学政策和时间安排是怎样的？",
             "documents": [
                 {
-                    "document_id": "cfa82b11-5f6c-4a9a-8f21-3d2d9e7b1b45",
-                    "document_description": "2022年比亚迪公司管理层调整公告，涉及新任CFO及多名高管调整。"
+                    "document_id": "d10",
+                    "document_description": "深圳市教育局2024年义务教育招生政策问答，包括入学条件、材料清单与时间节点。"
                 },
                 {
-                    "document_id": "比亚迪股份有限公司 2024年人事变更公告（2024-06-15）.pdf",
-                    "document_description": "比亚迪2024年最新人事调整，涉及董事会成员变更、新任CEO上任。"
+                    "document_id": "d11",
+                    "document_description": "广州教育局2023年小学招生简章，适用于天河、越秀等区域。"
                 },
                 {
-                    "document_id": "9d6c319b-d86e-4c23-8a1f-5d56729a9c13",
-                    "document_description": "2023年比亚迪人事调整文件，包含多个部门高管轮岗及管理层架构优化。"
-                }
-            ],
-            "classification_instructions": []
+                    "document_id": "d12",
+                    "document_description": "教育部关于优化义务教育阶段招生制度的指导意见（全国适用）。"
+                }   
+            ]
         }"""
     },
     {
         'role': 'assistant',
         'content': """{
-            "keywords": ["比亚迪", "高管变动", "最近", "人事调整"],
-            "selected_documents": [
-                {
-                    "document_id": "比亚迪股份有限公司 2024年人事变更公告（2024-06-15）.pdf",
-                    "document_description": "比亚迪2024年最新人事调整，涉及董事会成员变更、新任CEO上任。"
-                }
-            ]
+            "selected_documents": ["d10"]
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "比亚迪今年在欧洲的销量如何？",
+            "input_text": "请提供比亚迪2023年财务表现、环境责任和高管变动相关内容。",
             "documents": [
                 {
-                    "document_id": "f3c27e94-1d72-4e86-b9e8-97b542ef1e63",
-                    "document_description": "比亚迪2023年全球市场销量报告，包含欧洲、北美和亚洲市场的增长趋势。"
+                    "document_id": "d01",
+                    "document_description": "比亚迪2023年第四季度财务报告，包含净利润、营收、资产结构等关键财务数据。"
                 },
                 {
-                    "document_id": "2022年比亚迪全球销量数据.pdf",
-                    "document_description": "比亚迪2022年全球销量分析，涵盖主要市场份额及竞争态势。"
+                    "document_id": "d02",
+                    "document_description": "比亚迪2023年ESG环境责任报告，聚焦碳排放、资源利用与社会公益项目。"
+                },
+                {
+                    "document_id": "d03",
+                    "document_description": "比亚迪2023年高管人事公告，涉及CEO变动与董事会新任命。"
+                },
+                {
+                    "document_id": "d04",
+                    "document_description": "比亚迪2022年年度报告，涵盖全年业务与股东信息。"
                 }
-            ],
-            "classification_instructions": []
+            ]
         }"""
     },
     {
         'role': 'assistant',
         'content': """{
-            "keywords": ["比亚迪", "欧洲", "销量", "今年"],
-            "selected_documents": [
-                {
-                    "document_id": "f3c27e94-1d72-4e86-b9e8-97b542ef1e63",
-                    "document_description": "比亚迪2023年全球市场销量报告，包含欧洲、北美和亚洲市场的增长趋势。"
-                }
-            ]
+            "selected_documents": ["d01","d02","d03"]
         }"""
     }
 ]
 
 # user input
-DOCUMENT_USER_PROMPT = """
-    "input_text": "{question}",
-    "documents": "{document_params}",
-    "classification_instructions": []
-"""
+DOCUMENT_USER_PROMPT = [
+    {
+        'role': 'user',
+    }
+]
 
 
 class DocumentSelector(BaseSelector):
-    def __init__(self, llm: BaseLLM):
-        self.llm = llm
-        self.selected_documents = None
-        self.params = []
+    def __init__(self, params):
+        super().__init__(params)
         self.documents = self.get_layer_data()
+        self.select_params = []
 
-    def get_layer_data(self):
-        with open(r'D:\xqm\python\project\llm\start-map\data\byd_info.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-
-        return data
-
-    def collate_select_params(self, params: List[Dict] = None):
-        for item in self.documents:
-            self.params.append({
-                "document_id": item["filename"],
-                "document_description": item["overall_description"]
+    def get_layer_data(self) -> Sequence[Dict]:
+        kb_id = self.params.kb_id
+        session = self.params.session
+        statement = select(Document).where(Document.kb_id == kb_id)
+        db_documents = session.exec(statement).all()
+        documents = []
+        for document in db_documents:
+            documents.append({
+                'document_id': document.category_id,
+                'document_description': f'{document.category_description};{document.parent_description}'
             })
+        return documents
+
+    def collate_select_params(self, selected_categories: List[Dict] = None):
+        session = self.params.session
+        for category_id in selected_categories:
+            db_category = session.get(Category, category_id)
+            self.select_params = [{
+                'document_id': doc.document_id,
+                'document_description': f'{doc.document_description};{doc.parent_description}'
+            } for doc in db_category.documents]
+
+        if len(self.select_params) == 0:
+            self.select_params = self.documents
+
         return self
 
-    def start_select(self, question: str, params: List[Dict] = None):
-        user_messages = [
-            {
-                'role': 'user',
-                'content': '{' + DOCUMENT_USER_PROMPT.format(question=question, document_params=self.params) + '}'
-            }
-        ]
-        response_chat = self.llm.chat(DOCUMENT_SYSTEM_MESSAGES + DOCUMENT_FEW_SHOT_MESSAGES + user_messages)
-        content, total_tokens = response_chat
-        return content['selected_documents']
+    def start_select(self):
+        question = self.params.question
+        llm = self.params.llm
+        DOCUMENT_USER_PROMPT[0]['content'] = {
+            'input_text': question,
+            'documents': self.select_params
+        }
+        response_chat = llm.chat(DOCUMENT_SYSTEM_MESSAGES + DOCUMENT_FEW_SHOT_MESSAGES + DOCUMENT_USER_PROMPT)
+
+        return response_chat[0]

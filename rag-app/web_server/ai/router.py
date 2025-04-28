@@ -15,7 +15,10 @@ from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
 
 from llm.qwen import Qwen
+from selector.base import SelectorParam
+from selector.class_selector import CategorySelector
 from selector.document_selector import DocumentSelector
+from selector.domain_selector import DomainSelector
 from selector.paragraph_selector import ParagraphSelector
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain
 from web_server.ai.views import loading_data
@@ -24,13 +27,12 @@ router = APIRouter(tags=['ai'], prefix='/ai')
 
 
 @router.get('/query')
-async def query_with_llm(question: str):
-    qwen = Qwen()
-    document_selector = DocumentSelector(qwen)
-    selected_documents = document_selector.collate_select_params().start_select(question)
-    paragraph_selector = ParagraphSelector(qwen)
-    target_paragraphs = paragraph_selector.collate_select_params(selected_documents).start_select(
-        question).collate_select_result()
+async def query_with_llm(kb_id: int, session: SessionDep, question: str):
+    params = SelectorParam(Qwen(), kb_id, session, question)
+    selected_domains = DomainSelector(params).collate_select_params().start_select()
+    selected_categories = CategorySelector(params).collate_select_params(selected_domains).start_select()
+    selected_documents = DocumentSelector(params).collate_select_params(selected_categories).start_select()
+    target_paragraphs = ParagraphSelector(params).collate_select_params(selected_documents).start_select().collate_select_result()
     return target_paragraphs
 
 
@@ -177,31 +179,3 @@ def update_knowledge_base(kb_id: int, kb: KbBase, session: SessionDep):
     session.commit()
     session.refresh(kb_db)
     return kb_db
-
-
-# @router.get('/meta_data/{kb_id}')
-# async def get_meta_data(meta_type: str, kb_id: int, session: SessionDep):
-#     data = []
-#     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../data'))
-#
-#     all_parser = {
-#         'paragraph': 'paragraph_info.json',
-#         'document': 'document_info.json',
-#         'category': 'category_info.json',
-#         'domain': 'domain_info.json',
-#     }
-#     if meta_type in all_parser:
-#         file_name = all_parser[meta_type]
-#         file_path = os.path.join(base_dir, file_name)
-#         with open(file_path, 'r', encoding='utf-8') as f:
-#             data = json.load(f)
-#
-#     return data
-
-
-if __name__ == '__main__':
-    os.environ['OPENAI_API_KEY'] = 'sk-3fb76d31383b4552b9c3ebf82f44157d'
-    os.environ['OPENAI_BASE_URL'] = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-    # page_split
-    # catalog_split
-    # automate_judgment_split

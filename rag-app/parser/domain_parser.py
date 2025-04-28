@@ -76,7 +76,6 @@ class DomainParser(BaseParser):
         self.domain = None
         self.known_domains = []
         self.new_domain = 'true'
-        self.save_path = os.path.join(self.base_path, 'domain_info.json')
 
     def parse(self, **kwargs):
         category = kwargs.get('category')

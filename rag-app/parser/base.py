@@ -1,11 +1,9 @@
-import os
-
 from sqlmodel import Session
+
 from llm.base import BaseLLM
 
 
 class BaseParser:
-    base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data'))
 
     def __init__(self, llm: BaseLLM, kb_id: int, session: Session):
         self.llm = llm
