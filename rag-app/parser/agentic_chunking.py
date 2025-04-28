@@ -200,7 +200,7 @@ def find_chunk_and_push_proposition(proposition: str):
             create_new_chunk(proposition)
 
 # === 主流程 ===
-def extraction_chain(text:str):
+def extraction_chain():
     print("请输入文本，结束后回车空行：")
     lines = []
     while True:
