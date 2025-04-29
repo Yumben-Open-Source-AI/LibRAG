@@ -1,5 +1,6 @@
 import json
 import datetime
+import uuid
 from typing import List, Dict
 
 from sqlmodel import select
@@ -185,17 +186,17 @@ class ParagraphSelector(BaseSelector):
         paragraphs = []
         for paragraph in db_paragraphs:
             paragraphs.append({
-                'paragraph_id': paragraph.paragraph_id,
-                'paragraph_description': f'{paragraph.category_description};{paragraph.parent_description}'
+                'paragraph_id': paragraph.paragraph_id.__str__(),
+                'paragraph_description': f'{paragraph.parent_description};{paragraph.parent_description}'
             })
         return paragraphs
 
     def collate_select_params(self, selected_documents: List[Dict] = None):
         session = self.params.session
         for doc_id in selected_documents:
-            db_doc = session.get(Document, doc_id)
+            db_doc = session.get(Document, uuid.UUID(doc_id))
             self.select_params = [{
-                'paragraph_id': paragraph.paragraph_id,
+                'paragraph_id': paragraph.paragraph_id.__str__(),
                 'paragraph_description': f'{paragraph.summary};{paragraph.parent_description}'
             } for paragraph in db_doc.paragraphs]
 
@@ -204,10 +205,10 @@ class ParagraphSelector(BaseSelector):
     def start_select(self):
         question = self.params.question
         llm = self.params.llm
-        PARAGRAPH_USER_MESSAGES[0]['content'] = {
+        PARAGRAPH_USER_MESSAGES[0]['content'] = str({
             'input_text': question,
             'paragraphs': self.select_params
-        }
+        })
         response_chat = llm.chat(PARAGRAPH_SYSTEM_MESSAGES + PARAGRAPH_FEW_SHOT_MESSAGES + PARAGRAPH_USER_MESSAGES)
         self.selected_paragraphs = set(response_chat[0]['selected_paragraphs'])
 
@@ -220,6 +221,6 @@ class ParagraphSelector(BaseSelector):
         session = self.params.session
         result = []
         for paragraph_id in self.selected_paragraphs:
-            result.append(session.get(Paragraph, paragraph_id).dict())
+            result.append(session.get(Paragraph, uuid.UUID(paragraph_id)).dict())
 
         return result

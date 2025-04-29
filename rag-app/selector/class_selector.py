@@ -6,6 +6,7 @@
 @Date    ：2025/4/28 上午10:40 
 """
 import datetime
+import uuid
 from typing import List, Dict, Sequence
 
 from sqlmodel import select
@@ -187,7 +188,7 @@ class CategorySelector(BaseSelector):
         categories = []
         for category in db_categories:
             categories.append({
-                'category_id': category.category_id,
+                'category_id': category.category_id.__str__(),
                 'category_description': f'{category.category_description};{category.parent_description}'
             })
         return categories
@@ -195,11 +196,11 @@ class CategorySelector(BaseSelector):
     def collate_select_params(self, selected_domains: List[Dict] = None):
         session = self.params.session
         for domain_id in selected_domains:
-            db_domain = session.get(Domain, domain_id)
+            db_domain = session.get(Domain, uuid.UUID(domain_id))
             self.select_params = [{
-                'category_id': category.category_id,
+                'category_id': category.category_id.__str__,
                 'category_description': f'{category.category_description};{category.parent_description}'
-            } for category in db_domain.categories]
+            } for category in db_domain.sub_categories]
 
         if len(self.select_params) == 0:
             self.select_params = self.categories
@@ -209,10 +210,10 @@ class CategorySelector(BaseSelector):
     def start_select(self):
         question = self.params.question
         llm = self.params.llm
-        CATEGORY_USER_MESSAGES[0]['content'] = {
+        CATEGORY_USER_MESSAGES[0]['content'] = str({
             'input_text': question,
             'categories': self.select_params
-        }
+        })
         response_chat = llm.chat(CATEGORY_SYSTEM_MESSAGES + CATEGORY_FEW_SHOT_MESSAGES + CATEGORY_USER_MESSAGES)
         selected_categories = set(response_chat[0]['selected_categories'])
 

@@ -178,7 +178,7 @@ class DomainSelector(BaseSelector):
         db_domains = self.params.session.exec(statement).all()
         for domain in db_domains:
             self.select_params.append({
-                'domain_id': domain.domain_id,
+                'domain_id': domain.domain_id.__str__(),
                 'domain_description': domain.domain_description,
             })
         return self
@@ -186,10 +186,10 @@ class DomainSelector(BaseSelector):
     def start_select(self):
         question = self.params.question
         llm = self.params.llm
-        DOMAIN_USER_MESSAGES[0]['content'] = {
+        DOMAIN_USER_MESSAGES[0]['content'] = str({
             'input_text': question,
             'domains': self.select_params
-        }
+        })
         response_chat = llm.chat(DOMAIN_SYSTEM_MESSAGES + DOMAIN_FEW_SHOT_MESSAGES + DOMAIN_USER_MESSAGES)
         selected_domains = set(response_chat[0]['selected_domains'])
 

@@ -1,5 +1,6 @@
 import datetime
 import json
+import uuid
 from typing import List, Dict, Sequence
 
 from sqlmodel import select
@@ -197,17 +198,17 @@ class DocumentSelector(BaseSelector):
         documents = []
         for document in db_documents:
             documents.append({
-                'document_id': document.category_id,
-                'document_description': f'{document.category_description};{document.parent_description}'
+                'document_id': document.document_id.__str__(),
+                'document_description': f'{document.document_description};{document.parent_description}'
             })
         return documents
 
     def collate_select_params(self, selected_categories: List[Dict] = None):
         session = self.params.session
         for category_id in selected_categories:
-            db_category = session.get(Category, category_id)
+            db_category = session.get(Category, uuid.UUID(category_id))
             self.select_params = [{
-                'document_id': doc.document_id,
+                'document_id': doc.document_id.__str__(),
                 'document_description': f'{doc.document_description};{doc.parent_description}'
             } for doc in db_category.documents]
 
@@ -219,10 +220,10 @@ class DocumentSelector(BaseSelector):
     def start_select(self):
         question = self.params.question
         llm = self.params.llm
-        DOCUMENT_USER_PROMPT[0]['content'] = {
+        DOCUMENT_USER_PROMPT[0]['content'] = str({
             'input_text': question,
             'documents': self.select_params
-        }
+        })
         response_chat = llm.chat(DOCUMENT_SYSTEM_MESSAGES + DOCUMENT_FEW_SHOT_MESSAGES + DOCUMENT_USER_PROMPT)
         selected_documents = set(response_chat[0]['selected_documents'])
 
