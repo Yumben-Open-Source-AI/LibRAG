@@ -46,6 +46,12 @@ kb_state_init = [
 ]
 
 
+def get_kb_choices():
+    all_kbs = request.safe_send_request('knowledge_bases', 'GET')
+
+    return gr.update(choices=[f"{str(kb['kb_id'])}:{kb['kb_name']}" for kb in all_kbs])
+
+
 def get_kb_table(include_key=None):
     all_kbs = request.safe_send_request('knowledge_bases', 'GET')
 
@@ -178,26 +184,39 @@ def add_files_to_kb(paths, idx, state):
     return file_table_from_kb(kb)
 
 
-def recall_test(query, kb_name):
+def recall_clear():
+    return None, None, pd.DataFrame()
+
+
+def recall_test(query: str, kb_info: str):
     if not query.strip():
         gr.Warning("请输入查询内容")
         return pd.DataFrame()
-    if not kb_name:
+    if not kb_info:
         gr.Warning("请选择知识库")
         return pd.DataFrame()
 
-    rows = []
-    for i in range(1, 6):
-        rows.append({
-            "rank": i, "doc": random.choice(["demo_说明.pdf", "requirements.txt"]),
-            "score": round(random.random(), 4),
-            "snippet": f"『{query}』相关内容片段 #{i}"
-        })
-    return pd.DataFrame(rows)
+    kb_id, kb_name = kb_info.split(':')
+    paragraphs = request.safe_send_request('recall', 'GET', body={
+        'kb_id': kb_id,
+        'question': query
+    })
 
+    paragraphs = [{'paragraph_id': par['paragraph_id'], '段落摘要': par['summary'], '段落内容': par['content'],
+                   '来源描述': par['parent_description']} for par in paragraphs]
+
+    return pd.DataFrame(paragraphs)
+
+
+css = """
+    /* 限制表格的宽度并允许换行 */
+    table td {
+        white-space: pre-line; /* Allows line breaks in table cells */
+    }
+"""
 
 # ---------- UI ----------
-with gr.Blocks(title="LibRAG") as demo:
+with gr.Blocks(title="LibRAG", css=css) as demo:
     kb_state = gr.State(kb_state_init.copy())
     kb_selected_idx = gr.State(None)
 
@@ -269,12 +288,13 @@ with gr.Blocks(title="LibRAG") as demo:
         # 召回测试tag
         with gr.TabItem("召回测试"):
             with gr.Row():
-                query_tb = gr.Textbox(label="输入内容", placeholder="请输入查询…", lines=1, scale=6)
-                kb_select_dd = gr.Dropdown(choices=[kb["name"] for kb in kb_state_init],
-                                           label="选择知识库", scale=3)
-                recall_btn = gr.Button("提交", variant="primary", scale=1)
-            recall_df = gr.Dataframe(headers=["rank", "doc", "score", "snippet"],
-                                     interactive=False, max_height=350)
+                query_tb = gr.Textbox(label="输入内容", placeholder="请输入查询，建议采用陈述性语句", lines=1, scale=6)
+                recall_dd = gr.Dropdown(label="选择知识库", scale=2)
+                with gr.Column(scale=2):
+                    recall_btn = gr.Button("测试召回", variant="primary")
+                    clear_btn = gr.Button("重置查询", variant="secondary")
+            recall_df = gr.Dataframe(headers=["paragraph_id", "段落摘要", "段落内容", "来源描述"],
+                                     interactive=False, max_height=650, elem_id='recall-df')
 
     # 事件绑定
     create_btn.click(lambda: Modal(visible=True), None, create_modal)
@@ -311,8 +331,26 @@ with gr.Blocks(title="LibRAG") as demo:
         outputs=[appends_modal, kb_files_df]
     )
 
-    recall_btn.click(recall_test, [query_tb, kb_select_dd], recall_df)
+    recall_btn.click(
+        recall_test,
+        inputs=[query_tb, recall_dd],
+        outputs=recall_df
+    )
+
+    clear_btn.click(
+        recall_clear,
+        outputs=[query_tb, recall_dd, recall_df]
+    )
+
+    demo.load(
+        get_kb_choices,
+        outputs=[recall_dd]
+    )
 
 # ---------- 启动 ----------
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        auth=('yumben', '123456')
+    )

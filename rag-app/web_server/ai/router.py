@@ -26,7 +26,7 @@ from web_server.ai.views import loading_data
 router = APIRouter(tags=['ai'], prefix='/ai')
 
 
-@router.get('/query')
+@router.get('/recall')
 async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     params = SelectorParam(Qwen(), kb_id, session, question)
     selected_domains = DomainSelector(params).collate_select_params().start_select()
