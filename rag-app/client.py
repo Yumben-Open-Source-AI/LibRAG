@@ -65,9 +65,9 @@ def file_table_from_kb(kb_id):
     show_document_info = []
     for document in kb_db['documents']:
         show_document_info.append({
-            'id': document['document_id'],
-            'name': document['document_name'],
-            'description': document['document_description'],
+            'document_id': document['document_id'],
+            '文档名称': document['document_name'],
+            '文档描述': document['document_description'],
         })
 
     return pd.DataFrame(show_document_info) if kb_db else pd.DataFrame()
@@ -236,7 +236,7 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
                     appends_files_btn = gr.Button('追加新文件', variant='primary', interactive=False)
 
             with gr.Column(visible=True) as kb_detail_col:
-                kb_files_df = gr.Dataframe(headers=['id', 'name', 'description'], interactive=True, max_height=650)
+                kb_files_df = gr.Dataframe(headers=['document_id', '文档名称', '文档描述'], interactive=True, max_height=650)
 
             create_modal = Modal(visible=False)
             with create_modal:
