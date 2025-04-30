@@ -5,6 +5,7 @@ import re
 from collections import deque
 from typing import List, Literal, Optional, Annotated
 
+import jieba
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks, Depends
 from sqlmodel import select
 
@@ -28,11 +29,30 @@ router = APIRouter(tags=['ai'], prefix='/ai')
 
 @router.get('/recall')
 async def query_with_llm(kb_id: int, session: SessionDep, question: str):
+    from rank_bm25 import BM25Okapi
+    import numpy as np
+
     params = SelectorParam(Qwen(), kb_id, session, question)
     selected_domains = DomainSelector(params).collate_select_params().start_select()
+    print(selected_domains)
     selected_categories = CategorySelector(params).collate_select_params(selected_domains).start_select()
+    print(selected_categories)
     selected_documents = DocumentSelector(params).collate_select_params(selected_categories).start_select()
-    target_paragraphs = ParagraphSelector(params).collate_select_params(selected_documents).start_select().collate_select_result()
+    print(selected_documents)
+    target_paragraphs = ParagraphSelector(params).collate_select_params(
+        selected_documents).start_select().collate_select_result()
+    print(target_paragraphs)
+
+    recall_content = [par['content'] for par in target_paragraphs]
+
+    # BM25进行段落召回评分
+    tokenized_paragraphs = [list(jieba.cut(par)) for par in recall_content]
+    tokenized_question = list(jieba.cut(question))
+    bm25 = BM25Okapi(tokenized_paragraphs, k1=1.5, b=0.6)
+    par_scores = bm25.get_scores(tokenized_question)
+    exp_scores = [np.exp(s) for s in par_scores]
+    for i, score in enumerate(exp_scores):
+        target_paragraphs[i]['score'] = score
     return target_paragraphs
 
 

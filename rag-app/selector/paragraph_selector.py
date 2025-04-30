@@ -39,6 +39,7 @@ PARAGRAPH_SYSTEM_MESSAGES = [
             4. 禁止返回与问题无关段落，不生成虚假信息；
             5. 输出段落数应保持数据准确，并按相关性排序；
             6.`selected_paragraphs`数组中是`paragraph_id`；
+            7. 可通过`paragraph_description`中的段落来源描述进行辅助选择；
             
             ## Workflows
             1. 解析 input_text，提取查询关键词（如公司名、时间、指标、行为）；
@@ -195,10 +196,10 @@ class ParagraphSelector(BaseSelector):
         session = self.params.session
         for doc_id in selected_documents:
             db_doc = session.get(Document, uuid.UUID(doc_id))
-            self.select_params = [{
+            self.select_params.extend([{
                 'paragraph_id': paragraph.paragraph_id.__str__(),
                 'paragraph_description': f'{paragraph.summary};{paragraph.parent_description}'
-            } for paragraph in db_doc.paragraphs]
+            } for paragraph in db_doc.paragraphs])
 
         return self
 

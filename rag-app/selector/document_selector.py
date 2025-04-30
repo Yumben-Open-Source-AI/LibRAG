@@ -207,10 +207,10 @@ class DocumentSelector(BaseSelector):
         session = self.params.session
         for category_id in selected_categories:
             db_category = session.get(Category, uuid.UUID(category_id))
-            self.select_params = [{
+            self.select_params.extend([{
                 'document_id': doc.document_id.__str__(),
                 'document_description': f'{doc.document_description};{doc.parent_description}'
-            } for doc in db_category.documents]
+            } for doc in db_category.documents])
 
         if len(self.select_params) == 0:
             self.select_params = self.documents

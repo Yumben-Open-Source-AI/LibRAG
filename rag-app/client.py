@@ -34,18 +34,6 @@ def log_io(func):
     return wrapper
 
 
-# ---------- 初始虚拟数据 ----------
-kb_state_init = [
-    {
-        "name": "DemoKB",
-        "files": [
-            {"name": "demo_说明.pdf", "size": 123.4},
-            {"name": "requirements.txt", "size": 2.7},
-        ],
-    }
-]
-
-
 def get_kb_choices():
     all_kbs = request.safe_send_request('knowledge_bases', 'GET')
 
@@ -203,7 +191,7 @@ def recall_test(query: str, kb_info: str):
     })
 
     paragraphs = [{'paragraph_id': par['paragraph_id'], '段落摘要': par['summary'], '段落内容': par['content'],
-                   '来源描述': par['parent_description']} for par in paragraphs]
+                   '来源描述': par['parent_description'], '分数': par['score']} for par in paragraphs]
 
     return pd.DataFrame(paragraphs)
 
@@ -217,7 +205,6 @@ css = """
 
 # ---------- UI ----------
 with gr.Blocks(title="LibRAG", css=css) as demo:
-    kb_state = gr.State(kb_state_init.copy())
     kb_selected_idx = gr.State(None)
 
     with gr.Tabs(selected=0):
@@ -236,7 +223,8 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
                     appends_files_btn = gr.Button('追加新文件', variant='primary', interactive=False)
 
             with gr.Column(visible=True) as kb_detail_col:
-                kb_files_df = gr.Dataframe(headers=['document_id', '文档名称', '文档描述'], interactive=True, max_height=650)
+                kb_files_df = gr.Dataframe(headers=['document_id', '文档名称', '文档描述'], interactive=True,
+                                           max_height=650)
 
             create_modal = Modal(visible=False)
             with create_modal:
@@ -293,7 +281,7 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
                 with gr.Column(scale=2):
                     recall_btn = gr.Button("测试召回", variant="primary")
                     clear_btn = gr.Button("重置查询", variant="secondary")
-            recall_df = gr.Dataframe(headers=["paragraph_id", "段落摘要", "段落内容", "来源描述"],
+            recall_df = gr.Dataframe(headers=["paragraph_id", "段落摘要", "段落内容", "来源描述", "分数"],
                                      interactive=False, max_height=650, elem_id='recall-df')
 
     # 事件绑定

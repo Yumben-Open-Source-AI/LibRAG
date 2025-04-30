@@ -197,10 +197,10 @@ class CategorySelector(BaseSelector):
         session = self.params.session
         for domain_id in selected_domains:
             db_domain = session.get(Domain, uuid.UUID(domain_id))
-            self.select_params = [{
+            self.select_params.extend([{
                 'category_id': category.category_id.__str__,
                 'category_description': f'{category.category_description};{category.parent_description}'
-            } for category in db_domain.sub_categories]
+            } for category in db_domain.sub_categories])
 
         if len(self.select_params) == 0:
             self.select_params = self.categories
