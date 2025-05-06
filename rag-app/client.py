@@ -4,6 +4,8 @@ Gradio 5.25.2  +  gradio_modal ≥0.2
 """
 
 import os, random, functools, inspect, logging, pprint
+import shutil
+
 import gradio as gr
 import pandas as pd
 from gradio_modal import Modal
@@ -100,12 +102,22 @@ def make_preview_cb():
 def submit_append_file(kb_id, files, *strategies):
     """ 追加提交每个文件解析及切割策略 """
 
+    files_info = []
+    policy_types = []
     for file, strategy in zip(files, strategies):
-        with open(file, 'rb') as f:
-            request.safe_send_request('upload', 'POST', body={
-                'kb_id': kb_id,
-                'policy_type': ALL_STRATEGY[strategy]
-            }, files={'file': f})
+        file_name = os.path.basename(file)
+        file_path = os.path.abspath(os.path.join('./files/', file_name))
+        with open(file, 'rb') as source:
+            with open(file_path, 'wb') as target:
+                shutil.copyfileobj(source, target)
+        files_info.append(file_path)
+        policy_types.append(ALL_STRATEGY[strategy])
+
+    request.safe_send_request('upload', 'POST', body={
+        'kb_id': kb_id,
+        'files': files_info,
+        'policy_types': policy_types
+    })
 
     gr.Info(f"成功追加{len(files)} 个文件")
     return (
@@ -134,12 +146,25 @@ def submit_create_kb(name, desc, files, *strategies):
     })
     kb_id = new_kb['kb_id']
 
+    base_dir = './files/'
+    os.makedirs(base_dir, exist_ok=True)
+
+    files_info = []
+    policy_types = []
     for file, strategy in zip(files, strategies):
-        with open(file, 'rb') as f:
-            request.safe_send_request('upload', 'POST', body={
-                'kb_id': kb_id,
-                'policy_type': ALL_STRATEGY[strategy]
-            }, files={'file': f})
+        file_name = os.path.basename(file)
+        file_path = os.path.abspath(os.path.join(base_dir, file_name))
+        with open(file, 'rb') as source:
+            with open(file_path, 'wb') as target:
+                shutil.copyfileobj(source, target)
+        files_info.append(file_path)
+        policy_types.append(ALL_STRATEGY[strategy])
+
+    request.safe_send_request('upload', 'POST', body={
+        'kb_id': kb_id,
+        'files': files_info,
+        'policy_types': policy_types
+    })
 
     gr.Info(f"知识库『{name}』已创建，共 {len(files)} 个文件")
     return (
@@ -340,5 +365,5 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        auth=('yumben', '123456')
+        # auth=('yumben', '123456')
     )

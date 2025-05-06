@@ -141,18 +141,11 @@ async def rebuild_data(meta_type: str):
 async def upload_file(
         background_tasks: BackgroundTasks,
         kb_id: int = Form(...),
-        file: UploadFile = File(...),
-        policy_type: str = Form(...),
+        files: List[str] = Form(...),
+        policy_types: List[str] = Form(...),
         engine=Depends(get_engine)
 ):
-    base_dir = './files/'
-    os.makedirs(base_dir, exist_ok=True)
-    file_name = file.filename
-
-    file_path = os.path.abspath(os.path.join(base_dir, file_name))
-    with open(file_path, 'wb') as f:
-        f.write(await file.read())
-    background_tasks.add_task(loading_data, kb_id, file_name, file_path, policy_type, engine)
+    background_tasks.add_task(loading_data, kb_id, files, policy_types, engine)
     return {'message': '知识库文件加载任务后台处理中'}
 
 
