@@ -22,6 +22,7 @@ from selector.document_selector import DocumentSelector
 from selector.domain_selector import DomainSelector
 from selector.paragraph_selector import ParagraphSelector
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain
+from web_server.ai.schemas import FileInfo
 from web_server.ai.views import loading_data
 
 router = APIRouter(tags=['ai'], prefix='/ai')
@@ -140,12 +141,10 @@ async def rebuild_data(meta_type: str):
 @router.post('/upload')
 async def upload_file(
         background_tasks: BackgroundTasks,
-        kb_id: int = Form(...),
-        files: List[str] = Form(...),
-        policy_types: List[str] = Form(...),
+        files_info: FileInfo,
         engine=Depends(get_engine)
 ):
-    background_tasks.add_task(loading_data, kb_id, files, policy_types, engine)
+    background_tasks.add_task(loading_data, files_info, engine)
     return {'message': '知识库文件加载任务后台处理中'}
 
 

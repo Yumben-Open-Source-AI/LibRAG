@@ -15,17 +15,19 @@ from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
 from parser.paragraph_parser import ParagraphParser
+from web_server.ai.schemas import FileInfo
 
 
 def loading_data(
-        kb_id: int,
-        files: list,
-        policy_types: list,
+        files_info: FileInfo,
         engine
 ):
     with Session(engine) as session:
         try:
-            for file_path, policy_type in zip(files, policy_types):
+            for info in files_info.items:
+                kb_id = info.kb_id
+                file_path = info.file_path
+                policy_type = info.policy_type
                 file_name = os.path.basename(file_path)
                 print('开始处理' + file_name, datetime.datetime.now())
                 qwen = Qwen()

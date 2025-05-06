@@ -103,20 +103,20 @@ def submit_append_file(kb_id, files, *strategies):
     """ 追加提交每个文件解析及切割策略 """
 
     files_info = []
-    policy_types = []
     for file, strategy in zip(files, strategies):
         file_name = os.path.basename(file)
         file_path = os.path.abspath(os.path.join('./files/', file_name))
         with open(file, 'rb') as source:
             with open(file_path, 'wb') as target:
                 shutil.copyfileobj(source, target)
-        files_info.append(file_path)
-        policy_types.append(ALL_STRATEGY[strategy])
+        files_info.append({
+            'kb_id': kb_id,
+            'file_path': file_path,
+            'policy_type': ALL_STRATEGY[strategy]
+        })
 
-    request.safe_send_request('upload', 'POST', body={
-        'kb_id': kb_id,
-        'files': files_info,
-        'policy_types': policy_types
+    request.safe_send_request('upload', 'POST', json={
+        'items': files_info
     })
 
     gr.Info(f"成功追加{len(files)} 个文件")
@@ -150,20 +150,20 @@ def submit_create_kb(name, desc, files, *strategies):
     os.makedirs(base_dir, exist_ok=True)
 
     files_info = []
-    policy_types = []
     for file, strategy in zip(files, strategies):
         file_name = os.path.basename(file)
         file_path = os.path.abspath(os.path.join(base_dir, file_name))
         with open(file, 'rb') as source:
             with open(file_path, 'wb') as target:
                 shutil.copyfileobj(source, target)
-        files_info.append(file_path)
-        policy_types.append(ALL_STRATEGY[strategy])
+        files_info.append({
+            'kb_id': kb_id,
+            'file_path': file_path,
+            'policy_type': ALL_STRATEGY[strategy]
+        })
 
-    request.safe_send_request('upload', 'POST', body={
-        'kb_id': kb_id,
-        'files': files_info,
-        'policy_types': policy_types
+    request.safe_send_request('upload', 'POST', json={
+        'items': files_info
     })
 
     gr.Info(f"知识库『{name}』已创建，共 {len(files)} 个文件")
