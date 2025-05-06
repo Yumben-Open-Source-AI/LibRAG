@@ -1,4 +1,6 @@
 fastapi
+jieba
+rank_bm25
 uvicorn
 openai
 python-dotenv
