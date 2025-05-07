@@ -15,7 +15,7 @@ from selector.class_selector import CategorySelector
 from selector.document_selector import DocumentSelector
 from selector.domain_selector import DomainSelector
 from selector.paragraph_selector import ParagraphSelector
-from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain
+from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink
 from web_server.ai.schemas import FileInfo
 from web_server.ai.views import loading_data
 
@@ -66,7 +66,6 @@ async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
     target = all_parser[meta_type]
     statement = select(target).where(target.kb_id == kb_id)
     db_result = session.exec(statement).all()
-    print(db_result)
 
     result = []
     # TODO 优化序列化
@@ -187,8 +186,7 @@ async def read_knowledge_bases(
         offset: int = 0,
         limit: Annotated[int, Query(le=100)] = 100,
 ):
-    heroes = session.exec(select(KnowledgeBase).offset(offset).limit(limit)).all()
-    return heroes
+    return session.exec(select(KnowledgeBase).offset(offset).limit(limit)).all()
 
 
 @router.patch('/knowledge_base/{kb_id}', response_model=KbBase)
@@ -206,4 +204,17 @@ def update_knowledge_base(kb_id: int, kb: KbBase, session: SessionDep):
 
 @router.delete('/knowledge_base/{kb_id}')
 async def delete_knowledge_base(kb_id: int, session: SessionDep):
-    print(session.query(KnowledgeBase).filter_by(kb_id=kb_id))
+    session.query(Paragraph).filter_by(kb_id=kb_id).delete()
+    db_documents = session.query(Document).filter_by(kb_id=kb_id)
+    db_documents_ids = [doc.document_id for doc in db_documents]
+    session.query(CategoryDocumentLink).filter(CategoryDocumentLink.document_id.in_(db_documents_ids)).delete()
+    db_documents.delete()
+
+    db_categories = session.query(Category).filter_by(kb_id=kb_id)
+    db_categories_ids = [category.category_id for category in db_categories]
+    session.query(CategoryDocumentLink).filter(CategoryDocumentLink.category_id.in_(db_categories_ids)).delete()
+    db_categories.delete()
+
+    session.query(Domain).filter_by(kb_id=kb_id).delete()
+    session.query(KnowledgeBase).filter_by(kb_id=kb_id).delete()
+    session.commit()

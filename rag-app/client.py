@@ -1,8 +1,3 @@
-"""
-Knowledge‑Base Manager & Recall‑Test Demo
-Gradio 5.25.2  +  gradio_modal ≥0.2
-"""
-
 import os, random, functools, inspect, logging, pprint
 import shutil
 
@@ -166,6 +161,17 @@ def submit_create_kb(name, desc, files, *strategies):
     )
 
 
+def submit_delete_kb(kb_id):
+    request.safe_send_request(f'knowledge_base/{kb_id}', 'DELETE')
+
+    gr.Info(f"知识库已成功删除")
+    return (
+        Modal(visible=False),
+        get_kb_table(),
+        pd.DataFrame({'document_id': '', '文档名称': '', '文档描述':''})
+    )
+
+
 def enter_kb(evt: gr.SelectData):
     selected_id = evt.row_value[0]
     selected_name = evt.row_value[1]
@@ -178,16 +184,9 @@ def enter_kb(evt: gr.SelectData):
             value=file_table_from_kb(selected_id),
             label=f"{selected_name} - 文件列表"
         ),
-        gr.update(interactive=True),
+        gr.update(interactive=True, value=f'知识库:{selected_name}中追加新文件'),
+        gr.update(interactive=True, value=f'删除知识库:{selected_name}'),
     )
-
-
-def add_files_to_kb(paths, idx, state):
-    kb = state[idx]
-    for p in paths:
-        kb["files"].append({"name": os.path.basename(p), "size": round(os.path.getsize(p) / 1024, 2)})
-    gr.Info(f"已向『{kb['name']}』追加 {len(paths)} 个文件")
-    return file_table_from_kb(kb)
 
 
 def recall_clear():
@@ -209,7 +208,7 @@ def recall_test(query: str, kb_info: str):
     })
 
     paragraphs = [{'paragraph_id': par['paragraph_id'], '段落摘要': par['summary'], '段落内容': par['content'],
-                   '来源描述': par['parent_description'], '分数': par['score']} for par in paragraphs]
+                   '来源描述': par['parent_description']} for par in paragraphs]
 
     return pd.DataFrame(paragraphs)
 
@@ -237,6 +236,11 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
         # 知识库管理tab
         with gr.TabItem("知识库管理"):
             with gr.Row():
+                create_btn = gr.Button("创建知识库", variant="primary")
+                appends_files_btn = gr.Button('追加新文件', variant='secondary', interactive=False)
+                delete_btn = gr.Button('删除知识库', variant='stop', interactive=False)
+
+            with gr.Row():
                 with gr.Column(scale=7):
                     kb_df = gr.Dataframe(
                         value=get_kb_table,
@@ -244,14 +248,11 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
                         max_height=260
                     )
 
-                with gr.Column(scale=2):
-                    create_btn = gr.Button("创建知识库", variant="primary")
-                    appends_files_btn = gr.Button('追加新文件', variant='primary', interactive=False)
-
             with gr.Column(visible=True) as kb_detail_col:
                 kb_files_df = gr.Dataframe(headers=['document_id', '文档名称', '文档描述'], interactive=True,
                                            max_height=650)
 
+            # 创建知识库 & 提交文件弹窗
             create_modal = Modal(visible=False)
             with create_modal:
                 gr.Markdown("## 创建新知识库")
@@ -275,12 +276,13 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
                 # 已上传文件预览
                 preview_df = gr.Dataframe(interactive=False, max_height=150)
                 with gr.Row():
-                    submit_btn = gr.Button("创建知识库并提交文件", variant="primary")
-                    cancel_btn = gr.Button("取消")
+                    cancel_create_btn = gr.Button("取消创建")
+                    submit_create_btn = gr.Button("创建知识库并提交文件", variant="primary")
 
+            # 追加文件弹窗
             appends_modal = Modal(visible=False)
             with appends_modal:
-                gr.Markdown("## 知识库追加新文件解析")
+                gr.Markdown("## 追加新文件")
                 with gr.Row():
                     with gr.Column(scale=4):
                         add_files_up = gr.File(file_count="multiple", label="上传文件（多选）", type="filepath")
@@ -296,8 +298,17 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
 
                 append_preview_df = gr.Dataframe(interactive=False, max_height=150)
                 with gr.Row():
-                    append_submit_btn = gr.Button("追加文件", variant="primary")
-                    cancel_files_btn = gr.Button("取消")
+                    cancel_files_btn = gr.Button("取消追加")
+                    submit_append_btn = gr.Button("追加文件", variant="primary")
+
+            # 删除知识库弹窗
+            delete_model = Modal(visible=False)
+            with delete_model:
+                delete_markdown = gr.Markdown('# 确认是否删除当前数据库？')
+
+                with gr.Row():
+                    cancel_delete_btn = gr.Button('取消删除')
+                    submit_delete_btn = gr.Button('删除知识库', variant='stop')
 
         # 召回测试tag
         with gr.TabItem("召回测试"):
@@ -307,14 +318,16 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
                 with gr.Column(scale=2):
                     recall_btn = gr.Button("测试召回", variant="primary")
                     clear_btn = gr.Button("重置查询", variant="secondary")
-            recall_df = gr.Dataframe(headers=["paragraph_id", "段落摘要", "段落内容", "来源描述", "分数"],
+            recall_df = gr.Dataframe(headers=["paragraph_id", "段落摘要", "段落内容", "来源描述"],
                                      interactive=False, max_height=650, elem_id='recall-df')
 
     # 事件绑定
     create_btn.click(lambda: Modal(visible=True), None, create_modal)
-    cancel_btn.click(lambda: Modal(visible=False), None, create_modal)
+    cancel_create_btn.click(lambda: Modal(visible=False), None, create_modal)
     appends_files_btn.click(lambda: Modal(visible=True), None, appends_modal)
     cancel_files_btn.click(lambda: Modal(visible=False), None, appends_modal)
+    delete_btn.click(lambda: Modal(visible=True), None, delete_model)
+    
 
     files_up.change(
         make_preview_cb(),
@@ -322,7 +335,7 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
         outputs=[preview_df, *row_comps]  # 控制显隐
     )
 
-    submit_btn.click(
+    submit_create_btn.click(
         submit_create_kb,
         inputs=[name_tb, desc_tb, files_up, *dd_inputs],
         outputs=[create_modal, kb_df],
@@ -330,7 +343,13 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
 
     kb_df.select(
         enter_kb,
-        outputs=[kb_selected_idx, kb_files_df, appends_files_btn],
+        outputs=[kb_selected_idx, kb_files_df, appends_files_btn, delete_btn],
+    )
+
+    submit_delete_btn.click(
+        submit_delete_kb,
+        inputs=[kb_selected_idx],
+        outputs=[delete_model, kb_df, kb_files_df]
     )
 
     add_files_up.change(
@@ -339,7 +358,7 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
         outputs=[append_preview_df, *add_row_comps],
     )
 
-    append_submit_btn.click(
+    submit_append_btn.click(
         submit_append_file,
         inputs=[kb_selected_idx, add_files_up, *add_inputs],
         outputs=[appends_modal, kb_files_df]
@@ -361,7 +380,6 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
         outputs=[recall_dd]
     )
 
-# ---------- 启动 ----------
 if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
