@@ -62,19 +62,15 @@ PARAGRAPH_FEW_SHOT_MESSAGES = [
     {
         'role': 'user',
         'content': """{
-            "input_text": "2023年新能源汽车补贴申请流程与审核标准",
+            "input_text": "比亚迪 2024 年氢燃料电池业务收入是多少？",
             "paragraphs": [
                 {
-                    "paragraph_id": "p01",
-                    "paragraph_description": "2023年新能源补贴政策更新，包含申请条件、审核标准及适用车型。"
+                    "paragraph_id": "p001",
+                    "paragraph_description": "报告披露 2024 年电动汽车营业收入 4800 亿元；段落来源描述:<比亚迪 2024 年年度报告。>"
                 },
                 {
-                    "paragraph_id": "p02",
-                    "paragraph_description": "补贴申报流程说明，包括企业登录、资料提交、平台初审等步骤。"
-                },
-                {
-                    "paragraph_id": "p03",
-                    "paragraph_description": "技术标准部分，规定新能源车需满足电池密度、安全性等指标。"
+                    "paragraph_id": "p002",
+                    "paragraph_description": "报告披露 2024 年动力电池出货量数据；段落来源描述:<比亚迪 2024 年年度报告。>"
                 }
             ]
         }"""
@@ -82,25 +78,33 @@ PARAGRAPH_FEW_SHOT_MESSAGES = [
     {
         'role': 'assistant',
         'content': """{
-            "selected_paragraphs": ["p01","p02"]
+            "selected_paragraphs": []
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "实验设计和评估指标",
+            "input_text": "请给出比亚迪 2024 年四个季度各自的营业收入。",
             "paragraphs": [
                 {
-                    "paragraph_id": "r01",
-                    "paragraph_description": "实验方法部分描述了训练数据来源、模型结构及对比模型。"
+                    "paragraph_id": "Q1‑revenue",
+                    "paragraph_description": "2024Q1 营业收入 1200 亿元；段落来源描述:<比亚迪 2024 年第一季度报告 第 2 页。>"
                 },
                 {
-                    "paragraph_id": "r02",
-                    "paragraph_description": "评估指标包括F1分数、准确率、召回率，评估在三个数据集上的表现。"
+                    "paragraph_id": "Q2‑revenue",
+                    "paragraph_description": "2024Q2 营业收入 1350 亿元；段落来源描述:<比亚迪 2024 年半年度报告 第 3 页。>"
                 },
                 {
-                    "paragraph_id": "r03",
-                    "paragraph_description": "引言介绍了背景、研究动机和贡献。"
+                    "paragraph_id": "Q3‑revenue",
+                    "paragraph_description": "2024Q3 营业收入 1420 亿元；段落来源描述:<比亚迪 2024 年第三季度报告 第 2 页。>"
+                },
+                {
+                    "paragraph_id": "Q4‑revenue",
+                    "paragraph_description": "2024Q4 营业收入 1600 亿元；段落来源描述:<比亚迪 2024 年年度报告 第 4 页。>"
+                },
+                {
+                    "paragraph_id": "distractor‑cost",
+                    "paragraph_description": "2024Q3 营业**成本** 1100 亿元；段落来源描述:<比亚迪 2024 年第三季度报告。>"
                 }
             ]
         }"""
@@ -108,25 +112,21 @@ PARAGRAPH_FEW_SHOT_MESSAGES = [
     {
         'role': 'assistant',
         'content': """{
-            "selected_paragraphs": ["r01","r02"]
+            "selected_paragraphs": ["Q1‑revenue", "Q2‑revenue", "Q3‑revenue", "Q4‑revenue"]
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "双减政策”实施成效和教师满意度",
+            "input_text": "Tesla 2023 Q3 total revenue (USD) 是多少？",
             "paragraphs": [
                 {
-                    "paragraph_id": "edu01",
-                    "paragraph_description": "‘双减’政策背景说明及政策条文要点摘要。"
+                    "paragraph_id": "uuid‑123e4567-e89b-12d3-a456-426614174000",
+                    "paragraph_description": "2023Q3 revenue reached USD 23.35 bn；段落来源描述:<Tesla Inc. 2023 Q3 Update 2023‑10‑18。>"
                 },
                 {
-                    "paragraph_id": "edu02",
-                    "paragraph_description": "调研数据部分显示家长满意度提升，但部分教师仍有备课负担。"
-                },
-                {
-                    "paragraph_id": "edu03",
-                    "paragraph_description": "调查问卷分析：教师群体对政策实施后的教学节奏、工作压力的反馈。"
+                    "paragraph_id": "rev‑2023Q2",
+                    "paragraph_description": "2023Q2 revenue USD 24.93 bn；段落来源描述:<Tesla Inc. 2023 Q2 Update。>"
                 }
             ]
         }"""
@@ -134,25 +134,21 @@ PARAGRAPH_FEW_SHOT_MESSAGES = [
     {
         'role': 'assistant',
         'content': """{
-            "selected_paragraphs": ["edu02","edu03"]
+            "selected_paragraphs": ["uuid‑123e4567-e89b-12d3-a456-426614174000"]
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "比亚迪什么时候召开了董事会会议，并披露了哪些议案？",
+            "input_text": "2025 年第一季度营业收入同比增长率是多少？",
             "paragraphs": [
                 {
-                    "paragraph_id": "a01",
-                    "paragraph_description": "这是比亚迪财务报告第一页，主要内容是财务摘要与声明信息。"
+                    "paragraph_id": "rev‑growth",
+                    "paragraph_description": "2025Q1 营业收入同比增长 18%；段落来源描述:<某公司 2025 年第一季度报告 第 5 页。>"
                 },
                 {
-                    "paragraph_id": "a02",
-                    "paragraph_description": "本段内容为比亚迪2024年3月董事会会议内容，包含会议时间、议案主题、披露媒体。"
-                },
-                {
-                    "paragraph_id": "a03",
-                    "paragraph_description": "股东信息页面，介绍股东持股比例、质押情况等。"
+                    "paragraph_id": "cost‑growth",
+                    "paragraph_description": "2025Q1 营业**成本**同比增长 16%；段落来源描述:<某公司 2025 年第一季度报告 第 6 页。>"
                 }
             ]
         }"""
@@ -160,7 +156,33 @@ PARAGRAPH_FEW_SHOT_MESSAGES = [
     {
         'role': 'assistant',
         'content': """{
-            "selected_paragraphs": ["a02"]
+            "selected_paragraphs": ["rev‑growth"]
+        }"""
+    },
+    {
+        'role': 'user',
+        'content': """{
+            "input_text": "列出 2023 药品目录细则附录 B 中申请材料清单及提交时限的段落。",
+            "paragraphs": [
+                {
+                    "paragraph_id": "segA12",
+                    "paragraph_description": "附录 B 要求企业提交 8 项材料并在 30 日内完成；段落来源描述:<国家医保局《药品目录调整实施细则（2023）》2023‑04‑10。>"
+                },
+                {
+                    "paragraph_id": "segA13",
+                    "paragraph_description": "附录 B 列出申请材料清单（无时限说明）；段落来源描述:<国家医保局《药品目录调整实施细则（2023）》2023‑04‑10。>"
+                },
+                {
+                    "paragraph_id": "segC01",
+                    "paragraph_description": "附录 C 规定申报窗口开放 45 日；段落来源描述:<国家医保局《药品目录调整实施细则（2023）》2023‑04‑10。>"
+                }
+            ]
+        }"""
+    },
+    {
+        'role': 'assistant',
+        'content': """{
+            "selected_paragraphs": ["segA12"]
         }"""
     }
 ]

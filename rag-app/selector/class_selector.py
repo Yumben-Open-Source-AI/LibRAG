@@ -189,7 +189,7 @@ class CategorySelector(BaseSelector):
         for category in db_categories:
             categories.append({
                 'category_id': category.category_id.__str__(),
-                'category_description': f'{category.category_description};{category.parent_description}'
+                'category_description': category.category_description
             })
         return categories
 
@@ -199,7 +199,7 @@ class CategorySelector(BaseSelector):
             db_domain = session.get(Domain, uuid.UUID(domain_id))
             self.select_params.extend([{
                 'category_id': category.category_id.__str__,
-                'category_description': f'{category.category_description};{category.parent_description}'
+                'category_description': category.category_description
             } for category in db_domain.sub_categories])
 
         if len(self.select_params) == 0:

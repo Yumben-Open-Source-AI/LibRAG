@@ -61,27 +61,19 @@ DOCUMENT_FEW_SHOT_MESSAGES = [
     {
         'role': 'user',
         'content': """{
-            "input_text": "国家出台的双碳目标政策，以及广东省的实施细则和比亚迪的企业响应有哪些？",
+            "input_text": "苹果公司2024年第二季度的营收情况如何？",
             "documents": [
                 {
-                    "document_id": "d101",
-                    "document_description": "《关于完整准确全面贯彻新发展理念做好碳达峰碳中和工作的意见》（国家发改委，2023年3月发布）。"
+                    "document_id": "d201",
+                    "document_description": "Apple Inc. 2024财年第一季度（Q1）财报，发布日期：2024年2月。"
                 },
                 {
-                    "document_id": "d102",
-                    "document_description": "广东省生态环境厅2023年发布《双碳行动实施细则》，涵盖工业转型与交通减排目标。"
+                    "document_id": "d202",
+                    "document_description": "Apple Inc. 2024财年第二季度（Q2）财报，发布日期：2024年5月，披露营收、净利润等关键指标。"
                 },
                 {
-                    "document_id": "d103",
-                    "document_description": "比亚迪2023年ESG报告披露了碳排放治理策略与电动车产能规划。"
-                },
-                {
-                    "document_id": "d104",
-                    "document_description": "国家能源局2022年氢能指导意见，聚焦能源结构调整。"
-                },
-                {
-                    "document_id": "d105",
-                    "document_description": "深圳市住建局绿色建筑标准指南，聚焦建筑节能。"
+                    "document_id": "d203",
+                    "document_description": "Apple Inc. 2023年度可持续发展报告，聚焦环保与供应链。"
                 }
             ]
         }"""
@@ -89,25 +81,29 @@ DOCUMENT_FEW_SHOT_MESSAGES = [
     {
         'role': 'assistant',
         'content': """{
-            "selected_documents": ["d101","d102","d103"]
+            "selected_documents": ["d202"]
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "GPT-5有哪些安全机制方面的提升？",
+            "input_text": "国家医保局2024年发布的药品目录调整相关政策和实施指南有哪些？",
             "documents": [
                 {
-                    "document_id": "d01",
-                    "document_description": "OpenAI最新发布的GPT-5模型技术白皮书，涉及模型能力、安全性和训练数据情况。"
+                    "document_id": "d301",
+                    "document_description": "国家医保局《2024年药品目录调整方案》（2024年3月）"
                 },
                 {
-                    "document_id": "d02",
-                    "document_description": "Transformer模型原理介绍，重点讨论注意力机制和多层结构。"
+                    "document_id": "d302",
+                    "document_description": "国家医保局《药品目录调整实施细则（2024）》详细说明落地流程，发布日期：2024年4月。"
                 },
                 {
-                    "document_id": "d03",
-                    "document_description": "2023年AI伦理与算法治理研讨会记录，包含各方观点与政策建议。"
+                    "document_id": "d303",
+                    "document_description": "2023年药品目录调整回顾报告，国家医保局政策解读。"
+                },
+                {
+                    "document_id": "d304",
+                    "document_description": "国家卫健委2024年医疗服务价格指导意见。"
                 }
             ]
         }"""
@@ -115,55 +111,25 @@ DOCUMENT_FEW_SHOT_MESSAGES = [
     {
         'role': 'assistant',
         'content': """{
-            "selected_documents": ["d01"]
+            "selected_documents": ["d301","d302"]
         }"""
     },
     {
         'role': 'user',
         'content': """{
-            "input_text": "2024年深圳的小学入学政策和时间安排是怎样的？",
+            "input_text": "深圳市2025年1月发布的住房租赁政策最新通知是什么？",
             "documents": [
                 {
-                    "document_id": "d10",
-                    "document_description": "深圳市教育局2024年义务教育招生政策问答，包括入学条件、材料清单与时间节点。"
+                    "document_id": "d401",
+                    "document_description": "深圳市住房和建设局《关于调整住房租赁扶持政策》的通知，发布日期：2025年1月10日。"
                 },
                 {
-                    "document_id": "d11",
-                    "document_description": "广州教育局2023年小学招生简章，适用于天河、越秀等区域。"
+                    "document_id": "d402",
+                    "document_description": "深圳市住房租赁市场分析报告（2024年第四季度）。"
                 },
                 {
-                    "document_id": "d12",
-                    "document_description": "教育部关于优化义务教育阶段招生制度的指导意见（全国适用）。"
-                }   
-            ]
-        }"""
-    },
-    {
-        'role': 'assistant',
-        'content': """{
-            "selected_documents": ["d10"]
-        }"""
-    },
-    {
-        'role': 'user',
-        'content': """{
-            "input_text": "请提供比亚迪2023年财务表现、环境责任和高管变动相关内容。",
-            "documents": [
-                {
-                    "document_id": "d01",
-                    "document_description": "比亚迪2023年第四季度财务报告，包含净利润、营收、资产结构等关键财务数据。"
-                },
-                {
-                    "document_id": "d02",
-                    "document_description": "比亚迪2023年ESG环境责任报告，聚焦碳排放、资源利用与社会公益项目。"
-                },
-                {
-                    "document_id": "d03",
-                    "document_description": "比亚迪2023年高管人事公告，涉及CEO变动与董事会新任命。"
-                },
-                {
-                    "document_id": "d04",
-                    "document_description": "比亚迪2022年年度报告，涵盖全年业务与股东信息。"
+                    "document_id": "d403",
+                    "document_description": "广东省住房租赁管理办法（2023年修订版）。"
                 }
             ]
         }"""
@@ -171,7 +137,67 @@ DOCUMENT_FEW_SHOT_MESSAGES = [
     {
         'role': 'assistant',
         'content': """{
-            "selected_documents": ["d01","d02","d03"]
+            "selected_documents": ["d401"]
+        }"""
+    },
+    {
+        'role': 'user',
+        'content': """{
+            "input_text": "我想了解ISO 27001与ISO 27701之间的主要差异，有没有对比分析报告？",
+            "documents": [
+                {
+                    "document_id": "d501",
+                    "document_description": "《ISO 27001信息安全管理体系实施指南》，2023年版。"
+                },
+                {
+                    "document_id": "d502",
+                    "document_description": "《ISO 27701隐私信息管理体系实施指南》，2023年版。"
+                },
+                {
+                    "document_id": "d503",
+                    "document_description": "《ISO 27001与ISO 27701差异对比白皮书》，2024年发布，系统比较两大标准要求差异。"
+                },
+                {
+                    "document_id": "d504",
+                    "document_description": "《企业信息安全年度报告2024》。"
+                }
+            ]
+        }"""
+    },
+    {
+        'role': 'assistant',
+        'content': """{
+            "selected_documents": ["d503"]
+        }"""
+    },
+    {
+        'role': 'user',
+        'content': """{
+            "input_text": "教育部发布的中小学人工智能课程标准以及2024年下半年的配套教师培训手册请提供。",
+            "documents": [
+                {
+                    "document_id": "d601",
+                    "document_description": "《中小学人工智能课程标准（试行稿）》，教育部，2024年5月发布。"
+                },
+                {
+                    "document_id": "d602",
+                    "document_description": "《中小学人工智能教师培训手册》，教育部教师司，2024年9月发布，适用于2024下半年培训班。"
+                },
+                {
+                    "document_id": "d603",
+                    "document_description": "《中小学信息技术课程标准（2017版）》。"
+                },
+                {
+                    "document_id": "d604",
+                    "document_description": "《AI+教育白皮书》，某研究院2023年发布。"
+                }
+            ]
+        }"""
+    },
+    {
+        'role': 'assistant',
+        'content': """{
+            "selected_documents": ["d601", "d602"]
         }"""
     }
 ]
@@ -199,7 +225,7 @@ class DocumentSelector(BaseSelector):
         for document in db_documents:
             documents.append({
                 'document_id': document.document_id.__str__(),
-                'document_description': f'{document.document_description};{document.parent_description}'
+                'document_description': document.document_description
             })
         return documents
 
@@ -209,7 +235,7 @@ class DocumentSelector(BaseSelector):
             db_category = session.get(Category, uuid.UUID(category_id))
             self.select_params.extend([{
                 'document_id': doc.document_id.__str__(),
-                'document_description': f'{doc.document_description};{doc.parent_description}'
+                'document_description': doc.document_description
             } for doc in db_category.documents])
 
         if len(self.select_params) == 0:
