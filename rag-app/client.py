@@ -10,7 +10,10 @@ import gradio as gr
 import pandas as pd
 from gradio_modal import Modal
 
-from tools.http_utils import RequestHandler
+import sys
+
+sys.path.append(os.path.abspath(os.path.join('./tools')))
+from http_utils import RequestHandler
 
 ALL_STRATEGY = {
     '按页切割': 'page_split',
@@ -99,13 +102,13 @@ def make_preview_cb():
     return preview_upload
 
 
-def submit_append_file(kb_id, files, *strategies):
-    """ 追加提交每个文件解析及切割策略 """
-
+def __upload_file(kb_id, files, strategies):
+    """ 上传文件 """
+    base_dir = './files/'
     files_info = []
     for file, strategy in zip(files, strategies):
         file_name = os.path.basename(file)
-        file_path = os.path.abspath(os.path.join('./files/', file_name))
+        file_path = os.path.abspath(os.path.join(base_dir, file_name))
         with open(file, 'rb') as source:
             with open(file_path, 'wb') as target:
                 shutil.copyfileobj(source, target)
@@ -118,6 +121,11 @@ def submit_append_file(kb_id, files, *strategies):
     request.safe_send_request('upload', 'POST', json={
         'items': files_info
     })
+
+
+def submit_append_file(kb_id, files, *strategies):
+    """ 追加提交每个文件解析及切割策略 """
+    __upload_file(kb_id, files, strategies)
 
     gr.Info(f"成功追加{len(files)} 个文件")
     return (
@@ -149,22 +157,7 @@ def submit_create_kb(name, desc, files, *strategies):
     base_dir = './files/'
     os.makedirs(base_dir, exist_ok=True)
 
-    files_info = []
-    for file, strategy in zip(files, strategies):
-        file_name = os.path.basename(file)
-        file_path = os.path.abspath(os.path.join(base_dir, file_name))
-        with open(file, 'rb') as source:
-            with open(file_path, 'wb') as target:
-                shutil.copyfileobj(source, target)
-        files_info.append({
-            'kb_id': kb_id,
-            'file_path': file_path,
-            'policy_type': ALL_STRATEGY[strategy]
-        })
-
-    request.safe_send_request('upload', 'POST', json={
-        'items': files_info
-    })
+    __upload_file(kb_id, files, strategies)
 
     gr.Info(f"知识库『{name}』已创建，共 {len(files)} 个文件")
     return (
@@ -224,13 +217,21 @@ def recall_test(query: str, kb_info: str):
 css = """
     /* 限制表格的宽度并允许换行 */
     table td {
-        white-space: pre-line; /* Allows line breaks in table cells */
+        white-space: pre-line;
+    }
+    
+    /* 设置markdown文字居中 */
+    div[data-testid="markdown"] {
+        text-align: center;
+        font-size: 30px;
     }
 """
 
 # ---------- UI ----------
 with gr.Blocks(title="LibRAG", css=css) as demo:
     kb_selected_idx = gr.State(None)
+
+    gr.Markdown('# LibRAG')
 
     with gr.Tabs(selected=0):
         # 知识库管理tab

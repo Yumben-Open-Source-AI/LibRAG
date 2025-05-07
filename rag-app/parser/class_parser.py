@@ -114,10 +114,7 @@ class CategoryParser(BaseParser):
 
     def storage_parser_data(self, parent: Domain):
         if self.new_classification == 'true':
-            print(parent)
             self.category.parent_id = parent.domain_id
-            self.category.parent_description = f'此分类所属父级领域描述:<{parent.domain_description}>'
-
         self.session.add(self.category)
 
     def __get_known_categories(self):

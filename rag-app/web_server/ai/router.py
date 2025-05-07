@@ -1,21 +1,15 @@
-import datetime
-import json
-import os
-import re
-from collections import deque
-from typing import List, Literal, Optional, Annotated
+from typing import Annotated
 
 import jieba
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from sqlmodel import select
 
 from db.database import SessionDep, get_engine
 from llm.deepseek import DeepSeek
+from llm.qwen import Qwen
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
-
-from llm.qwen import Qwen
 from selector.base import SelectorParam
 from selector.class_selector import CategorySelector
 from selector.document_selector import DocumentSelector
@@ -70,9 +64,26 @@ async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
         raise HTTPException(404, 'meta type is not supported')
 
     target = all_parser[meta_type]
-
     statement = select(target).where(target.kb_id == kb_id)
-    return session.exec(statement).all()
+    db_result = session.exec(statement).all()
+    print(db_result)
+
+    result = []
+    # TODO 优化序列化
+    if meta_type == 'document':
+        for doc in db_result:
+            doc_dict = doc.dict()
+            doc_dict['parent_id'] = [category.category_id for category in doc.categories]
+            doc_dict['parent_description'] = [f'此文档所属父级类别描述:<{category.category_description}>' for category
+                                              in doc.categories]
+            result.append(doc_dict)
+    elif meta_type == 'category':
+        for category in db_result:
+            category_dict = category.dict()
+            category_dict['parent_description'] = f'此分类所属父级领域描述:<{category.domain.domain_description}>'
+            result.append(category_dict)
+
+    return result
 
 
 @router.get('/rebuild')
@@ -191,3 +202,8 @@ def update_knowledge_base(kb_id: int, kb: KbBase, session: SessionDep):
     session.commit()
     session.refresh(kb_db)
     return kb_db
+
+
+@router.delete('/knowledge_base/{kb_id}')
+async def delete_knowledge_base(kb_id: int, session: SessionDep):
+    print(session.query(KnowledgeBase).filter_by(kb_id=kb_id))

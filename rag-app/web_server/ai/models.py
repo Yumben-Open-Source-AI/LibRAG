@@ -59,7 +59,6 @@ class Category(SQLModel, table=True):
     category_name: str = Field(default='', sa_column_kwargs={'comment': '分类名称'})
     category_description: str = Field(default='', sa_column_kwargs={'comment': '分类描述'})
     meta_data: dict = Field(sa_type=JSON, default={}, sa_column_kwargs={'comment': '元数据'})
-    parent_description: str
     # domain_info
     parent_id: uuid.UUID | None = Field(default=None, foreign_key='domain.domain_id')
     domain: Domain = Relationship(back_populates='sub_categories')
@@ -77,7 +76,6 @@ class Document(SQLModel, table=True):
     document_description: str = Field(default='', sa_column_kwargs={'comment': '文档描述'})
     file_path: str = Field(default='', sa_column_kwargs={'comment': '文档路径'})
     meta_data: dict = Field(sa_type=JSON, default={}, sa_column_kwargs={'comment': '元数据'})
-    parent_description: str
     categories: list['Category'] = Relationship(back_populates='documents', link_model=CategoryDocumentLink)
     paragraphs: list['Paragraph'] = Relationship(back_populates='document')
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',

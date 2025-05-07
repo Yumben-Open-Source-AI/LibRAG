@@ -92,8 +92,5 @@ class DocumentParser(BaseParser):
         return self.document
 
     def storage_parser_data(self, parent: Category):
-        # 回填上级分类数据
-        self.document.parent_description = f'此文档所属父级类别描述:<{parent.category_description}>'
         self.document.categories.append(parent)
-
         self.session.add(self.document)
