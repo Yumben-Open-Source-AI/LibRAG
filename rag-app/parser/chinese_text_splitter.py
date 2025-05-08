@@ -1,6 +1,8 @@
 import re
 from typing import List, Callable
 
+from parser.agentic_chunking import ChunkOrganizer
+
 WHITESPACE_RE = re.compile(
     r"[ \t\u3000\x0b\x0c\r]+"      # 半角/全角空格、Tab、VT、FF、CR
 )
@@ -109,8 +111,14 @@ if __name__ == "__main__":
     # granularity：报告 / 合同 → "paragraph"（语义更完整）；FAQ / 问答 → "sentence"（颗粒度适中）；代码 / 超长句边缘 → "char"（兜底）。
     # overlap_units：句级 / 段级通常1‑3；字符级按窗口5–50。
 
-
     ps = FlexibleRecursiveSplitter(granularity="sentence",chunk_size=1024, overlap_units=2)
+    import time
+    start_time = time.time()
+    organizer = ChunkOrganizer()
+    blocks = []
     for i, chunk in enumerate(ps.split(txt), 1):
+        blocks =organizer.process(chunk)
         print(f"{i:02d}｜{chunk}")
-
+    end_time = time.time()
+    print(blocks)
+    print("程序运行时间：%s 秒" % (end_time - start_time))
