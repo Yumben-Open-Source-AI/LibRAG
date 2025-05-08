@@ -112,7 +112,7 @@ class ChunkOrganizer:
            "position":""，#段落在文中的位置，如什么章节
          } ```
         ##Warning:
-        -summary必须列出所有指标字段包括页码说明，禁止使用```等```字眼省略指标项，但不需要数值数据。
+        -summary必须列出所有指标字段包括位置说明，禁止使用```等```字眼省略指标项，但不需要数值数据。
         -输出不要增加额外字段，严格按照Example Output结构输出。
         -不要解释行为。"""
 
@@ -162,6 +162,7 @@ class ChunkOrganizer:
         """
         主入口：接收原始长文本，返回整理后的块列表。
         """
+        print("##process text:"+text)
         propositions = self._extract_propositions(text)
 
         for prop in propositions:
@@ -178,6 +179,7 @@ class ChunkOrganizer:
             {"role": "user", "content": text}
         ]
         result = self.llm.chat(messages)[0]  # 预计返回 JSON 数组
+        print("##_extract_propositions result:"+str(result))
         return result
 
     # ---- 创建新块 ----
@@ -188,7 +190,7 @@ class ChunkOrganizer:
             {"role": "user", "content": f"txt_chunk:{proposition};"}
         ]
         summary_res = self.llm.chat(messages)[0]
-
+        print("##_create_new_chunk summary_res:" + str(summary_res))
         self.chunks[chunk_id] = ChunkMeta(
             chunk_id=chunk_id,
             paragraph_name=summary_res.get("paragraph_name", ""),
@@ -211,6 +213,7 @@ class ChunkOrganizer:
             {"role": "user", "content": f"txt_chunk:{all_text};"}
         ]
         summary_res = self.llm.chat(messages)[0]
+        print("##_add_to_chunk summary_res:" + str(summary_res))
         chunk.paragraph_name = summary_res.get("paragraph_name", chunk.paragraph_name)
         chunk.keywords = summary_res.get("keywords", chunk.keywords)
         chunk.position = summary_res.get("position", chunk.position)
@@ -229,7 +232,7 @@ class ChunkOrganizer:
              "content": f"已有块信息:{json.dumps(chunks_summaries, ensure_ascii=False)};proposition:{proposition};"}
         ]
         alloc_res = self.llm.chat(messages)[0]
-
+        print("##_dispatch_proposition alloc_res:"+str(alloc_res))
         if alloc_res.get("action") == "create_new":
             self._create_new_chunk(proposition)
         else:  # assign
