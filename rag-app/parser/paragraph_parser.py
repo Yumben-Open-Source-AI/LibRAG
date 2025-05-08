@@ -8,11 +8,13 @@ import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from string import Template
 from llm.base import BaseLLM
+from parser.agentic_chunking import ChunkOrganizer
 from parser.base import BaseParser
 from markdownify import MarkdownConverter
 
 from pathlib import Path
 
+from parser.chinese_text_splitter import FlexibleRecursiveSplitter
 from parser.load_api import convert_pdf_to_md, convert_file_type
 from web_server.ai.models import Document, Paragraph
 
@@ -192,6 +194,7 @@ class ParagraphParser(BaseParser):
             'page_split': self.__page_split,
             'catalog_split': self.__catalog_split,
             'automate_judgment_split': self.__automate_judgment_split,
+            'agentic_chunking': self.__agentic_chunking
         }
         if self.parse_strategy not in policies:
             raise ValueError('异常的文本切割策略，请提供正确的文本分割策略')
@@ -448,3 +451,34 @@ class ParagraphParser(BaseParser):
             for task in as_completed(tasks_page):
                 paragraph_content = task.result()[0]
                 self.collate_paragraphs(paragraph_content)
+
+    def __agentic_chunking(self, file_path):
+        """
+        文本切割策略-agentic_chunking
+        场景: 处理速度最慢，能够保持极致的上下文语义连贯
+        """
+        import fitz
+
+        pdf_content = fitz.open(file_path)
+
+        page_contents = ''.join([page.get_text() for page in pdf_content.pages()])
+
+        ps = FlexibleRecursiveSplitter(granularity="sentence", chunk_size=1024, overlap_units=2)
+        organizer = ChunkOrganizer()
+        chunks = []
+
+        for i, sentence in enumerate(ps.split(page_contents), 1):
+            chunks = organizer.process(sentence)
+
+        for chunk in chunks:
+            chunk_dict = chunk.model_dump()
+            chunk_dict['paragraph_id'] = uuid.UUID(chunk_dict.pop('chunk_id'))
+            chunk_dict['paragraph_name'] = chunk_dict.pop('title')
+            chunk_dict['parse_strategy']= self.parse_strategy
+            chunk_dict['keywords']=[]
+            chunk_dict['position']=''
+            chunk_dict['content'] = ' '.join(chunk_dict.pop('propositions'))
+            chunk_dict['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            chunk_dict['kb_id'] = self.kb_id
+            # TODO 转存paragrph
+            self.paragraphs.append(chunk_dict)

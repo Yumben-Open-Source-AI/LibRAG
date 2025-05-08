@@ -13,7 +13,8 @@ from http_utils import RequestHandler
 ALL_STRATEGY = {
     '按页切割': 'page_split',
     '按目录切割': 'catalog_split',
-    '智能上下文切割': 'automate_judgment_split'
+    '智能上下文切割': 'automate_judgment_split',
+    '智能语义分块切割':'agentic_chunking'
 }
 
 MAX_ROWS = 20
@@ -100,6 +101,7 @@ def make_preview_cb():
 def __upload_file(kb_id, files, strategies):
     """ 上传文件 """
     base_dir = './files/'
+    os.makedirs(base_dir, exist_ok=True)
     files_info = []
     for file, strategy in zip(files, strategies):
         file_name = os.path.basename(file)
@@ -148,9 +150,6 @@ def submit_create_kb(name, desc, files, *strategies):
         'keywords': ''
     })
     kb_id = new_kb['kb_id']
-
-    base_dir = './files/'
-    os.makedirs(base_dir, exist_ok=True)
 
     __upload_file(kb_id, files, strategies)
 
