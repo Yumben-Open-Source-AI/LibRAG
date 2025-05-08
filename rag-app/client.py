@@ -57,6 +57,7 @@ def file_table_from_kb(kb_id):
             'document_id': document['document_id'],
             '文档名称': document['document_name'],
             '文档描述': document['document_description'],
+            '切割策略': document.get('parse_strategy', ''),
         })
 
     return pd.DataFrame(show_document_info) if kb_db else pd.DataFrame()
@@ -248,7 +249,7 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
                     )
 
             with gr.Column(visible=True) as kb_detail_col:
-                kb_files_df = gr.Dataframe(headers=['document_id', '文档名称', '文档描述'], interactive=True,
+                kb_files_df = gr.Dataframe(headers=['document_id', '文档名称', '文档描述', '切割策略'], interactive=True,
                                            max_height=650)
 
             # 创建知识库 & 提交文件弹窗

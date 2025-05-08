@@ -36,7 +36,7 @@ def loading_data(
                 par_parser = ParagraphParser(qwen, kb_id, session)
                 paragraph_params = {
                     'path': file_path,
-                    'policy_type': policy_type
+                    'parse_strategy': policy_type
                 }
                 all_paragraphs = par_parser.parse(**paragraph_params)
                 print('paragraph', all_paragraphs)
@@ -45,6 +45,7 @@ def loading_data(
                 doc_parser = DocumentParser(qwen, kb_id, session)
                 document_params = {
                     'path': file_path,
+                    'parse_strategy': policy_type,
                     'paragraphs': all_paragraphs
                 }
                 document = doc_parser.parse(**document_params)
@@ -62,7 +63,7 @@ def loading_data(
                 domain = domain_parser.parse(**domain_params)
                 print('domain', domain)
 
-                # 回填上级及存储数据
+                # 回填及存储数据
                 par_parser.storage_parser_data(document)
                 doc_parser.storage_parser_data(category)
                 category_parser.storage_parser_data(domain)
