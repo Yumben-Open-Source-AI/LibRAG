@@ -204,7 +204,7 @@ class ParagraphParser(BaseParser):
 
     def parse(self, **kwargs):
         file_path = kwargs.get('path')
-        self.parse_strategy = kwargs.get('policy_type')
+        self.parse_strategy = kwargs.get('parse_strategy')
         file_obj = Path(file_path)
 
         # 文件转换为pdf
@@ -230,13 +230,11 @@ class ParagraphParser(BaseParser):
     def collate_paragraphs(self, paragraph_content):
         if isinstance(paragraph_content, dict):
             paragraph_content['kb_id'] = self.kb_id
-            paragraph_content['parse_strategy'] = self.parse_strategy
             paragraph_content['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.append(paragraph_content)
         elif isinstance(paragraph_content, list):
             for paragraph in paragraph_content:
                 paragraph['kb_id'] = self.kb_id
-                paragraph['parse_strategy'] = self.parse_strategy
                 paragraph['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             self.paragraphs.extend(paragraph_content)
 
@@ -460,7 +458,6 @@ class ParagraphParser(BaseParser):
         import fitz
 
         pdf_content = fitz.open(file_path)
-
         page_contents = ''.join([page.get_text() for page in pdf_content.pages()])
 
         ps = FlexibleRecursiveSplitter(granularity="sentence", chunk_size=1024, overlap_units=2)
@@ -475,11 +472,9 @@ class ParagraphParser(BaseParser):
             chunk_dict['paragraph_id'] = uuid.UUID(chunk_dict.pop('chunk_id'))
             chunk_dict['paragraph_name'] = chunk_dict.pop('paragraph_name')
             chunk_dict['summary'] = chunk_dict.pop('summary')
-            chunk_dict['parse_strategy'] = self.parse_strategy
             chunk_dict['keywords'] = chunk_dict.pop('keywords')
             chunk_dict['position'] = chunk_dict.pop('position')
             chunk_dict['content'] = ' '.join(chunk_dict.pop('propositions'))
             chunk_dict['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             chunk_dict['kb_id'] = self.kb_id
-            # TODO 转存paragrph
             self.paragraphs.append(chunk_dict)

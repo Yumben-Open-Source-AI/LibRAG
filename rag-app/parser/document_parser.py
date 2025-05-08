@@ -72,7 +72,6 @@ class DocumentParser(BaseParser):
         for paragraph in paragraphs:
             # TODO 代码整理
             del paragraph['paragraph_name']
-            del paragraph['parse_strategy']
             del paragraph['content']
             del paragraph['keywords']
             del paragraph['position']
@@ -87,6 +86,7 @@ class DocumentParser(BaseParser):
         parse_messages[1]['content'] = content.substitute(paragraphs=paragraphs, path=path)
         self.document = self.llm.chat(parse_messages)[0]
         self.document['kb_id'] = self.kb_id
+        self.document['parse_strategy'] = kwargs.get('parse_strategy')
         self.document['meta_data']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         self.document = Document(**self.document)
         return self.document
