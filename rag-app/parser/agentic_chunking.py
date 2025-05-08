@@ -5,11 +5,14 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from llm.qwen import Qwen
 
+
 # ---------- 数据模型 ----------
 class ChunkMeta(BaseModel):
     chunk_id: str
-    title: str
+    paragraph_name: str
     summary: str
+    keywords: List[str]
+    position:str
     propositions: List[str]
 
 
@@ -72,45 +75,46 @@ class ChunkOrganizer:
         你好！我是内容命题拆解专家✍️。请发送你想拆解的内容，我会帮你规范化处理成清晰的命题列表，方便你后续使用。"""
 
         self._summary_system = """
-        # Role: 文本摘要与标题生成专家（summary_llm）
-        ## Profile
-        - author: LangGPT
+        #Role 文档总结专家（summary_llm）
+		## Profile
         - version: 1.0
         - language: 中文
-        - description: 针对给定的一段文本块，生成一个简明扼要的摘要，以及一个精准概括内容的标题。
+        - description: 你将得到User输入的一组文本，请详细提取且总结描述其内容，包含必须如实准确提取关键信息如所有指标及其数值数据等，最终按指定格式生成总结及描述。
         
-        ## Skills
-        - 从复杂文本中提取关键信息。
-        - 用简洁、准确的语言总结文本内容。
-        - 根据文本主旨创作具有概括性的标题。
-        
-        ## Background
-        在处理大量文本信息时，需要快速提取要点和生成清晰的标题，以便于信息检索、归类和阅读。
-        
-        ## Goals
-        帮助用户从任意文本中提炼出高质量的摘要和符合内容主题的标题。
-        
-        ## OutputFormat
-        输出一个JSON对象，格式如下：
-        { 
-          "title": "简洁概括的标题",
-          "summary": "简明扼要的摘要"
-        }
-        
-        ## Rules
-        - 摘要应覆盖文本中的主要观点，控制在50-150字以内。
-        - 标题应高度凝练，不超过15字。
-        - 保持客观、中立，不添加主观评价。
-        - 必须用标准中文输出。
-        
-        ## Workflows
-        1. 阅读输入文本，理解核心内容和主旨。
-        2. 提取文本中的关键信息和重要细节。
-        3. 生成内容清晰、易于理解的摘要。
-        4. 创作符合内容主题且吸引人的标题。
-        
-        ## Init
-        你好！我是 summary_llm 文本摘要与标题生成专家✍️。请发送你需要处理的文本块，我会帮你提炼出精华摘要并拟定标题。"""
+        ##Skills
+        - 擅长使用面向对象的视角抽取文本内容的对象属性(属性项:什么文档,当前页,对象主体,内容所属类型[摘要/引言/目录/首页/正文/公告/...]。
+        - 生成详细及信息丰富的描述。
+        - 擅长提取文本中的数值数据。
+        - 擅长提取文本中所有指标信息。
+        - 擅长生成严格符合JSON格式的输出。
+        - 擅长使用清晰的语言完整总结文本的主要内容。
+        - 擅长使用陈述叙事的风格总结文本的主要内容。
+    
+        ##Rules
+        - 描述与总结不能省略内容。
+        - 每个summary至少50字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx(什么文档/章节)第xxx页xxx(对象主体)的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
+        - summary必须声章节名称，段落类型，对象主体这三个属性。
+        - 严格生成结构化不带有转义的JSON数据的总结及描述。
+        - 总结和描述仅使用文本格式呈现。
+
+        ##Workflows
+        1. 获取用户提供的文本。
+        2. 逐行解析提取文本的指标。
+        3. 理解文中主要内容，结合指标和对象属性生成总结。
+        4. 组合关键信息和对象属性生成描述，确保指标信息数据完整。
+        5. 输出最终的总结及描述，确保准确性、可读性、完整性。
+
+        ##Example Output
+        ```json{
+           "paragraph_name": "",#填写章节或段落名称
+           "summary": "<>", #段落描述；
+           "keywords": [],#关键词
+           "position":""，#段落在文中的位置，如什么章节
+         } ```
+        ##Warning:
+        -summary必须列出所有指标字段包括页码说明，禁止使用```等```字眼省略指标项，但不需要数值数据。
+        -输出不要增加额外字段，严格按照Example Output结构输出。
+        -不要解释行为。"""
 
         self._allocation_system = """
         # Role: 命题归块判断与分配专家（allocation_llm）
@@ -187,8 +191,10 @@ class ChunkOrganizer:
 
         self.chunks[chunk_id] = ChunkMeta(
             chunk_id=chunk_id,
-            title=summary_res.get("title", ""),
+            paragraph_name=summary_res.get("paragraph_name", ""),
             summary=summary_res.get("summary", ""),
+            keywords=summary_res.get("keywords", []),
+            position=summary_res.get("position", ""),
             propositions=[proposition]
         )
         return chunk_id
@@ -205,7 +211,9 @@ class ChunkOrganizer:
             {"role": "user", "content": f"txt_chunk:{all_text};"}
         ]
         summary_res = self.llm.chat(messages)[0]
-        chunk.title = summary_res.get("title", chunk.title)
+        chunk.paragraph_name = summary_res.get("paragraph_name", chunk.paragraph_name)
+        chunk.keywords = summary_res.get("keywords", chunk.keywords)
+        chunk.position = summary_res.get("position", chunk.position)
         chunk.summary = summary_res.get("summary", chunk.summary)
 
     # ---- 判定归属 ----
@@ -243,6 +251,7 @@ if __name__ == "__main__":
         lines.append(line)
     text = "\n".join(lines)
     import time
+
     start_time = time.time()
     organizer = ChunkOrganizer()
     blocks = organizer.process(text)

@@ -473,10 +473,11 @@ class ParagraphParser(BaseParser):
         for chunk in chunks:
             chunk_dict = chunk.model_dump()
             chunk_dict['paragraph_id'] = uuid.UUID(chunk_dict.pop('chunk_id'))
-            chunk_dict['paragraph_name'] = chunk_dict.pop('title')
-            chunk_dict['parse_strategy']= self.parse_strategy
-            chunk_dict['keywords']=[]
-            chunk_dict['position']=''
+            chunk_dict['paragraph_name'] = chunk_dict.pop('paragraph_name')
+            chunk_dict['summary'] = chunk_dict.pop('summary')
+            chunk_dict['parse_strategy'] = self.parse_strategy
+            chunk_dict['keywords'] = chunk_dict.pop('keywords')
+            chunk_dict['position'] = chunk_dict.pop('position')
             chunk_dict['content'] = ' '.join(chunk_dict.pop('propositions'))
             chunk_dict['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             chunk_dict['kb_id'] = self.kb_id
