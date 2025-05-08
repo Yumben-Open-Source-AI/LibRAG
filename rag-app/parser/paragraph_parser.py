@@ -176,7 +176,7 @@ PARAGRAPH_JUDGE_MESSAGES = [
 class NoEscapeConverter(MarkdownConverter):
     """ 重写MarkdownConverter更改转义策略 """
 
-    def escape(self, text):
+    def escape(self, text, parent_tags):
         # 直接返回原始文本，不做任何转义
         return text
 
@@ -209,7 +209,7 @@ class ParagraphParser(BaseParser):
             temp_dir = tempfile.mkdtemp()
             convert_file_type(file_path, temp_dir)
             name = ' '.join(file_obj.name.split('.')[:-1])
-            file_path = f"{temp_dir}\\{name}.pdf"
+            file_path = os.path.join(temp_dir, name + '.pdf')
             print(file_path)
 
         if file_path.endswith('.pdf'):
