@@ -168,7 +168,7 @@ def submit_delete_kb(kb_id):
     return (
         Modal(visible=False),
         get_kb_table(),
-        pd.DataFrame({'document_id': '', '文档名称': '', '文档描述':''})
+        pd.DataFrame([{'document_id': '', '文档名称': '', '文档描述': ''}])
     )
 
 
@@ -327,7 +327,7 @@ with gr.Blocks(title="LibRAG", css=css) as demo:
     appends_files_btn.click(lambda: Modal(visible=True), None, appends_modal)
     cancel_files_btn.click(lambda: Modal(visible=False), None, appends_modal)
     delete_btn.click(lambda: Modal(visible=True), None, delete_model)
-    
+    cancel_delete_btn.click(lambda: Modal(visible=False), None, delete_model)
 
     files_up.change(
         make_preview_cb(),
