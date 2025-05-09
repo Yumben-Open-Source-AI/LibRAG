@@ -7,6 +7,7 @@
 """
 import datetime
 import os.path
+from typing import List, Dict
 
 from sqlmodel import Session
 
@@ -19,15 +20,15 @@ from web_server.ai.schemas import FileInfo
 
 
 def loading_data(
-        files_info: FileInfo,
+        files_info: List[Dict],
         engine
 ):
     with Session(engine) as session:
         try:
-            for info in files_info.items:
-                kb_id = info.kb_id
-                file_path = info.file_path
-                policy_type = info.policy_type
+            for info in files_info:
+                kb_id = info['kb_id']
+                file_path = info['file_path']
+                policy_type = info['policy_type']
                 file_name = os.path.basename(file_path)
                 print('开始处理' + file_name, datetime.datetime.now())
                 qwen = Qwen()

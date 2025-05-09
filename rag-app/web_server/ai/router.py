@@ -1,7 +1,10 @@
-from typing import Annotated
+import json
+import os.path
+import uuid
+from typing import Annotated, List
 
 import jieba
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends, File, UploadFile, Form
 from sqlmodel import select
 
 from db.database import SessionDep, get_engine
@@ -151,10 +154,20 @@ async def rebuild_data(meta_type: str):
 @router.post('/upload')
 async def upload_file(
         background_tasks: BackgroundTasks,
-        files_info: FileInfo,
+        items: str = Form(...),
+        files: List[UploadFile] = File(...),
         engine=Depends(get_engine)
 ):
-    background_tasks.add_task(loading_data, files_info, engine)
+    items = json.loads(items)
+    base_dir = os.path.abspath('./files')
+    os.makedirs(base_dir, exist_ok=True)
+    for i, file in enumerate(files):
+        content = await file.read()
+        file_path = os.path.join(base_dir, file.filename)
+        with open(file_path, 'wb') as f:
+            f.write(content)
+        items[i]['file_path'] = file_path
+    background_tasks.add_task(loading_data, items, engine)
     return {'message': '知识库文件加载任务后台处理中'}
 
 
@@ -168,7 +181,7 @@ async def create_knowledge_bases(kb: KbBase, session: SessionDep):
 
 
 @router.get('/knowledge_base/{kb_id}')
-async def read_knowledge_base(kb_id: int, session: SessionDep):
+async def query_knowledge_base(kb_id: int, session: SessionDep):
     know_base = session.get(KnowledgeBase, kb_id)
     documents = know_base.documents
     know_base = know_base.dict()
@@ -181,7 +194,7 @@ async def read_knowledge_base(kb_id: int, session: SessionDep):
 
 
 @router.get('/knowledge_bases', response_model=list[KnowledgeBase])
-async def read_knowledge_bases(
+async def query_knowledge_bases(
         session: SessionDep,
         offset: int = 0,
         limit: Annotated[int, Query(le=100)] = 100,
@@ -218,3 +231,20 @@ async def delete_knowledge_base(kb_id: int, session: SessionDep):
     session.query(Domain).filter_by(kb_id=kb_id).delete()
     session.query(KnowledgeBase).filter_by(kb_id=kb_id).delete()
     session.commit()
+
+
+@router.delete('/document/{document_id}')
+async def delete_document(document_id: str, session: SessionDep):
+    document_id = uuid.UUID(document_id)
+    session.query(Paragraph).filter_by(parent_id=document_id).delete()
+    db_documents = session.query(Document).filter_by(document_id=document_id)
+    db_documents_ids = [doc.document_id for doc in db_documents]
+    session.query(CategoryDocumentLink).filter(CategoryDocumentLink.document_id.in_(db_documents_ids)).delete()
+    # TODO 暂不同步调整category summary
+    db_documents.delete()
+    session.commit()
+
+
+@router.get('/paragraphs/{document_id}')
+async def query_paragraphs(document_id: str, session: SessionDep):
+    return session.query(Paragraph).filter_by(parent_id=uuid.UUID(document_id)).all()
