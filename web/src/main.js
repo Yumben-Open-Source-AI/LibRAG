@@ -1,9 +1,13 @@
-import './assets/main.css'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 
 import { createApp } from 'vue'
+import { api } from './http.js'
 import App from './App.vue'
 
-createApp(App).use(ElementPlus).mount('#app')
+const app = createApp(App)
+
+app.provide('$api', api)
+app.use(ElementPlus)
+app.mount('#app')
 

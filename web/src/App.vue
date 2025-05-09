@@ -1,7 +1,8 @@
 <template>
   <div class="lib-rag-app p-4 space-y-6">
     <!-- Title -->
-    <h1 class="text-3xl font-bold text-center">LibRAG</h1>
+
+    <el-text class="mx-1" type="success">LibRAG</el-text>
 
     <!-- Tabs -->
     <el-tabs v-model="activeTab" type="border-card">
@@ -15,28 +16,18 @@
         </div>
 
         <!-- All KB Table -->
-        <el-table
-          :data="kbTableData"
-          height="260"
-          highlight-current-row
-          @row-click="handleKBRowClick"
-        >
-          <el-table-column prop="kb_id" label="知识库ID" width="120"/>
-          <el-table-column prop="kb_name" label="知识库名称"/>
-          <el-table-column prop="kb_description" label="知识库描述"/>
+        <el-table :data="kbTableData" height="260" highlight-current-row @row-click="handleKBRowClick">
+          <el-table-column prop="kb_id" label="知识库ID" width="120" />
+          <el-table-column prop="kb_name" label="知识库名称" />
+          <el-table-column prop="kb_description" label="知识库描述" />
         </el-table>
 
         <!-- File list of selected KB -->
-        <el-table
-          v-if="selectedKB"
-          :data="fileTableData"
-          height="650"
-          class="mt-6"
-        >
-          <el-table-column prop="document_id" label="文档ID" width="120"/>
-          <el-table-column prop="文档名称" label="文档名称"/>
-          <el-table-column prop="文档描述" label="文档描述"/>
-          <el-table-column prop="切割策略" label="切割策略" width="160"/>
+        <el-table v-if="selectedKB" :data="fileTableData" height="650" class="mt-6">
+          <el-table-column prop="document_id" label="文档ID" width="120" />
+          <el-table-column prop="文档名称" label="文档名称" />
+          <el-table-column prop="文档描述" label="文档描述" />
+          <el-table-column prop="切割策略" label="切割策略" width="160" />
         </el-table>
       </el-tab-pane>
 
@@ -44,18 +35,9 @@
       <el-tab-pane label="召回测试" name="recall">
         <!-- Query bar -->
         <div class="flex flex-wrap items-center gap-2 mb-4">
-          <el-input
-            v-model="query"
-            placeholder="请输入查询，建议陈述性语句"
-            class="flex-1"
-          />
+          <el-input v-model="query" placeholder="请输入查询，建议陈述性语句" class="flex-1" />
           <el-select v-model="selectedKBOption" placeholder="选择知识库" style="width:220px">
-            <el-option
-              v-for="opt in kbOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
+            <el-option v-for="opt in kbOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
           <el-button type="primary" @click="doRecall">测试召回</el-button>
           <el-button @click="resetRecall">重置查询</el-button>
@@ -63,10 +45,10 @@
 
         <!-- Recall result table -->
         <el-table :data="recallTableData" height="650">
-          <el-table-column prop="paragraph_id" label="段落ID" width="150"/>
-          <el-table-column prop="summary" label="段落摘要"/>
-          <el-table-column prop="content" label="段落内容"/>
-          <el-table-column prop="parent_description" label="来源描述"/>
+          <el-table-column prop="paragraph_id" label="段落ID" width="150" />
+          <el-table-column prop="summary" label="段落摘要" />
+          <el-table-column prop="content" label="段落内容" />
+          <el-table-column prop="parent_description" label="来源描述" />
         </el-table>
       </el-tab-pane>
     </el-tabs>
@@ -75,20 +57,14 @@
     <el-dialog v-model="createDialogVisible" title="创建新知识库" width="800px">
       <el-form :model="createForm" label-width="120px">
         <el-form-item label="知识库名称">
-          <el-input v-model="createForm.name"/>
+          <el-input v-model="createForm.name" />
         </el-form-item>
         <el-form-item label="知识库描述">
-          <el-input v-model="createForm.desc"/>
+          <el-input v-model="createForm.desc" />
         </el-form-item>
         <el-form-item label="上传文件">
-          <el-upload
-            multiple
-            :auto-upload="false"
-            :file-list="createFileList"
-            :on-change="handleCreateUpload"
-            drag
-          >
-            <i class="el-icon-upload"/>
+          <el-upload multiple :auto-upload="false" :file-list="createFileList" :on-change="handleCreateUpload" drag>
+            <i class="el-icon-upload" />
             <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
           </el-upload>
         </el-form-item>
@@ -96,18 +72,13 @@
 
       <!-- Files preview & strategy table -->
       <el-table :data="createFileRows" v-if="createFileRows.length" size="small" class="mb-4">
-        <el-table-column prop="filename" label="文件名"/>
-        <el-table-column prop="size" label="大小(KB)" width="120"/>
-        <el-table-column prop="type" label="文件类型" width="120"/>
+        <el-table-column prop="filename" label="文件名" />
+        <el-table-column prop="size" label="大小(KB)" width="120" />
+        <el-table-column prop="type" label="文件类型" width="120" />
         <el-table-column label="切割策略" width="200">
           <template #default="{ row }">
             <el-select v-model="row.strategy" placeholder="选择策略" size="small">
-              <el-option
-                v-for="(val,label) in ALL_STRATEGY"
-                :key="label"
-                :label="label"
-                :value="label"
-              />
+              <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label" />
             </el-select>
           </template>
         </el-table-column>
@@ -121,31 +92,20 @@
 
     <!-- ---------------- 追加文件 Dialog ---------------- -->
     <el-dialog v-model="appendDialogVisible" title="追加新文件" width="800px">
-      <el-upload
-        multiple
-        :auto-upload="false"
-        :file-list="appendFileList"
-        :on-change="handleAppendUpload"
-        drag
-      >
-        <i class="el-icon-upload"/>
+      <el-upload multiple :auto-upload="false" :file-list="appendFileList" :on-change="handleAppendUpload" drag>
+        <i class="el-icon-upload" />
         <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
       </el-upload>
 
       <!-- Files & strategy -->
       <el-table :data="appendFileRows" v-if="appendFileRows.length" size="small" class="my-4">
-        <el-table-column prop="filename" label="文件名"/>
-        <el-table-column prop="size" label="大小(KB)" width="120"/>
-        <el-table-column prop="type" label="文件类型" width="120"/>
+        <el-table-column prop="filename" label="文件名" />
+        <el-table-column prop="size" label="大小(KB)" width="120" />
+        <el-table-column prop="type" label="文件类型" width="120" />
         <el-table-column label="切割策略" width="200">
           <template #default="{ row }">
             <el-select v-model="row.strategy" placeholder="选择策略" size="small">
-              <el-option
-                v-for="(val,label) in ALL_STRATEGY"
-                :key="label"
-                :label="label"
-                :value="label"
-              />
+              <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label" />
             </el-select>
           </template>
         </el-table-column>
@@ -169,12 +129,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
-import axios from 'axios'
+import { ref, reactive, computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 
+const api = inject('$api')
+
+
 /* ---------------- 常量 & 基础 ---------------- */
-const BASE_URL = 'http://127.0.0.1:13113/ai/'
 const ALL_STRATEGY = {
   '按页切割': 'page_split',
   '按目录切割': 'catalog_split',
@@ -216,7 +177,6 @@ const kbOptions = computed(() =>
 )
 
 /* ---------------- API ---------------- */
-const api = axios.create({ baseURL: BASE_URL })
 
 async function fetchKnowledgeBases() {
   const { data } = await api.get('knowledge_bases')
