@@ -3,3 +3,4 @@ files
 *.jpg
 .env
 librag.db
+*.pyc

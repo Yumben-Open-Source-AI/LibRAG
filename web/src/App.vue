@@ -21,20 +21,22 @@
               <template #header>
                 <div class="card-header">
                   <span>知识库列表</span>
-                  <el-button type="primary" icon="el-icon-plus" circle size="mini" />
+                  <!-- <el-button type="primary" icon="el-icon-plus" circle size="mini" /> -->
                 </div>
               </template>
               <el-table :data="kbTableData" border highlight-current-row @row-click="handleKBRowClick">
-                <el-table-column prop="kb_id" label="知识库ID" />
                 <el-table-column prop="kb_name" label="知识库名称" />
-                <el-table-column prop="kb_description" label="知识库描述" />
-                <el-table-column fixed="right" label="操作" min-width="80">
+                <el-table-column prop="kb_description" label="知识库描述" width="180" />
+                <el-table-column fixed="right" label="操作">
                   <template #default>
                     <div>
                       <el-button @click="openAppendDialog" :disabled="!selectedKB" type="primary">追加新文件</el-button>
                     </div>
                     <div style="margin-top: 5px;">
-                      <el-button type="danger" plain @click="openDeleteKBDialog"
+                      <el-button :disabled="!selectedKB" type="success">重构建索引</el-button>
+                    </div>
+                    <div style="margin-top: 5px;">
+                      <el-button type="danger" @click.stop="openDeleteKBDialog"
                         :disabled="!selectedKB">删除知识库</el-button>
                     </div>
                   </template>
@@ -48,21 +50,24 @@
               <template #header>
                 <div class="card-header">
                   <div v-if="selectedKB" class="sub-title">
-                    文档列表 当前知识库：{{ selectedKB.kb_name }}
-                    <el-tag type="info">{{ selectedKB.length }}篇文档</el-tag>
+                    知识库：{{ selectedKB.kb_name }}
+                    <el-tag type="info">{{ fileTableData.length }}篇文档</el-tag>
                   </div>
                 </div>
               </template>
-              <el-table v-if="selectedKB" border :data="fileTableData" class="mt-6" height="600"
-                @row-click="handleDocRowClick">
+              <el-table v-if="selectedKB" border :data="fileTableData" class="mt-6" height="600">
                 <el-table-column prop="文档名称" label="文档名称" width="250" />
                 <el-table-column prop="切割策略" label="切割策略" width="100" />
                 <el-table-column prop="文档描述" label="文档描述" />
                 <el-table-column prop="meta_data.最后更新时间" label="最后更新时间" width="100" />
                 <el-table-column fixed="right" label="操作" width="110">
                   <template #default="scope">
-                    <el-button type="danger" plain
-                      @click="openDeleteDocDialog(scope.$index, scope.row)">删除文档</el-button>
+                    <div>
+                      <el-button type="info" @click="handleDocRowClick(scope.$index, scope.row)">查看段落</el-button>
+                    </div>
+                    <div style="margin-top: 5px;">
+                      <el-button type="danger" @click="openDeleteDocDialog(scope.$index, scope.row)">删除文档</el-button>
+                    </div>
                   </template>
                 </el-table-column>
               </el-table>
@@ -81,7 +86,7 @@
           <el-button @click="resetRecall">重置查询</el-button>
         </div>
 
-        <el-table :data="recallTableData" height="650">
+        <el-table :data="recallTableData" border height="650">
           <el-table-column prop="paragraph_id" label="段落ID" width="150" />
           <el-table-column prop="summary" label="段落摘要" />
           <el-table-column prop="content" label="段落内容" />
@@ -177,25 +182,18 @@
       </template>
     </el-dialog>
 
-    <!-- 查看文档切割段落 -->
-    <el-dialog>
-      <el-table :data="appendFileRows" v-if="appendFileRows.length" size="small" class="my-4">
-        <el-table-column prop="filename" label="文件名" />
-        <el-table-column prop="size" label="大小(KB)" width="120" />
-        <el-table-column prop="type" label="文件类型" width="120" />
-        <el-table-column label="切割策略" width="200">
-          <template #default="{ row }">
-            <el-select v-model="row.strategy" placeholder="选择策略" size="small">
-              <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label" />
-            </el-select>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <template #footer>
-        <el-button @click="appendDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitAppend">追加</el-button>
+    <!-- 查看文档切割段落 Dialog -->
+    <el-dialog v-model="showParDialogVisible" width="1000">
+      <template #header="{ titleId }">
+        <el-text :id="titleId"> 文档：{{ selectedDoc.document_name }} </el-text>
       </template>
+
+      <el-table :data="parTableData" border class="my-4" height="680">
+        <el-table-column prop="paragraph_name" label="段落名" width="120" />
+        <el-table-column prop="summary" label="段落摘要" />
+        <el-table-column prop="content" label="段落内容" />
+        <el-table-column prop="position" label="段落位置" width="80" />
+      </el-table>
     </el-dialog>
   </div>
 </template>
@@ -217,6 +215,7 @@ const ALL_STRATEGY = {
 /* 全局状态 */
 const activeTab = ref('kb')
 const kbTableData = ref([])
+const parTableData = ref([])
 const fileTableData = ref([])
 const selectedKB = ref(null)
 const selectedDoc = ref(null)
@@ -267,7 +266,7 @@ async function fetchDocuments(kbId) {
 
 async function fetchParagraphs(documentId) {
   const { data } = await api.get(`paragraphs/${documentId}`)
-  console.log(data);
+  parTableData.value = data
 }
 
 /* 事件处理 */
@@ -277,7 +276,7 @@ function handleKBRowClick(row) {
   fetchDocuments(row.kb_id)
 }
 
-function handleDocRowClick(row) {
+function handleDocRowClick(index, row) {
   selectedDoc.value = row
   showParDialogVisible.value = true
   fetchParagraphs(row.document_id)
@@ -363,6 +362,7 @@ async function submitCreate() {
   ElMessage.success(`知识库『${createForm.name}』创建成功，共 ${createFileRows.value.length} 个文件后台解析中`)
   createDialogVisible.value = false
   await fetchKnowledgeBases()
+  activeTab.value = kb
 }
 
 /*  追加文件  */
@@ -470,6 +470,7 @@ fetchKnowledgeBases()
 .right-panel {
   padding: 16px;
   background: #fff1f1;
+  margin-left: 5px;
 }
 
 .sub-title {

@@ -19,7 +19,6 @@ from selector.document_selector import DocumentSelector
 from selector.domain_selector import DomainSelector
 from selector.paragraph_selector import ParagraphSelector
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink
-from web_server.ai.schemas import FileInfo
 from web_server.ai.views import loading_data
 
 router = APIRouter(tags=['ai'], prefix='/ai')
@@ -88,67 +87,26 @@ async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
     return result
 
 
-@router.get('/rebuild')
-async def rebuild_data(meta_type: str):
-    """
-    重建domain领域以及category分类索引
-    """
-    deepseek = DeepSeek()
+@router.patch('/index/{kb_id}')
+async def update_kb_index(kb_id: int, meta_type: str, session: SessionDep):
     qwen = Qwen()
-
-    # TODO 调整重建domain & category索引接口
+    # TODO 重建索引过程不能影响查询
     if meta_type == 'category':
-        documents = await get_meta_data(meta_type='document')
-        # TODO 清空category & domain 数据文件
-        for document in documents:
-            doc_parser = DocumentParser(deepseek)
-            doc_parser.document = document
-            category_parser = CategoryParser(qwen)
-            category_params = {
-                'document': document,
-            }
-            category = category_parser.parse(**category_params)
-            print('category', category)
+        # 重建类别及领域索引
+        domains = []
+        categories = []
+        statement = select(Document).where(Document.kb_id == kb_id)
+        for doc in session.exec(statement):
+            doc_parser = DocumentParser(qwen, kb_id, session)
 
-            # back fill document parent data
-            doc_parser.back_fill_parent(category, True)
-            doc_parser.storage_parser_data()
+            cat_parser = CategoryParser(qwen, kb_id, session)
+            new_category = cat_parser.parse(**{'document': doc})
 
-            domain_parser = DomainParser(qwen)
-            domain_params = {
-                'cla': category
-            }
-            domain = domain_parser.parse(**domain_params)
-            print('domain', domain)
 
-            # back fill category parent data
-            if category_parser.new_classification == 'true':
-                category_parser.back_fill_parent(domain)
-            category_parser.storage_parser_data()
 
-            # back fill domain parent data
-            if domain_parser.new_domain == 'true':
-                domain_parser.back_fill_parent(None)
-            domain_parser.storage_parser_data()
     elif meta_type == 'domain':
-        categories = await get_meta_data(meta_type='category')
-        for category in categories:
-            category_parser = CategoryParser(qwen)
-            category_parser.category = category
-            domain_parser = DomainParser(qwen)
-            domain_params = {
-                'cla': category
-            }
-            domain = domain_parser.parse(**domain_params)
-            print('domain', domain)
-
-            category_parser.back_fill_parent(domain)
-            category_parser.storage_parser_data()
-
-            # back fill domain parent data
-            if domain_parser.new_domain == 'true':
-                domain_parser.back_fill_parent(None)
-            domain_parser.storage_parser_data()
+        # 重建领域索引
+        ...
 
 
 @router.post('/upload')

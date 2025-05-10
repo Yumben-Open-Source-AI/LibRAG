@@ -94,3 +94,10 @@ class DocumentParser(BaseParser):
     def storage_parser_data(self, parent: Category):
         self.document.categories.append(parent)
         self.session.add(self.document)
+
+    def rebuild_parser_data(self, parent: Category):
+        # 解绑旧类别
+        self.document.categories = []
+        self.session.add(parent)
+        self.session.add(self.document)
+
