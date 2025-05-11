@@ -98,6 +98,5 @@ class DocumentParser(BaseParser):
     def rebuild_parser_data(self, parent: Category):
         # 解绑旧类别
         self.document.categories = []
-        self.session.add(parent)
+        self.document.categories.append(parent)
         self.session.add(self.document)
-

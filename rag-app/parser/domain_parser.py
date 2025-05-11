@@ -79,17 +79,21 @@ class DomainParser(BaseParser):
 
     def parse(self, **kwargs):
         category = kwargs.get('category')
+        ext_domains = kwargs.get('ext_domains', [])
+        known_domains = self.__get_known_domains()
+        if ext_domains:
+            known_domains = self.tidy_up_known_domains(ext_domains)
         parse_params = {
             'category_name': category.category_name,
             'category_description': category.category_description,
-            'known_domains': self.__get_known_domains()
+            'known_domains': known_domains
         }
         parse_messages = copy.deepcopy(DOMAIN_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
         parse_messages[1]['content'] = content.substitute(cla=str(parse_params))
         self.domain = self.llm.chat(parse_messages)[0]
         self.new_domain = self.domain['new_domain']
-        if self.domain['new_domain'] == 'true':
+        if self.new_domain == 'true':
             self.domain['kb_id'] = self.kb_id
             del self.domain['domain_id']
             self.domain = Domain(**self.domain)
@@ -105,18 +109,10 @@ class DomainParser(BaseParser):
     def storage_parser_data(self, parent):
         self.session.add(self.domain)
 
-    def rebuild_domain(self):
-        ...
-
-    def __get_known_domains(self):
-        """
-        Getting Known Categories to Aid in Classification Selection for Large Language Models
-        """
-        statement = select(Domain).where(Domain.kb_id == self.kb_id)
-        db_domains = self.session.exec(statement).all()
-
+    @staticmethod
+    def tidy_up_known_domains(domains):
         known_domains = []
-        for domain in db_domains:
+        for domain in domains:
             known_domains.append({
                 'domain_id': domain.domain_id,
                 'domain_name': domain.domain_name,
@@ -124,3 +120,11 @@ class DomainParser(BaseParser):
             })
 
         return known_domains
+
+    def __get_known_domains(self):
+        """
+        Getting Known domains to Aid in Classification Selection for Large Language Models
+        """
+        statement = select(Domain).where(Domain.kb_id == self.kb_id)
+        db_domains = self.session.exec(statement).all()
+        return self.tidy_up_known_domains(db_domains)

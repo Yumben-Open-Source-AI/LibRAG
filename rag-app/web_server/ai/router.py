@@ -98,12 +98,28 @@ async def update_kb_index(kb_id: int, meta_type: str, session: SessionDep):
         statement = select(Document).where(Document.kb_id == kb_id)
         for doc in session.exec(statement):
             doc_parser = DocumentParser(qwen, kb_id, session)
-
             cat_parser = CategoryParser(qwen, kb_id, session)
-            new_category = cat_parser.parse(**{'document': doc})
+            domain_parser = DomainParser(qwen, kb_id, session)
 
+            category_params = {
+                'document': doc,
+                'ext_categories': categories
+            }
+            new_category = cat_parser.parse(**category_params)
+            new_domain = domain_parser.parse(**{'category': new_category})
 
+            doc_parser.rebuild_parser_data(new_category)
+            cat_parser.rebuild_parser_data(new_domain)
 
+            categories.append(new_category)
+            domains.append(new_domain)
+
+        # 清除旧数据
+        # session.query(Category).filter_by(kb_id == kb_id).delete()
+        # session.query(Document).filter_by(kb_id == kb_id).delete()
+        # session.add_all(categories)
+        # session.add_all(domains)
+        # session.commit()
     elif meta_type == 'domain':
         # 重建领域索引
         ...

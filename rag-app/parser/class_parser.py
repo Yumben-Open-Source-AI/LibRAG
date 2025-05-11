@@ -85,10 +85,14 @@ class CategoryParser(BaseParser):
 
     def parse(self, **kwargs):
         document = kwargs.get('document')
+        ext_categories = kwargs.get('ext_categories', [])
+        known_categories = self.__get_known_categories()
+        if ext_categories:
+            known_categories = self.tidy_up_known_categories(ext_categories)
         parse_params = {
             'document_name': document.document_name,
             'document_description': document.document_description,
-            'known_categories': self.__get_known_categories(),
+            'known_categories': known_categories,
         }
         parse_messages = copy.deepcopy(CATEGORY_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
@@ -109,23 +113,20 @@ class CategoryParser(BaseParser):
         self.category.meta_data['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         return self.category
 
-    def rebuild_domain(self):
-        ...
-
     def storage_parser_data(self, parent: Domain):
         if self.new_classification == 'true':
             self.category.parent_id = parent.domain_id
         self.session.add(self.category)
 
-    def __get_known_categories(self):
-        """
-        Getting Known Categories to Aid in Classification Selection for Large Language Models
-        """
-        statement = select(Category).where(Category.kb_id == self.kb_id)
-        db_categories = self.session.exec(statement).all()
+    def rebuild_parser_data(self, parent: Domain):
+        if self.new_classification == 'true':
+            self.category.parent_id = parent.domain_id
+
+    @staticmethod
+    def tidy_up_known_categories(categories):
         known_categories = []
 
-        for category in db_categories:
+        for category in categories:
             known_categories.append({
                 'category_id': category.category_id,
                 'category_name': category.category_name,
@@ -133,3 +134,11 @@ class CategoryParser(BaseParser):
             })
 
         return known_categories
+
+    def __get_known_categories(self):
+        """
+        Getting Known Categories to Aid in Classification Selection for Large Language Models
+        """
+        statement = select(Category).where(Category.kb_id == self.kb_id)
+        db_categories = self.session.exec(statement).all()
+        return self.tidy_up_known_categories(db_categories)
