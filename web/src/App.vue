@@ -78,12 +78,26 @@
 
       <el-tab-pane label="召回测试" name="recall">
         <div class="flex flex-wrap items-center gap-2 mb-4">
-          <el-input v-model="query" placeholder="请输入查询，建议陈述性语句" class="flex-1" />
-          <el-select v-model="selectedKBOption" placeholder="选择知识库" style="width:220px">
-            <el-option v-for="opt in kbOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-          </el-select>
-          <el-button type="primary" @click="doRecall">测试召回</el-button>
-          <el-button @click="resetRecall">重置查询</el-button>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="请输入查询：">
+                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" class="flex-1"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4">
+              <el-form-item label="知识库：">
+                <el-select v-model="selectedKBOption" placeholder="选择知识库" style="width:220px">
+                  <el-option v-for="opt in kbOptions" :key="opt.value" :label="opt.label" :value="opt.value"/>
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4">
+              <el-button type="primary" @click="doRecall">测试召回</el-button>
+              <el-button @click="resetRecall">重置查询</el-button>
+            </el-col>
+          </el-row>
+
+
         </div>
 
         <el-table :data="recallTableData" border height="650">
@@ -96,23 +110,24 @@
     </el-tabs>
 
     <!-- 创建 KB & 提交文件 Dialog -->
-    <el-dialog v-model="createDialogVisible" title="创建新知识库 & 提交文件" width="1000px">
+    <el-dialog v-model="createDialogVisible" title="创建新知识库 & 提交文件" width="30%">
       <el-form :model="createForm" label-width="100px">
         <el-row>
-          <el-col :span="12">
-            <el-form-item label="知识库名称">
-              <el-input v-model="createForm.name" width="100%" />
+          <el-col :span="24">
+            <el-form-item label="知识库名称：">
+              <el-input v-model="createForm.name" width="100%"/>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="知识库描述">
-              <el-input v-model="createForm.desc" width="100%" />
+          <el-col :span="24">
+            <el-form-item label="知识库描述：">
+              <el-input type="textarea" v-model="createForm.desc" width="100%"/>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="上传文件">
-          <el-upload multiple :auto-upload="false" :file-list="createFileList" :on-change="handleCreateUpload" drag>
-            <i class="el-icon-upload" />
+        <el-form-item label="上传文件：">
+          <el-upload multiple :auto-upload="false" :file-list="createFileList" :on-change="handleCreateUpload" drag
+                     style="width: 100%;">
+            <i class="el-icon-upload"/>
             <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
           </el-upload>
         </el-form-item>
@@ -183,7 +198,7 @@
     </el-dialog>
 
     <!-- 查看文档切割段落 Dialog -->
-    <el-dialog v-model="showParDialogVisible" width="1000">
+    <el-dialog v-model="showParDialogVisible" width="80%">
       <template #header="{ titleId }">
         <el-text :id="titleId"> 文档：{{ selectedDoc.document_name }} </el-text>
       </template>
