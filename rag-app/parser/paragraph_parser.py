@@ -288,39 +288,56 @@ class ParagraphParser(BaseParser):
             """
             import re, unicodedata
 
-            # 清理标题：去掉 #、空白、全角→半角，便于匹配
+            PUNCT_CLASSES = {
+                "(": r"[\(\（]",
+                ")": r"[\)\）]",
+                ",": r"[,，]",
+                ":": r"[:：]",
+                ";": r"[;；]",
+                ".": r"[\.。]",
+                "!": r"[!！]",
+                "?": r"[\?？]",
+                "-": r"[-－﹣_]",
+                "/": r"[/／]",
+            }
+
             def _clean(t: str) -> str:
-                t = re.sub(r'^#+\s*', '', t)
-                return unicodedata.normalize("NFKC", t).strip()
+                # 去掉井号、空白并做全角→半角归一
+                return unicodedata.normalize("NFKC", re.sub(r'^#+\s*', '', t)).strip()
+
+            def _build_pattern(title: str) -> str:
+                """
+                把中文符号和英文符号视为同一个：
+                例：'三、投资管理（二）费用' → S∙a∙v∙e…
+                """
+                parts = []
+                for ch in title:
+                    if ch.isspace():
+                        parts.append(r"\s*")  # 任意空白
+                    elif ch in PUNCT_CLASSES:
+                        parts.append(PUNCT_CLASSES[ch])
+                    else:
+                        parts.append(re.escape(ch))
+                # 标题行以换行或文末结束
+                return "".join(parts) + r"(?:\s*\n|\Z)"
 
             clean_titles = [_clean(t) for t in markdown_titles]
 
-            valid_titles: list[str] = []  # 只保存匹配成功的标题
-            matches: list[tuple] = []  # [(start, end), ...]
+            valid_titles, matches = [], []
             last_pos = 0
 
             for t in clean_titles:
-                # ① 严格匹配：标题 + 换行/结束
-                pat1 = re.escape(t) + r'(?:\s*\n|\Z)'
-                m = re.search(pat1, full_text[last_pos:], flags=re.MULTILINE)
-
-                if not m:
-                    # ② 放宽：标题 + 句号/换行/结束（中英文混排）
-                    pat2 = re.escape(t) + r'(?:[。\.]?\s*\n|\Z)'
-                    m = re.search(pat2, full_text[last_pos:], flags=re.MULTILINE)
-
-                if not m:
-                    # 找不到就直接跳过
+                pat = _build_pattern(t)
+                m = re.search(pat, full_text[last_pos:], flags=re.MULTILINE)
+                if not m:  # 找不到就跳过
                     print(f"[SKIP] 未匹配标题 -> {t}")
                     continue
 
-                # 记录匹配成功的标题和位置
                 start = last_pos + m.start()
                 end = last_pos + m.end()
                 matches.append((start, end))
                 valid_titles.append(t)
                 last_pos = end
-
             # 如果一个都没匹配到，直接返回空 dict
             if not matches:
                 return {}
