@@ -85,9 +85,10 @@ class CategoryParser(BaseParser):
 
     def parse(self, **kwargs):
         document = kwargs.get('document')
+        parse_type = kwargs.get('parse_type', 'default')
         ext_categories = kwargs.get('ext_categories', [])
         known_categories = self.__get_known_categories()
-        if ext_categories:
+        if parse_type == 'rebuild':
             known_categories = self.tidy_up_known_categories(ext_categories)
         parse_params = {
             'document_name': document.document_name,

@@ -79,9 +79,10 @@ class DomainParser(BaseParser):
 
     def parse(self, **kwargs):
         category = kwargs.get('category')
+        parse_type = kwargs.get('parse_type', 'default')
         ext_domains = kwargs.get('ext_domains', [])
         known_domains = self.__get_known_domains()
-        if ext_domains:
+        if parse_type:
             known_domains = self.tidy_up_known_domains(ext_domains)
         parse_params = {
             'category_name': category.category_name,

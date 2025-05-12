@@ -33,7 +33,7 @@
                       <el-button @click="openAppendDialog" :disabled="!selectedKB" type="primary">追加新文件</el-button>
                     </div>
                     <div style="margin-top: 5px;">
-                      <el-button :disabled="!selectedKB" type="success">重构建索引</el-button>
+                      <el-button @click="openUpdateIndexDialog" :disabled="!selectedKB" type="success">重构建索引</el-button>
                     </div>
                     <div style="margin-top: 5px;">
                       <el-button type="danger" @click.stop="openDeleteKBDialog"
@@ -169,7 +169,7 @@
       <span>确认删除选中的知识库？此操作无法撤销！</span>
       <template #footer>
         <el-button @click="deleteDialogVisible = false">取消</el-button>
-        <el-button type="danger" @click="submitDeleteKB">删除</el-button>
+        <el-button type="danger" @click="submitDeleteKB">构建</el-button>
       </template>
     </el-dialog>
 
@@ -189,11 +189,21 @@
       </template>
 
       <el-table :data="parTableData" border class="my-4" height="680">
+        <el-table-column prop="paragraph_id" label="段落id" width="120" />
         <el-table-column prop="paragraph_name" label="段落名" width="120" />
         <el-table-column prop="summary" label="段落摘要" />
         <el-table-column prop="content" label="段落内容" />
         <el-table-column prop="position" label="段落位置" width="80" />
       </el-table>
+    </el-dialog>
+
+    <!-- 重构建索引 Dialog -->
+    <el-dialog v-model="updateIndexDialogVisible" title="重构建索引" width="400px">
+      <span>确认重新构建当前知识库所有文档的索引？此操作将需要一定时间后台运行</span>
+      <template #footer>
+        <el-button @click="updateIndexDialogVisible = false">取消</el-button>
+        <el-button type="danger" @click="submitUpdateIndex">重构建</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -231,6 +241,7 @@ const appendDialogVisible = ref(false)
 const deleteDialogVisible = ref(false)
 const deleteDocDialogVisible = ref(false)
 const showParDialogVisible = ref(false)
+const updateIndexDialogVisible = ref(false)
 
 /*  创建 KB 表单 */
 const createForm = reactive({ name: '', desc: '' })
@@ -293,6 +304,10 @@ function openAppendDialog() {
   appendDialogVisible.value = true
   appendFileList.value = []
   appendFileRows.value = []
+}
+
+function openUpdateIndexDialog() {
+  updateIndexDialogVisible.value = true
 }
 
 function openDeleteKBDialog() {
@@ -407,13 +422,20 @@ async function submitDeleteKB() {
 /*  删除 文档  */
 async function submitDeleteDoc() {
   if (!selectedDoc.value) return
-  console.log(selectedDoc.value.document_id);
 
   await api.delete(`document/${selectedDoc.value.document_id}`)
   ElMessage.success('文档删除成功')
   deleteDocDialogVisible.value = false
   selectedDoc.value = null
   fetchDocuments(selectedKB.value.kb_id)
+}
+
+/*  重构建 索引 */
+async function submitUpdateIndex() {
+  api.patch(`index/${selectedKB.value.kb_id}`)
+  ElMessage.success('重构建成功')
+  updateIndexDialogVisible.value = false
+  await fetchKnowledgeBases()
 }
 
 
