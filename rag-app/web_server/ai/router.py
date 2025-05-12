@@ -41,7 +41,8 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     print(target_paragraphs)
 
     recall_content = [par['content'] for par in target_paragraphs]
-
+    if not recall_content:
+        return []
     # BM25进行段落召回评分
     tokenized_paragraphs = [list(jieba.cut(par)) for par in recall_content]
     tokenized_question = list(jieba.cut(question))
