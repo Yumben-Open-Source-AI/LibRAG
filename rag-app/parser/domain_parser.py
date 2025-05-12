@@ -100,6 +100,11 @@ class DomainParser(BaseParser):
             self.domain = Domain(**self.domain)
         else:
             db_domain = self.session.get(Domain, uuid.UUID(self.domain['domain_id']))
+            if parse_type == 'rebuild':
+                for domain in ext_domains:
+                    if domain.domain_id.__str__() == self.domain['domain_id']:
+                        db_domain = domain
+
             if not db_domain:
                 raise ValueError('new_domain judge is wrong, db domain does not exist')
             db_domain.domain_description = self.domain['domain_description']

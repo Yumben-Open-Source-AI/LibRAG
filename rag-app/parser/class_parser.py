@@ -106,6 +106,11 @@ class CategoryParser(BaseParser):
             self.category = Category(**self.category)
         else:
             db_category = self.session.get(Category, uuid.UUID(self.category['category_id']))
+            if parse_type == 'rebuild':
+                for category in ext_categories:
+                    if category.category_id.__str__() == self.category['category_id']:
+                        db_category = category
+
             if not db_category:
                 raise ValueError('new_classification judge is wrong, db category does not exist')
             db_category.meta_data = self.category['meta_data']
