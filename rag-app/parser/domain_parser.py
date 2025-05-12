@@ -82,7 +82,7 @@ class DomainParser(BaseParser):
         parse_type = kwargs.get('parse_type', 'default')
         ext_domains = kwargs.get('ext_domains', [])
         known_domains = self.__get_known_domains()
-        if parse_type:
+        if parse_type == 'rebuild':
             known_domains = self.tidy_up_known_domains(ext_domains)
         parse_params = {
             'category_name': category.category_name,

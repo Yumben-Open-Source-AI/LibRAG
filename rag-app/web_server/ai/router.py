@@ -91,49 +91,53 @@ async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
 @router.patch('/index/{kb_id}')
 async def update_kb_index(kb_id: int, session: SessionDep):
     qwen = Qwen()
-    # 重建索引过程不能影响查询
-    db_categories = session.query(Category).filter_by(kb_id=kb_id).all()
-    db_category_ids = [category.category_id for category in db_categories]
-    db_domains = session.query(Domain).filter_by(kb_id=kb_id).all()
-    db_domain_ids = [domain.domain_id for domain in db_domains]
-    # 重建类别及领域索引
-    domains = []
-    categories = []
-    statement = select(Document).where(Document.kb_id == kb_id)
-    db_documents = session.exec(statement)
-    for doc in db_documents:
-        doc_parser = DocumentParser(qwen, kb_id, session)
-        doc_parser.document = doc
-        cat_parser = CategoryParser(qwen, kb_id, session)
-        domain_parser = DomainParser(qwen, kb_id, session)
+    try:
+        # 重建索引过程不能影响查询
+        db_categories = session.query(Category).filter_by(kb_id=kb_id).all()
+        db_category_ids = [category.category_id for category in db_categories]
+        db_domains = session.query(Domain).filter_by(kb_id=kb_id).all()
+        db_domain_ids = [domain.domain_id for domain in db_domains]
+        # 重建类别及领域索引
+        domains = []
+        categories = []
+        statement = select(Document).where(Document.kb_id == kb_id)
+        db_documents = session.exec(statement)
+        for doc in db_documents:
+            doc_parser = DocumentParser(qwen, kb_id, session)
+            doc_parser.document = doc
+            cat_parser = CategoryParser(qwen, kb_id, session)
+            domain_parser = DomainParser(qwen, kb_id, session)
 
-        new_category = cat_parser.parse(**{
-            'document': doc,
-            'parse_type': 'rebuild',
-            'ext_categories': categories
-        })
-        print(new_category)
+            new_category = cat_parser.parse(**{
+                'document': doc,
+                'parse_type': 'rebuild',
+                'ext_categories': categories
+            })
+            print(new_category)
 
-        new_domain = domain_parser.parse(**{
-            'category': new_category,
-            'parse_type': 'rebuild',
-            'ext_domains': domains
-        })
-        print(new_domain)
+            new_domain = domain_parser.parse(**{
+                'category': new_category,
+                'parse_type': 'rebuild',
+                'ext_domains': domains
+            })
+            print(new_domain)
 
-        doc_parser.rebuild_parser_data(new_category)
-        cat_parser.rebuild_parser_data(new_domain)
+            doc_parser.rebuild_parser_data(new_category)
+            cat_parser.rebuild_parser_data(new_domain)
 
-        domains.append(new_domain)
-        categories.append(new_category)
+            domains.append(new_domain)
+            categories.append(new_category)
 
-    # 清理旧数据
-    session.query(Category).filter(Category.category_id.in_(db_category_ids)).delete()
-    session.query(CategoryDocumentLink).filter(CategoryDocumentLink.category_id.in_(db_category_ids)).delete()
-    session.query(Domain).filter(Domain.domain_id.in_(db_domain_ids)).delete()
-    session.add_all(categories)
-    session.add_all(domains)
-    session.commit()
+        # 清理旧数据
+        session.query(Category).filter(Category.category_id.in_(db_category_ids)).delete()
+        session.query(CategoryDocumentLink).filter(CategoryDocumentLink.category_id.in_(db_category_ids)).delete()
+        session.query(Domain).filter(Domain.domain_id.in_(db_domain_ids)).delete()
+        session.add_all(categories)
+        session.add_all(domains)
+        session.commit()
+    except Exception as e:
+        print(e)
+        session.rollback()
 
 
 @router.post('/upload')
