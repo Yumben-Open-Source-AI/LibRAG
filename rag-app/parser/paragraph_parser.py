@@ -279,68 +279,65 @@ class ParagraphParser(BaseParser):
             processed = markdown_titles
             return processed
 
-        def split_markdown_structured_document(full_text, markdown_titles):
+        def split_markdown_structured_document(full_text: str,
+                                               markdown_titles: list[str]) -> dict[str, dict]:
             """
-            根据Markdown格式的目录结构切割文档
-            :param full_text: 完整文档文本
-            :param markdown_titles: 包含Markdown标记的标题列表
-            :return: 按结构分割的字典 {处理后的标题: 内容}
+            根据 Markdown 目录切割 PDF 文本。
+            - 找不到的标题自动跳过，不影响后续切割。
+            - 返回 {clean_title: {"raw_title": 原始标题, "content": 对应内容}}
             """
-            import re
-            clean_titles = markdown_titles
+            import re, unicodedata
 
-            patterns = []
-            for title in clean_titles:
-                # 转义特殊字符，匹配标题行（可能包含换行）
-                pattern = re.escape(title) + r'(?:\s*\n|\Z)'
-                patterns.append(pattern)
+            # 清理标题：去掉 #、空白、全角→半角，便于匹配
+            def _clean(t: str) -> str:
+                t = re.sub(r'^#+\s*', '', t)
+                return unicodedata.normalize("NFKC", t).strip()
 
-            # 查找所有标题的起始位置
-            matches = []
+            clean_titles = [_clean(t) for t in markdown_titles]
+
+            valid_titles: list[str] = []  # 只保存匹配成功的标题
+            matches: list[tuple] = []  # [(start, end), ...]
             last_pos = 0
 
-            # 验证标题顺序
-            for i, pattern in enumerate(patterns):
-                match = re.search(pattern, full_text[last_pos:], flags=re.MULTILINE)
-                # 标题带着'#'进行初次匹配
-                if not match:
-                    # 标题去掉'#'字符进行二次匹配
-                    clean_titles[i] = re.sub(r'^#+\s*', '', clean_titles[i].strip())
-                    match = re.search(re.escape(clean_titles[i]) + r'(?:。\s*|\s*\n|\Z)', full_text[last_pos:],
-                                      flags=re.MULTILINE)
-                    if not match:
-                        expected_title = clean_titles[i]
-                        found_titles = '\n'.join(clean_titles[:i])
-                        # 二次匹配后依旧不成功跳过处理
-                        continue
-                        # raise ValueError(f"标题 '{expected_title}' 未找到，请确认：\n"
-                        #                  f"1.标题顺序是否正确\n2.是否缺少必要标题\n3.已匹配标题列表：\n{found_titles}")
-                start = last_pos + match.start()
-                end = last_pos + match.end()
-                matches.append((start, end))
-                last_pos = start  # 允许重叠匹配
+            for t in clean_titles:
+                # ① 严格匹配：标题 + 换行/结束
+                pat1 = re.escape(t) + r'(?:\s*\n|\Z)'
+                m = re.search(pat1, full_text[last_pos:], flags=re.MULTILINE)
 
-            # 添加文档结束位置
+                if not m:
+                    # ② 放宽：标题 + 句号/换行/结束（中英文混排）
+                    pat2 = re.escape(t) + r'(?:[。\.]?\s*\n|\Z)'
+                    m = re.search(pat2, full_text[last_pos:], flags=re.MULTILINE)
+
+                if not m:
+                    # 找不到就直接跳过
+                    print(f"[SKIP] 未匹配标题 -> {t}")
+                    continue
+
+                # 记录匹配成功的标题和位置
+                start = last_pos + m.start()
+                end = last_pos + m.end()
+                matches.append((start, end))
+                valid_titles.append(t)
+                last_pos = end
+
+            # 如果一个都没匹配到，直接返回空 dict
+            if not matches:
+                return {}
+
+            # 结尾哨兵，简化最后一段计算
             matches.append((len(full_text), len(full_text)))
 
-            # 提取内容块
+            # 构造分块结果
             sections = {}
-            for i in range(len(clean_titles)):
-                title_start, title_end = matches[i]
-                content_start = title_end
-                content_end = matches[i + 1][0]
+            for idx, title in enumerate(valid_titles):
+                title_start, title_end = matches[idx]
+                next_start = matches[idx + 1][0]
 
-                # 提取原始标题（保留文档中的实际格式）
                 raw_title = full_text[title_start:title_end].strip('\n')
+                content = full_text[title_end:next_start].strip('\n')
 
-                # 提取内容（保留原始换行符）
-                content = full_text[content_start:content_end].strip('\n')
-
-                # 存储到字典（使用清洗后的标题作为键）
-                sections[clean_titles[i]] = {
-                    'raw_title': raw_title,  # 文档中实际存在的标题
-                    'content': content
-                }
+                sections[title] = {"raw_title": raw_title, "content": content}
 
             return sections
 
@@ -361,11 +358,10 @@ class ParagraphParser(BaseParser):
 
             last_index = 0
             # 根据目录层级分割文本块
-            for original_title in titles:
-                clean_title = preprocess_markdown_titles([original_title])[0]
-                raw_title = result[clean_title]['raw_title']
-                raw_content = result[clean_title]['content']
-                print(f"【Markdown标题】{original_title}")
+            for clean_title, block in result.items():
+                raw_title = block['raw_title']
+                raw_content = block['content']
+                print(f"【Markdown标题】{clean_title}")
                 print(f"【实际匹配标题】{raw_title}")
                 print(f"【内容片段】\n{raw_content}\n")
                 raw_content = raw_content.replace(' ', '').replace('\n', '')

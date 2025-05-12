@@ -11,3 +11,4 @@ python-multipart
 gradio==5.25.2
 gradio_modal
 magic_pdf[full]==1.3.1
+opencv-python==4.11.0.86
