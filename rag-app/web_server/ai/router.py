@@ -85,7 +85,7 @@ async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
             category_dict['parent_description'] = f'此分类所属父级领域描述:<{category.domain.domain_description}>'
             result.append(category_dict)
 
-    return result
+    return result or db_result
 
 
 @router.patch('/index/{kb_id}')
