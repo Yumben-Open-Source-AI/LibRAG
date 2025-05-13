@@ -2,6 +2,7 @@ import os
 from typing import List, Dict
 
 from llm.base import BaseLLM
+from tools.decorator import concurrent_decorator
 
 
 class Qwen(BaseLLM):
@@ -18,7 +19,8 @@ class Qwen(BaseLLM):
         base_url = os.getenv('OPENAI_BASE_URL', default='https://dashscope.aliyuncs.com/compatible-mode/v1')
         self.client = OpenAI_(api_key=api_key, base_url=base_url, **kwargs)
 
-    def chat(self, messages: List[Dict]):
+    @concurrent_decorator
+    def chat(self, messages: List[Dict], count: int = 0):
         retries = 0
         while retries < 3:
             try:

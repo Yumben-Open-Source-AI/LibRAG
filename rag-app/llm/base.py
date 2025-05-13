@@ -12,10 +12,11 @@ class BaseLLM:
         """
         pass
 
-    def chat(self, messages: List[Dict]):
+    def chat(self, messages: List[Dict], count: int = 0):
         """
         Send a message to the big language model and get a response.
         :param messages: list of messages
+        :param count: Number of concurrent messages per group
         """
         pass
 

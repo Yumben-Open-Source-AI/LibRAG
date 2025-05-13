@@ -232,8 +232,8 @@ class ParagraphSelector(BaseSelector):
             'input_text': question,
             'paragraphs': self.select_params
         })
-        response_chat = llm.chat(PARAGRAPH_SYSTEM_MESSAGES + PARAGRAPH_FEW_SHOT_MESSAGES + PARAGRAPH_USER_MESSAGES)
-        self.selected_paragraphs = set(response_chat[0]['selected_paragraphs'])
+        response_chat = llm.chat(PARAGRAPH_SYSTEM_MESSAGES + PARAGRAPH_FEW_SHOT_MESSAGES + PARAGRAPH_USER_MESSAGES, count=10)
+        self.selected_paragraphs = set(response_chat)
 
         return self
 

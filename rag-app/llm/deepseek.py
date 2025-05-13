@@ -18,7 +18,7 @@ class DeepSeek(BaseLLM):
         base_url = os.getenv('OPENAI_BASE_URL', default='https://dashscope.aliyuncs.com/compatible-mode/v1')
         self.client = OpenAI_(api_key=api_key, base_url=base_url, **kwargs)
 
-    def chat(self, messages: List[Dict]):
+    def chat(self, messages: List[Dict], count: int = 0):
         retries = 0
         while retries < 3:
             try:
