@@ -7,20 +7,37 @@
 """
 import ast
 import copy
+import re
 from math import ceil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+PUNCT_CLASSES = {
+    "(": r"[\(\（]",
+    ")": r"[\)\）]",
+    ",": r"[,，]",
+    ":": r"[:：]",
+    ";": r"[;；]",
+    ".": r"[\.。]",
+    "!": r"[!！]",
+    "?": r"[\?？]",
+    "-": r"[-－﹣_]",
+    "/": r"[/／]",
+}
+
+
+def normalize_punctuation(text):
+    for standard_char, pattern in PUNCT_CLASSES.items():
+        text = re.sub(pattern, standard_char, text)
+    return text
 
 def concurrent_decorator(func):
     def wrapper(*args, **kwargs):
         llm = args[0]
         messages = args[1]
         count = kwargs.get('count', 0)
-        contents = ast.literal_eval(messages[-1]['content'])
-
         if not count:
             return func(*args, **kwargs)
-
+        contents = ast.literal_eval(normalize_punctuation(messages[-1]['content']))
         if 'input_text' not in contents:
             return func(*args, **kwargs)
 

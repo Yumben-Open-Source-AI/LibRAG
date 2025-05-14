@@ -359,7 +359,6 @@ class ParagraphParser(BaseParser):
             return sections
 
         pdf_content = convert_pdf_to_md(file_path)
-        pdf_content = html_to_markdown(pdf_content)
 
         catalog_messages = copy.deepcopy(PARAGRAPH_CATALOG_MESSAGES)
         template = Template(catalog_messages[1]['content'])
