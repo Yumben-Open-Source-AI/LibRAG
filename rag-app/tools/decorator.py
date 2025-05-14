@@ -37,7 +37,7 @@ def concurrent_decorator(func):
         count = kwargs.get('count', 0)
         if not count:
             return func(*args, **kwargs)
-        contents = ast.literal_eval(normalize_punctuation(messages[-1]['content']))
+        contents = ast.literal_eval(messages[-1]['content'])
         if 'input_text' not in contents:
             return func(*args, **kwargs)
 
