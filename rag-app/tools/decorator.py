@@ -30,6 +30,7 @@ def normalize_punctuation(text):
         text = re.sub(pattern, standard_char, text)
     return text
 
+
 def concurrent_decorator(func):
     def wrapper(*args, **kwargs):
         llm = args[0]

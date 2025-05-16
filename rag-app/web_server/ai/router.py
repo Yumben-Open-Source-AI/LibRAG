@@ -36,6 +36,10 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     print(selected_categories)
     selected_documents = DocumentSelector(params).collate_select_params(selected_categories).start_select()
     print(selected_documents)
+
+    if not selected_documents:
+        return []
+
     target_paragraphs = ParagraphSelector(params).collate_select_params(
         selected_documents).start_select().collate_select_result()
     print(target_paragraphs)
