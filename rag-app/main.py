@@ -1,9 +1,11 @@
-import datetime
+from tools.log_tools import setup, log, hijack_print
+setup(log_dir="./logs")
+hijack_print()
 
+import datetime
 import uvicorn
 from fastapi import FastAPI, Request
 from dotenv import load_dotenv
-
 from db.database import create_db_and_tables
 from fastapi.middleware.cors import CORSMiddleware
 from web_server.ai.router import router as query_router
