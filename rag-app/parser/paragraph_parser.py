@@ -211,8 +211,8 @@ class ParagraphParser(BaseParser):
         if file_obj.suffix in ['.doc', '.docx']:
             temp_dir = tempfile.mkdtemp()
             convert_file_type(file_path, temp_dir)
-            name = ' '.join(file_obj.name.split('.')[:-1])
-            file_path = os.path.join(temp_dir, name + '.pdf')
+            name = file_obj.name.replace(file_obj.suffix, '.pdf')
+            file_path = os.path.join(temp_dir, name)
             print(file_path)
 
         if file_path.endswith('.pdf'):

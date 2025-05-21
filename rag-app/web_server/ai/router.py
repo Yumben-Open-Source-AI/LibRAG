@@ -47,14 +47,14 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     recall_content = [par['content'] for par in target_paragraphs]
     if not recall_content:
         return []
-    # BM25进行段落召回评分
-    tokenized_paragraphs = [list(jieba.cut(par)) for par in recall_content]
-    tokenized_question = list(jieba.cut(question))
-    bm25 = BM25Okapi(tokenized_paragraphs, k1=1.5, b=0.6)
-    par_scores = bm25.get_scores(tokenized_question)
-    exp_scores = [np.exp(s) for s in par_scores]
-    for i, score in enumerate(exp_scores):
-        target_paragraphs[i]['score'] = score
+    # # BM25进行段落召回评分
+    # tokenized_paragraphs = [list(jieba.cut(par)) for par in recall_content]
+    # tokenized_question = list(jieba.cut(question))
+    # bm25 = BM25Okapi(tokenized_paragraphs, k1=1.5, b=0.6)
+    # par_scores = bm25.get_scores(tokenized_question)
+    # exp_scores = [np.exp(s) for s in par_scores]
+    # for i, score in enumerate(exp_scores):
+    #     target_paragraphs[i]['score'] = score
     return target_paragraphs
 
 
@@ -241,3 +241,9 @@ async def delete_document(document_id: str, session: SessionDep):
 @router.get('/paragraphs/{document_id}')
 async def query_paragraphs(document_id: str, session: SessionDep):
     return session.query(Paragraph).filter_by(parent_id=uuid.UUID(document_id)).all()
+
+
+@router.get('/paragraph/{paragraph_id}')
+async def query_paragraph(paragraph_id: str, session: SessionDep):
+    paragraph_id = uuid.UUID(paragraph_id)
+    return session.query(Paragraph).get(paragraph_id)

@@ -45,7 +45,7 @@ def convert_pdf_to_md(file_path):
 
     # args
     pdf_file_name = os.path.abspath(file_path)
-    name_without_suffix = pdf_file_name.split(".")[0]
+    name_without_suffix = ''.join(pdf_file_name.split(".")[:-1])
 
     # prepare env
     local_image_dir, local_md_dir = "output/images", "output"
