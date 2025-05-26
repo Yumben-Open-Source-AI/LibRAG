@@ -10,12 +10,11 @@ from string import Template
 from llm.base import BaseLLM
 from parser.agentic_chunking import ChunkOrganizer
 from parser.base import BaseParser
-from markdownify import MarkdownConverter
 
 from pathlib import Path
 
 from parser.chinese_text_splitter import FlexibleRecursiveSplitter
-from parser.load_api import convert_pdf_to_md, convert_file_type
+from parser.load_api import convert_pdf_to_md, convert_file_type, PDFLoader
 from web_server.ai.models import Document, Paragraph
 
 PARAGRAPH_PARSE_MESSAGES = [
@@ -175,14 +174,6 @@ PARAGRAPH_JUDGE_MESSAGES = [
 ]
 
 
-class NoEscapeConverter(MarkdownConverter):
-    """ 重写MarkdownConverter更改转义策略 """
-
-    def escape(self, text, parent_tags):
-        # 直接返回原始文本，不做任何转义
-        return text
-
-
 class ParagraphParser(BaseParser):
     def __init__(self, llm: BaseLLM, kb_id, session):
         super().__init__(llm, kb_id, session)
@@ -263,21 +254,6 @@ class ParagraphParser(BaseParser):
                     return page_num + 1
 
             return -1
-
-        def html_to_markdown(pages: str):
-            """ html形式table转化为markdown """
-            pattern = '<!--.*?-->|<html[^>]*>[\s\S]*?</html>'
-            htmls = re.findall(pattern, pages)
-            for html in htmls:
-                markdown_html = NoEscapeConverter().convert(html)
-                pages = pages.replace(html, markdown_html)
-
-            return pages
-
-        def preprocess_markdown_titles(markdown_titles):
-            """ 预处理Markdown格式的标题列表，去除#符号和空格 """
-            processed = markdown_titles
-            return processed
 
         def split_markdown_structured_document(full_text: str,
                                                markdown_titles: list[str]) -> dict[str, dict]:
@@ -406,11 +382,8 @@ class ParagraphParser(BaseParser):
         按页轮询自主大模型判断上下文
         场景: 目录层级多、文件结构复杂优先
         """
-        import fitz
-
-        pdf_content = fitz.open(file_path)
+        page_contents = PDFLoader(file_path).load_file()
         index = 0
-        page_contents = [page.get_text() for page in pdf_content.pages()]
 
         # 上下文连贯判断
         while index < len(page_contents):
@@ -445,15 +418,11 @@ class ParagraphParser(BaseParser):
         文本切割策略-按页切割
         场景: 目录层级多、文件结构复杂优先
         """
-        import fitz
-        doc = fitz.open(file_path)
+        page_contents = PDFLoader(file_path).load_file()
         with ThreadPoolExecutor(max_workers=25) as executor:
             tasks_page = []
-            for page in doc.pages():
-                doc_markdown = page.get_text()
-                page_count = page.number + 1
+            for page_count, doc_markdown in enumerate(page_contents, start=1):
                 parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
-                # parse_messages[0]['content'] = system_prompt
                 parse_messages[1]['content'] += f"```<当前页:{page_count}, 段落原文:{doc_markdown}>```"
                 task = executor.submit(self.llm.chat, parse_messages)
                 tasks_page.append(task)
@@ -467,10 +436,7 @@ class ParagraphParser(BaseParser):
         文本切割策略-agentic_chunking
         场景: 处理速度最慢，能够保持极致的上下文语义连贯
         """
-        import fitz
-
-        pdf_content = fitz.open(file_path)
-        page_contents = ''.join([page.get_text() for page in pdf_content.pages()])
+        page_contents = ''.join(PDFLoader(file_path).load_file())
 
         ps = FlexibleRecursiveSplitter(granularity="sentence", chunk_size=1024, overlap_units=2)
         organizer = ChunkOrganizer()

@@ -2,6 +2,7 @@
 import logging, os, sys, inspect
 from pathlib import Path
 
+
 def setup(log_dir="./logs", level=logging.INFO):
     """
     初始化简单日志系统：
@@ -21,6 +22,7 @@ def setup(log_dir="./logs", level=logging.INFO):
         ],
     )
 
+
 def log(*objects,
         sep=" ",
         end="\n",
@@ -37,6 +39,7 @@ def log(*objects,
         msg,
         stacklevel=stacklevel + 1  # 向上再跳一层
     )
+
 
 def hijack_print():
     """把内置 print 替换成 log，调用处不用改任何代码"""

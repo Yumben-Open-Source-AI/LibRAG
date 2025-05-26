@@ -6,6 +6,5 @@ openai
 python-dotenv
 requests
 sqlmodel
-markdownify
 python-multipart
 magic_pdf[full]==1.3.1

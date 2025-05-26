@@ -1,10 +1,10 @@
 import os
 import subprocess
+from typing import List
 
 from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
 from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
 from magic_pdf.config.enums import SupportedPdfParseMethod
-from magic_pdf.data.data_reader_writer import FileBasedDataReader
 from magic_pdf.data.dataset import PymuDocDataset
 from magic_pdf.utils.office_to_pdf import ConvertToPdfError
 
@@ -75,3 +75,14 @@ def convert_pdf_to_md(file_path):
             md_writer, f"{name_without_suffix}.md", image_dir
         )
     return read_md_file(name_without_suffix)
+
+
+class PDFLoader:
+    def __init__(self, file_path):
+        self.file_path = file_path
+
+    def load_file(self) -> List:
+        import fitz
+        pdf_content = fitz.open(self.file_path)
+        page_contents = [page.get_text() for page in pdf_content.pages()]
+        return page_contents
