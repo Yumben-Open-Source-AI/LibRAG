@@ -3,13 +3,10 @@ import os.path
 import uuid
 from typing import Annotated, List
 
-import jieba
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends, File, UploadFile, Form
 from sqlmodel import select
-
 from db.database import SessionDep, get_engine
-from llm.deepseek import DeepSeek
-from llm.qwen import Qwen
+from llm.llmchat import LlmChat
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
@@ -29,7 +26,7 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     from rank_bm25 import BM25Okapi
     import numpy as np
 
-    params = SelectorParam(Qwen(), kb_id, session, question)
+    params = SelectorParam(LlmChat(), kb_id, session, question)
     selected_domains = DomainSelector(params).collate_select_params().start_select()
     print(selected_domains)
     selected_categories = CategorySelector(params).collate_select_params(selected_domains).start_select()

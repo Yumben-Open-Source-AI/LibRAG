@@ -2,11 +2,11 @@ from typing import List, Dict
 
 from sqlmodel import Session
 
-from llm.base import BaseLLM
+from llm.llmchat import LlmChat
 
 
 class SelectorParam:
-    def __init__(self, llm: BaseLLM, kb_id: int, session: Session, question: str):
+    def __init__(self, llm: LlmChat, kb_id: int, session: Session, question: str):
         self.llm = llm
         self.kb_id = kb_id
         self.session = session

@@ -9,6 +9,15 @@ def setup(log_dir="./logs", level=logging.INFO):
       • 终端 + 文件双输出
       • 自动创建目录
       • 默认 INFO 级别，可改 DEBUG/ERROR 等
+      # # ---- 方式 A：显式用 log() --------------------------------------------------
+      # log("服务启动 OK")
+      # log("调试变量:", {"x": 10}, level="debug")
+      # log("发生异常!", level="error")
+      #
+      # # ---- 方式 B：一键把所有 print 劫持成日志 ------------------------------------
+      # hijack_print()
+      # print("这行其实写进日志了")
+      # print("支持", "多个参数", 123)
     """
     Path(log_dir).mkdir(parents=True, exist_ok=True)
 

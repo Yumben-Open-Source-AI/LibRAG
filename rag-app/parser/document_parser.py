@@ -1,10 +1,7 @@
 import copy
-import os
 import datetime
-import json
-import uuid
 from string import Template
-from llm.base import BaseLLM
+from llm.llmchat import LlmChat
 from parser.base import BaseParser
 from web_server.ai.models import Document, Category
 
@@ -63,7 +60,7 @@ DOCUMENT_PARSE_MESSAGES = [
 
 
 class DocumentParser(BaseParser):
-    def __init__(self, llm: BaseLLM, kb_id, session):
+    def __init__(self, llm: LlmChat, kb_id, session):
         super().__init__(llm, kb_id, session)
         self.document = None
 
@@ -84,7 +81,7 @@ class DocumentParser(BaseParser):
         parse_messages = copy.deepcopy(DOCUMENT_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
         parse_messages[1]['content'] = content.substitute(paragraphs=paragraphs, path=path)
-        self.document = self.llm.chat(parse_messages)[0]
+        self.document = self.llm.chat(parse_messages)
         self.document['kb_id'] = self.kb_id
         self.document['parse_strategy'] = kwargs.get('parse_strategy')
         self.document['meta_data']['最后更新时间'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')

@@ -1,13 +1,9 @@
 import copy
-import json
-import os
 import uuid
 import datetime
 from string import Template
-
 from sqlmodel import select
-
-from llm.base import BaseLLM
+from llm.llmchat import LlmChat
 from parser.base import BaseParser
 from web_server.ai.models import Domain
 
@@ -71,7 +67,7 @@ DOMAIN_PARSE_MESSAGES = [
 
 
 class DomainParser(BaseParser):
-    def __init__(self, llm: BaseLLM, kb_id, session):
+    def __init__(self, llm: LlmChat, kb_id, session):
         super().__init__(llm, kb_id, session)
         self.domain = None
         self.known_domains = []
@@ -92,7 +88,7 @@ class DomainParser(BaseParser):
         parse_messages = copy.deepcopy(DOMAIN_PARSE_MESSAGES)
         content = Template(parse_messages[1]['content'])
         parse_messages[1]['content'] = content.substitute(cla=str(parse_params))
-        self.domain = self.llm.chat(parse_messages)[0]
+        self.domain = self.llm.chat(parse_messages)
         self.new_domain = self.domain['new_domain']
         if self.new_domain == 'true':
             self.domain['kb_id'] = self.kb_id

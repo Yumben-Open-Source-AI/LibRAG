@@ -2,5 +2,5 @@
 files
 *.jpg
 .env
-librag.db
+web_server/librag.db
 *.pyc

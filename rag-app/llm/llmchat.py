@@ -1,24 +1,26 @@
-from typing import List, Dict
+import os
+from typing import Any, Sequence, Dict, List, Union
+
+from llama_index.core.base.llms.types import ChatResponse, ChatMessage
+from llama_index.llms.openai_like import OpenAILike
+
+from tools.decorator import concurrent_decorator
 
 
-class BaseLLM:
-    """
-    Base class for all LLMs
-    """
+class LlmChat(OpenAILike):
 
-    def __init__(self):
-        """
-        init LLM
-        """
-        pass
-
-    def chat(self, messages: List[Dict], count: int = 0):
-        """
-        Send a message to the big language model and get a response.
-        :param messages: list of messages
-        :param count: Number of concurrent messages per group
-        """
-        pass
+    def __init__(self, **kwargs):
+        kwargs['model'] = os.getenv('MODEL_NAME', default='qwen2.5-72b-instruct')
+        kwargs['api_base'] = os.getenv('OPENAI_BASE_URL', default='https://dashscope.aliyuncs.com/compatible-mode/v1')
+        kwargs['api_key'] = os.getenv('OPENAI_API_KEY')
+        kwargs['context_window'] = 128000
+        kwargs['max_tokens'] = 8192
+        kwargs['is_chat_model'] = True
+        kwargs['is_function_calling_model'] = False
+        kwargs['max_retries'] = 3
+        kwargs['timeout'] = 1800
+        kwargs['reuse_client'] = True
+        super().__init__(**kwargs)
 
     @staticmethod
     def literal_eval(response_content: str):
@@ -52,11 +54,23 @@ class BaseLLM:
         except Exception as e:
             print(response_content)
             import re
-
             json_match = re.findall(r'(\[.*?\]|\{.*?\})', response_content, re.DOTALL)
             if len(json_match) != 1:
                 raise Exception('the response is invalid JSON content, please try again')
-
             result = ast.literal_eval(json_match[0])
 
         return result
+
+    @concurrent_decorator
+    def chat(self, messages: List[Union[str, dict]], count: int = 0, **kwargs: Any) -> ChatResponse:
+        processed_messages = []
+        for i, msg in enumerate(messages):
+            if isinstance(msg, dict):
+                # 如果消息是字典，直接使用其role/content
+                processed_messages.append(ChatMessage(**msg))
+            else:
+                # 自动分配角色：偶数索引为system，奇数索引为user
+                role = "system" if i % 2 == 0 else "user"
+                processed_messages.append(ChatMessage(role=role, content=msg))
+        response = super().chat(processed_messages, **kwargs).message.content
+        return self.literal_eval(response)

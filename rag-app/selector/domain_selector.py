@@ -191,6 +191,5 @@ class DomainSelector(BaseSelector):
             'domains': self.select_params
         })
         response_chat = llm.chat(DOMAIN_SYSTEM_MESSAGES + DOMAIN_FEW_SHOT_MESSAGES + DOMAIN_USER_MESSAGES)
-        selected_domains = set(response_chat[0]['selected_domains'])
-
+        selected_domains = set(response_chat['selected_domains'])
         return selected_domains

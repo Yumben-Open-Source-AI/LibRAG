@@ -3,7 +3,7 @@ import json
 from typing import List, Dict
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from llm.qwen import Qwen
+from llm.llmchat import LlmChat
 
 
 # ---------- 数据模型 ----------
@@ -12,7 +12,7 @@ class ChunkMeta(BaseModel):
     paragraph_name: str
     summary: str
     keywords: List[str]
-    position:str
+    position: str
     propositions: List[str]
 
 
@@ -28,7 +28,7 @@ class ChunkOrganizer:
     # ======== 初始化 ========
     def __init__(self):
         load_dotenv()
-        self.llm = Qwen()
+        self.llm = LlmChat()
 
         # 保存所有块
         self.chunks: Dict[str, ChunkMeta] = {}
@@ -157,7 +157,7 @@ class ChunkOrganizer:
         """
         主入口：接收原始长文本，返回整理后的块列表。
         """
-        print("##process text:"+text)
+        print("##process text:" + text)
         propositions = self._extract_propositions(text)
 
         for prop in propositions:
@@ -170,21 +170,21 @@ class ChunkOrganizer:
     # ---- proposition 提取 ----
     def _extract_propositions(self, text: str) -> List[str]:
         messages = [
-            {"role": "system", "content": self._proposition_system},
-            {"role": "user", "content": text}
+            self._proposition_system,
+            text
         ]
-        result = self.llm.chat(messages)[0]  # 预计返回 JSON 数组
-        print("##_extract_propositions result:"+str(result))
+        result = self.llm.chat(messages)  # 预计返回 JSON 数组
+        print("##_extract_propositions result:" + str(result))
         return result
 
     # ---- 创建新块 ----
     def _create_new_chunk(self, proposition: str) -> str:
         chunk_id = str(uuid.uuid4())
         messages = [
-            {"role": "system", "content": self._summary_system},
-            {"role": "user", "content": f"txt_chunk:{proposition};"}
+            self._summary_system,
+            f"txt_chunk:{proposition};"
         ]
-        summary_res = self.llm.chat(messages)[0]
+        summary_res = self.llm.chat(messages)
         print("##_create_new_chunk summary_res:" + str(summary_res))
         self.chunks[chunk_id] = ChunkMeta(
             chunk_id=chunk_id,
@@ -204,10 +204,10 @@ class ChunkOrganizer:
         # 重新生成块标题与摘要
         all_text = " ".join(chunk.propositions)
         messages = [
-            {"role": "system", "content": self._summary_system},
-            {"role": "user", "content": f"txt_chunk:{all_text};"}
+            self._summary_system,
+            f"txt_chunk:{all_text};"
         ]
-        summary_res = self.llm.chat(messages)[0]
+        summary_res = self.llm.chat(messages)
         print("##_add_to_chunk summary_res:" + str(summary_res))
         chunk.paragraph_name = summary_res.get("paragraph_name", chunk.paragraph_name)
         chunk.keywords = summary_res.get("keywords", chunk.keywords)
@@ -222,12 +222,11 @@ class ChunkOrganizer:
 
         chunks_summaries = {cid: c.summary for cid, c in self.chunks.items()}
         messages = [
-            {"role": "system", "content": self._allocation_system},
-            {"role": "user",
-             "content": f"已有块信息:{json.dumps(chunks_summaries, ensure_ascii=False)};proposition:{proposition};"}
+            self._allocation_system,
+            f"已有块信息:{json.dumps(chunks_summaries, ensure_ascii=False)};proposition:{proposition};"
         ]
-        alloc_res = self.llm.chat(messages)[0]
-        print("##_dispatch_proposition alloc_res:"+str(alloc_res))
+        alloc_res = self.llm.chat(messages)
+        print("##_dispatch_proposition alloc_res:" + str(alloc_res))
         if alloc_res.get("action") == "create_new":
             self._create_new_chunk(proposition)
         else:  # assign

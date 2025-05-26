@@ -64,9 +64,9 @@ def concurrent_decorator(func):
 
             for task in as_completed(tasks):
                 # 获取不同层级选择器选项key值保持1个
-                print(task.result()[0])
-                selected_key = list(task.result()[0].keys())[0]
-                all_messages_result.extend(task.result()[0][selected_key])
+                print(task.result())
+                selected_key = list(task.result().keys())[0]
+                all_messages_result.extend(task.result()[selected_key])
 
         return all_messages_result
 

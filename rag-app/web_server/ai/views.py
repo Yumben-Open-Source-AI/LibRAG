@@ -11,12 +11,11 @@ from typing import List, Dict
 
 from sqlmodel import Session
 
-from llm.qwen import Qwen
+from llm.llmchat import LlmChat
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
 from parser.paragraph_parser import ParagraphParser
-from web_server.ai.schemas import FileInfo
 
 
 def loading_data(
@@ -31,10 +30,10 @@ def loading_data(
                 policy_type = info['policy_type']
                 file_name = os.path.basename(file_path)
                 print('开始处理' + file_name, datetime.datetime.now())
-                qwen = Qwen()
+                llm = LlmChat()
 
                 # 解析文档内部段落
-                par_parser = ParagraphParser(qwen, kb_id, session)
+                par_parser = ParagraphParser(llm, kb_id, session)
                 paragraph_params = {
                     'path': file_path,
                     'parse_strategy': policy_type
@@ -43,7 +42,7 @@ def loading_data(
                 print('paragraph', all_paragraphs)
 
                 # 解析文档信息
-                doc_parser = DocumentParser(qwen, kb_id, session)
+                doc_parser = DocumentParser(llm, kb_id, session)
                 document_params = {
                     'path': file_path,
                     'parse_strategy': policy_type,
@@ -53,13 +52,13 @@ def loading_data(
                 print('document', document)
 
                 # 解析文档所属分类
-                category_parser = CategoryParser(qwen, kb_id, session)
+                category_parser = CategoryParser(llm, kb_id, session)
                 category_params = {'document': document}
                 category = category_parser.parse(**category_params)
                 print('category', category)
 
                 # 解析文档所属领域
-                domain_parser = DomainParser(qwen, kb_id, session)
+                domain_parser = DomainParser(llm, kb_id, session)
                 domain_params = {'category': category}
                 domain = domain_parser.parse(**domain_params)
                 print('domain', domain)

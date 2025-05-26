@@ -7,7 +7,7 @@ import uuid
 import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from string import Template
-from llm.base import BaseLLM
+from llm.llmchat import LlmChat
 from parser.agentic_chunking import ChunkOrganizer
 from parser.base import BaseParser
 
@@ -175,7 +175,7 @@ PARAGRAPH_JUDGE_MESSAGES = [
 
 
 class ParagraphParser(BaseParser):
-    def __init__(self, llm: BaseLLM, kb_id, session):
+    def __init__(self, llm: LlmChat, kb_id, session):
         super().__init__(llm, kb_id, session)
         self.paragraphs = []
         self.parse_strategy = ''
@@ -232,7 +232,7 @@ class ParagraphParser(BaseParser):
     def chat_parse_paragraph(self, cur_index, next_index, page_text):
         parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
         parse_messages[1]['content'] += f"```<当前页:{cur_index}至{next_index}, 段落原文:{page_text}>```"
-        paragraph_content = self.llm.chat(parse_messages)[0]
+        paragraph_content = self.llm.chat(parse_messages)
         self.collate_paragraphs(paragraph_content)
 
     def __catalog_split(self, file_path):
@@ -339,7 +339,7 @@ class ParagraphParser(BaseParser):
         catalog_messages = copy.deepcopy(PARAGRAPH_CATALOG_MESSAGES)
         template = Template(catalog_messages[1]['content'])
         catalog_messages[1]['content'] = template.substitute(content=pdf_content)
-        catalog_result = self.llm.chat(catalog_messages)[0]
+        catalog_result = self.llm.chat(catalog_messages)
         catalogs = catalog_result['catalogs']
         titles = catalogs
         if isinstance(catalog_result['catalogs'], str):
@@ -397,7 +397,7 @@ class ParagraphParser(BaseParser):
                     'current_page_text': f'```{current_page_text}```',
                 }
                 PARAGRAPH_JUDGE_MESSAGES[1]['content'] = str(user_content)
-                judge_result = self.llm.chat(PARAGRAPH_JUDGE_MESSAGES)[0]
+                judge_result = self.llm.chat(PARAGRAPH_JUDGE_MESSAGES)
                 print(judge_result)
                 if 'is_continuous' in judge_result and judge_result['is_continuous'] == 'false':
                     index = next_index
@@ -428,7 +428,7 @@ class ParagraphParser(BaseParser):
                 tasks_page.append(task)
 
             for task in as_completed(tasks_page):
-                paragraph_content = task.result()[0]
+                paragraph_content = task.result()
                 self.collate_paragraphs(paragraph_content)
 
     def __agentic_chunking(self, file_path):
