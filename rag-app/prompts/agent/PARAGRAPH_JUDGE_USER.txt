@@ -1,0 +1,1 @@
+{'previous_page_text': '```{$previous_page_text}```','current_page_text': '```{$current_page_text}```'}

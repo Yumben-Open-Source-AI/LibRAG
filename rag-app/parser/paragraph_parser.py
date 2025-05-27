@@ -15,161 +15,40 @@ from pathlib import Path
 
 from parser.chinese_text_splitter import FlexibleRecursiveSplitter
 from parser.load_api import convert_pdf_to_md, convert_file_type, PDFLoader
+from tools.prompt_load import TextFileReader
 from web_server.ai.models import Document, Paragraph
 
+# 生成段落总结
 PARAGRAPH_PARSE_MESSAGES = [
     {
         'role': 'system',
-        'content': """
-            Role: 文档总结专家
-            - version: 1.0
-            - language: 中文
-            - description: 你将得到User输入的一段文本，请详细提取且总结描述其内容，包含必须如实准确提取关键信息如所有指标及其数值数据等，最终按指定格式生成总结及描述。
-
-            Skills
-            - 擅长使用面向对象的视角抽取文本内容的对象属性(属性项:什么文档,当前页,对象主体,内容所属类型[摘要/引言/目录/首页/正文/公告/...]。
-            - 生成详细及信息丰富的描述。
-            - 擅长提取文本中的数值数据。
-            - 擅长提取文本中所有指标信息。
-            - 擅长生成严格符合JSON格式的输出。
-            - 擅长使用清晰的语言完整总结文本的主要内容。
-            - 擅长使用陈述叙事的风格总结文本的主要内容。
-
-            Rules
-            - 描述与总结不能省略内容。
-            - 每个summary至少20字，用清晰准确的语言陈述，不添加额外主观评价，陈述出所有指标和对象属性(如:这是xxx(什么文档/章节)第xxx页xxx(对象主体)的[摘要/引言/目录/首页/正文/公告/...]内容，内容包含以下指标内容xxx)。
-            - summary必须声明页码，段落类型，对象主体这三个属性。
-            - 每个content至少50个字，且必须涵盖文本中所有出现的指标信息及数值数据，文本中准确如实提取，避免出现遗漏情况，注重完整和清晰度。
-            - 允许根据上下文内容智能分割，生成多个paragraph
-            - 严格生成结构化不带有转义的JSON数据的总结及描述。
-            - 总结和描述仅使用文本格式呈现。
-
-            Workflows
-            1. 获取用户提供的文本。
-            2. 逐行解析提取文本的指标。
-            3. 理解文中主要内容，结合指标和对象属性生成总结。
-            4. 组合关键信息和对象属性生成描述，确保指标信息及数值数据完整。
-            5. 输出最终的总结及描述，确保准确性、可读性、完整性。
-
-            Example Output
-            ```json
-            [
-                {
-                    "paragraph_name": "",#填写章节或段落名称
-                    "summary": "<>", #段落描述；
-                    "content": "",
-                    "keywords": [],#关键词
-                    "position":""，#段落在文中的位置，如第几页，第几章
-                }
-            ]
-            ```
-            Warning:
-            -summary必须列出所有指标字段包括页码说明，禁止使用```等```字眼省略指标项，但不需要数值数据。
-            -content必须列出所有指标及数值数据，不能省略。  
-            -输出不要增加额外字段，严格按照Example Output结构输出。
-            -不要解释行为。
-        """
+        'content': TextFileReader().read_file("prompts/parse/PARAGRAPH_SYSTEM.txt")
     },
     {
         'role': 'user',
-        'content': """
-            读取文档，使用中文生成这段文本的描述以及总结，最终按照Example Output样例生成完整json格式数据
-        """
+        'content': TextFileReader().read_file("prompts/parse/PARAGRAPH_USER.txt")
     }
 ]
-PARAGRAPH_CATALOG_MESSAGES = [
+# 送入全文提取标题
+FULL_TEXT_CATALOG_MESSAGES = [
     {
         'role': 'system',
-        'content': """
-            # Role: 文本标题结构提取器
-            
-            ## Profile
-            - author: LangGPT
-            - version: 1.0
-            - language: 中文
-            - description: 从任意格式文本中**仅**提取文中实际存在的一至三级大标题（跳过四级及以下标题），最终使用 Markdown 风格的 `#`（#、##、###）表示标题层级并将结果结构化为 JSON 输出。
-            
-            ## Skills
-            1. 能基于多种线索（编号、缩进、格式、类型等）准确识别**一二三级标题**。
-            2. 标题可为任意长度，保留标题全部原文与顺序。
-            3. 忽略正文以及**四级及以下标题**（即`####` 及更多井号、或示例“1.1.1.1”、编号、缩进、标记等其他类似深度层次等）。
-            4. 使用 Markdown 的 `#`（#、##、###）表示层级并保持原顺序。
-            
-            ## Rules
-            1. 仅提取一、二、三级标题，**禁止**提取四级及以下标题；若检测到 `####` 及更多井号，或编号/缩进/标记中存在四级及更深层次时，直接跳过不输出。
-            2. 标题内容保持不变，不做任何精简或修改，并保持原顺序。
-            3. 忽略正文（普通文本）和其他无关元素，仅输出标题结构。
-            4. 最终结果只输出为以下 JSON 结构，**键名固定**为 `"catalogs"`：
-            
-            ## Example Output
-            ```json
-            {
-                "catalogs":  [] #<用 Markdown 形式的标题串列表>
-            }
-            Warning:
-            -最多输出到三级标题###为止，禁止输出四级标题####；
-        """
+        'content': TextFileReader().read_file("prompts/agent/FULL_TEXT_CATALOG_SYSTEN.txt")
     },
     {
         'role': 'user',
-        'content': '解析文本且提取文中所有一二三级标题结构，最终只需返回字符串形式大纲保留文中实际出现的标题不需要具体内容(#表示一级标题以此类推)<$content>'
+        'content': TextFileReader().read_file("prompts/agent/FULL_TEXT_CATALOG_USER.txt")
     }
 ]
+# 送入跨页内容判断连续性
 PARAGRAPH_JUDGE_MESSAGES = [
     {
         'role': 'system',
-        'content': """
-            # Role: 跨页文档连续性判别助手
-
-            ## Profile
-            - **Author**: LangGPT  
-            - **Version**: 1.0  
-            - **Language**: 中文 / 英文  
-            - **Description**: 你是一位专业的跨页文档解析助手，负责基于内容功能块的变化来判断跨页文本是否连续。哪怕文本围绕同一主体对象（如同一家公司），只要内容功能块发生变化（如从“战略创新”切换到“公司治理”），也需准确识别并判定为不连续。
-
-            ## Skills
-            1. 深度理解文档内容，精准识别文本功能/话题块。  
-            2. 忽略主体对象的一致性（同公司或同人），专注于内容功能块的变化。  
-            3. 仅依据内容块的功能划分来判断连续性。  
-            4. 输出简洁、结构化的连续性判断结果。
-
-            ## Background
-            在长篇文档中，哪怕内容都与同一家公司相关，也可能在不同部分呈现截然不同的功能块（例如：公司概述、战略创新、公司治理、荣誉奖项等）。一旦前后页面功能块不同，即可判定为不连续。
-
-            ## Goals
-            1. 严格基于内容块 / 功能块的变化来判断页面间的连续性。  
-            2. 忽略是否属于同一主体，只关注内容在功能和逻辑上的划分。  
-            3. 提供明确且结构化的输出结果，以支持后续文档处理流程。
-
-            ## Rules
-            1. 理解文本内容，并识别功能或话题变化。  
-            2. 如果上一页与当前页属于同一功能块：  
-                - 若上一页结尾内容尚未结束、当前页顺势衔接，为 full_continuation。  
-                - 若上一页已完整阐述一个小结，当前页在同一功能块下继续展开，为 partial_continuation。  
-                - 以上两种情形下，`is_continuous` 均为 'true'。  
-            3. 如果当前页开始了新的功能块或话题（如从“公司战略”切换到“公司治理”），则 `is_continuous` 为 'false'，并判定为 'independent'。  
-            4. 标题变化可作为参考线索，但最终判断需结合内容块的实际变化。  
-            5. 解释部分力求简明扼要，概括出主要依据。
-
-            ## Workflows
-            1. **输入**：上一页（`previous_page_text`）与当前页（`current_page_text`）文本内容。  
-            2. **识别**：深入理解两段文本所属的功能块或话题类型。  
-            3. **判定**：若两页功能块相同 → `is_continuous` = 'true'；否则 → `is_continuous` = 'false'。  
-                - 'true' → 根据内容连贯程度判定为 `full_continuation` 或 `partial_continuation`。  
-                - 'false' → 判定为 `independent`。  
-            4. **输出**：返回 JSON 格式结果，包含 `is_continuous`、`continuity_type`、`explanation` 三个字段。
-
-            ## Example Output
-            ```json
-            {
-                "is_continuous": "true" or "false",
-                "continuity_type": "full_continuation" | "partial_continuation" | "independent",
-                "explanation": "简要说明本次判定的主要逻辑，如话题是否连续、段落是否承接等。"
-            }
-            """
+        'content': TextFileReader().read_file("prompts/agent/PARAGRAPH_JUDGE_SYSTEM.txt")
     },
     {
-        'role': 'user'
+        'role': 'user',
+        'content': TextFileReader().read_file("prompts/agent/PARAGRAPH_JUDGE_USER.txt")
     }
 ]
 
@@ -336,7 +215,7 @@ class ParagraphParser(BaseParser):
 
         pdf_content = convert_pdf_to_md(file_path)
 
-        catalog_messages = copy.deepcopy(PARAGRAPH_CATALOG_MESSAGES)
+        catalog_messages = copy.deepcopy(FULL_TEXT_CATALOG_MESSAGES)
         template = Template(catalog_messages[1]['content'])
         catalog_messages[1]['content'] = template.substitute(content=pdf_content)
         catalog_result = self.llm.chat(catalog_messages)
@@ -392,12 +271,13 @@ class ParagraphParser(BaseParser):
             next_index = index + 1
             while next_index < len(page_contents):
                 current_page_text = page_contents[next_index]
-                user_content = {
-                    'previous_page_text': f'```{previous_page_text}```',
-                    'current_page_text': f'```{current_page_text}```',
-                }
-                PARAGRAPH_JUDGE_MESSAGES[1]['content'] = str(user_content)
-                judge_result = self.llm.chat(PARAGRAPH_JUDGE_MESSAGES)
+                paragraph_judge_messages = copy.deepcopy(PARAGRAPH_JUDGE_MESSAGES)
+                template = Template(paragraph_judge_messages[1]['content'])
+                paragraph_judge_messages[1]['content'] = template.substitute(
+                    previous_page_text=previous_page_text,
+                    current_page_text=current_page_text
+                )
+                judge_result = self.llm.chat(paragraph_judge_messages)
                 print(judge_result)
                 if 'is_continuous' in judge_result and judge_result['is_continuous'] == 'false':
                     index = next_index
