@@ -1,0 +1,128 @@
+[
+    {
+        "role": "user",
+        "content": {
+            "input_text": "比亚迪 2024 年氢燃料电池业务收入是多少？",
+            "paragraphs": [
+                {
+                    "paragraph_id": "p001",
+                    "paragraph_description": "报告披露 2024 年电动汽车营业收入 4800 亿元；段落来源描述:<比亚迪 2024 年年度报告。>"
+                },
+                {
+                    "paragraph_id": "p002",
+                    "paragraph_description": "报告披露 2024 年动力电池出货量数据；段落来源描述:<比亚迪 2024 年年度报告。>"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_paragraphs": []
+        }
+    },
+    {
+        "role": "user",
+        "content": {
+            "input_text": "请给出比亚迪 2024 年四个季度各自的营业收入。",
+            "paragraphs": [
+                {
+                    "paragraph_id": "Q1‑revenue",
+                    "paragraph_description": "2024Q1 营业收入 1200 亿元；段落来源描述:<比亚迪 2024 年第一季度报告 第 2 页。>"
+                },
+                {
+                    "paragraph_id": "Q2‑revenue",
+                    "paragraph_description": "2024Q2 营业收入 1350 亿元；段落来源描述:<比亚迪 2024 年半年度报告 第 3 页。>"
+                },
+                {
+                    "paragraph_id": "Q3‑revenue",
+                    "paragraph_description": "2024Q3 营业收入 1420 亿元；段落来源描述:<比亚迪 2024 年第三季度报告 第 2 页。>"
+                },
+                {
+                    "paragraph_id": "Q4‑revenue",
+                    "paragraph_description": "2024Q4 营业收入 1600 亿元；段落来源描述:<比亚迪 2024 年年度报告 第 4 页。>"
+                },
+                {
+                    "paragraph_id": "distractor‑cost",
+                    "paragraph_description": "2024Q3 营业**成本** 1100 亿元；段落来源描述:<比亚迪 2024 年第三季度报告。>"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_paragraphs": ["Q1‑revenue", "Q2‑revenue", "Q3‑revenue", "Q4‑revenue"]
+        }
+    },
+    {
+        "role": "user",
+        "content": {
+            "input_text": "Tesla 2023 Q3 total revenue (USD) 是多少？",
+            "paragraphs": [
+                {
+                    "paragraph_id": "uuid‑123e4567-e89b-12d3-a456-426614174000",
+                    "paragraph_description": "2023Q3 revenue reached USD 23.35bn；段落来源描述:<Tesla Inc. 2023 Q3 Update 2023‑10‑18。>"
+                },
+                {
+                    "paragraph_id": "rev‑2023Q2",
+                    "paragraph_description": "2023Q2 revenue USD 24.93bn；段落来源描述:<Tesla Inc. 2023 Q2 Update。>"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_paragraphs": ["uuid‑123e4567-e89b-12d3-a456-426614174000"]
+        }
+    },
+    {
+        "role": "user",
+        "content": {
+            "input_text": "2025 年第一季度营业收入同比增长率是多少？",
+            "paragraphs": [
+                {
+                    "paragraph_id": "rev‑growth",
+                    "paragraph_description": "2025Q1 营业收入同比增长 18%；段落来源描述:<某公司 2025 年第一季度报告 第 5 页。>"
+                },
+                {
+                    "paragraph_id": "cost‑growth",
+                    "paragraph_description": "2025Q1 营业**成本**同比增长 16%；段落来源描述:<某公司 2025 年第一季度报告 第 6 页。>"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_paragraphs": ["rev‑growth"]
+        }
+    },
+    {
+        "role": "user",
+        "content": {
+            "input_text": "列出 2023 药品目录细则附录 B 中申请材料清单及提交时限的段落。",
+            "paragraphs": [
+                {
+                    "paragraph_id": "segA12",
+                    "paragraph_description": "附录 B 要求企业提交 8 项材料并在 30 日内完成；段落来源描述:<国家医保局《药品目录调整实施细则（2023）》2023‑04‑10。>"
+                },
+                {
+                    "paragraph_id": "segA13",
+                    "paragraph_description": "附录 B 列出申请材料清单（无时限说明）；段落来源描述:<国家医保局《药品目录调整实施细则（2023）》2023‑04‑10。>"
+                },
+                {
+                    "paragraph_id": "segC01",
+                    "paragraph_description": "附录 C 规定申报窗口开放 45 日；段落来源描述:<国家医保局《药品目录调整实施细则（2023）》2023‑04‑10。>"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_paragraphs": ["segA12"]
+        }
+    }
+]

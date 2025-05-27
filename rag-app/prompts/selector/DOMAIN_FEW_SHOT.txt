@@ -1,0 +1,98 @@
+[
+    {
+        "role": "user",
+        "content": {
+            "input_text": "请告诉我2023年第四季度比亚迪的净利润和收入变化。",
+            "domains": [
+                {
+                    "domain_id": "finance",
+                    "domain_description": "财经金融类领域，包括企业财务分析、市场数据、会计审计、股票、基金等内容。"
+                },
+                {
+                    "domain_id": "tech",
+                    "domain_description": "科技与AI领域，包括人工智能、大数据、芯片、算法模型、互联网等技术内容。"
+                },
+                {
+                    "domain_id": "law",
+                    "domain_description": "法律政策领域，包括司法判决、法律解释、合规制度、合同协议等法律文书内容。"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_domains": ["finance"]
+        }
+    },
+    {
+        "role": "user",
+        "content": {
+            "input_text": "Transformer 和 LSTM 哪种模型更适合自然语言生成？",
+            "domains": [
+                {
+                    "domain_id": "tech",
+                    "domain_description": "科技与AI领域，包括人工智能、大数据、芯片、算法模型、互联网等技术内容。"
+                },
+                {
+                    "domain_id": "education",
+                    "domain_description": "教育科研领域，包括教学内容、考试制度、教育政策、研究报告等。"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_domains": ["tech"]
+        }
+    },
+    {
+        "role": "user",
+        "content": {
+            "input_text": "劳动合同纠纷中，员工是否可以单方面解除合同？",
+            "domains": [
+                {
+                    "domain_id": "law",
+                    "domain_description": "法律政策领域，包括司法判决、法律解释、合规制度、合同协议等法律文书内容。"
+                },
+                {
+                    "domain_id": "education",
+                    "domain_description": "教育科研领域，包括教学内容、考试制度、教育政策、研究报告等。"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_domains": ["law"]
+        }
+    },
+    {
+        "role": "user",
+        "content": {
+            "input_text": "AI技术在中小学教育中的应用效果如何？",
+            "domains": [
+                {
+                    "domain_id": "tech",
+                    "domain_description": "科技与AI领域，包括人工智能、大数据、芯片、算法模型、互联网等技术内容。"
+                },
+                {
+                    "domain_id": "education",
+                    "domain_description": "教育科研领域，包括教学内容、考试制度、教育政策、研究报告等。"
+                },
+                {
+                    "domain_id": "medical",
+                    "domain_description": "医疗健康领域，涵盖药品研发、医疗器械、疾病诊断、健康数据等相关信息。"
+                }
+            ]
+        }
+    },
+    {
+        "role": "assistant",
+        "content": {
+            "selected_domains": ["law"]
+        }
+    }
+]

@@ -1,0 +1,4 @@
+{
+  "input_text": "$input_text",
+  "documents": $documents
+}
