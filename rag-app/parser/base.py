@@ -1,11 +1,11 @@
 from sqlmodel import Session
 
-from llm.base import BaseLLM
+from llm.llmchat import LlmChat
 
 
 class BaseParser:
 
-    def __init__(self, llm: BaseLLM, kb_id: int, session: Session):
+    def __init__(self, llm: LlmChat, kb_id: int, session: Session):
         self.llm = llm
         self.kb_id = kb_id
         self.session = session
