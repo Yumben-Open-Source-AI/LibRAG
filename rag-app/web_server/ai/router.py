@@ -18,6 +18,7 @@ from selector.document_selector import DocumentSelector
 from selector.domain_selector import DomainSelector
 from selector.paragraph_selector import ParagraphSelector
 from tools.result_scoring import ResultScoringParser
+from tools.log_tools import selector_logger, parser_logger
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink
 from web_server.ai.views import loading_data
 from decimal import Decimal
@@ -29,20 +30,19 @@ router = APIRouter(tags=['ai'], prefix='/ai')
 async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     llm_chat = LlmChat()
     params = SelectorParam(llm_chat, kb_id, session, question)
-    selected_domains = DomainSelector(params).collate_select_params().start_select()
-    print(selected_domains)
-    selected_categories = CategorySelector(params).collate_select_params(selected_domains).start_select()
-    print(selected_categories)
-    selected_documents = DocumentSelector(params).collate_select_params(selected_categories).start_select()
-    print(selected_documents)
+    selected_domains, domains = DomainSelector(params).collate_select_params().start_select()
+    selector_logger.info(f'{question} -> {domains}')
+    selected_categories, categories = CategorySelector(params).collate_select_params(selected_domains).start_select()
+    selector_logger.info(f'{question} -> {domains} \n-> {categories}')
+    selected_documents, documents = DocumentSelector(params).collate_select_params(selected_categories).start_select()
+    selector_logger.info(f'{question} -> {domains} \n-> {categories} \n-> {documents}')
 
     if not selected_documents:
         return []
 
     target_paragraphs = ParagraphSelector(params).collate_select_params(
         selected_documents).start_select().collate_select_result()
-    print(target_paragraphs)
-
+    selector_logger.info(f'{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
     recall_content = [par['content'] for par in target_paragraphs]
     if not recall_content:
         return []
@@ -140,14 +140,14 @@ async def update_kb_index(kb_id: int, session: SessionDep):
                 'parse_type': 'rebuild',
                 'ext_categories': categories
             })
-            print(new_category)
+            parser_logger.info(f'文件:{doc.document_name} 类别重构建:{new_category}')
 
             new_domain = domain_parser.parse(**{
                 'category': new_category,
                 'parse_type': 'rebuild',
                 'ext_domains': domains
             })
-            print(new_domain)
+            parser_logger.info(f'文件:{doc.document_name} 领域重构建:{new_domain}')
 
             doc_parser.rebuild_parser_data(new_category)
             cat_parser.rebuild_parser_data(new_domain)
@@ -163,7 +163,7 @@ async def update_kb_index(kb_id: int, session: SessionDep):
         session.add_all(domains)
         session.commit()
     except Exception as e:
-        print(e)
+        parser_logger.error(f'重构建异常:{e}', exc_info=True)
         session.rollback()
 
 

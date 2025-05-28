@@ -1,7 +1,3 @@
-from tools.log_tools import setup, log, hijack_print
-setup(log_dir="./logs")
-hijack_print()
-
 import datetime
 import uvicorn
 from fastapi import FastAPI, Request
@@ -9,6 +5,7 @@ from dotenv import load_dotenv
 from db.database import create_db_and_tables
 from fastapi.middleware.cors import CORSMiddleware
 from web_server.ai.router import router as query_router
+from tools.log_tools import manage_logger as logger
 
 app = FastAPI()
 app.include_router(query_router)
@@ -34,7 +31,7 @@ async def log_request(request: Request, call_next):
     query_params = dict(request.query_params)  # 获取查询参数
 
     # 打印开始日志
-    print(f"\n[START] 开始时间: {start_time} | 请求路径: {path} | 参数: {query_params}")
+    logger.debug(f'请求路径: {path} | 参数: {query_params}')
 
     try:
         response = await call_next(request)
@@ -42,7 +39,7 @@ async def log_request(request: Request, call_next):
         # 确保无论是否异常都记录结束时间
         end_time = datetime.datetime.now()
         duration = end_time - start_time
-        print(f"[END] 结束时间: {end_time} | 请求时长: {duration.total_seconds():.2f}s")
+        logger.debug(f'请求时长: {duration.total_seconds():.2f}s')
 
     return response
 
@@ -54,4 +51,4 @@ def on_startup():
 
 if __name__ == '__main__':
     load_dotenv()
-    uvicorn.run(app='main:app', host='0.0.0.0', port=13113, workers=10)
+    uvicorn.run(app='main:app', host='0.0.0.0', port=13113)

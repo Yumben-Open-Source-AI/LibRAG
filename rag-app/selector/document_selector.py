@@ -9,6 +9,7 @@ from sqlmodel import select
 from selector.base import BaseSelector
 from tools.prompt_load import TextFileReader
 from web_server.ai.models import Document, Category
+from tools.log_tools import selector_logger as logger
 
 # system action
 DOCUMENT_SYSTEM_MESSAGES = [
@@ -33,6 +34,7 @@ DOCUMENT_USER_PROMPT = [
 class DocumentSelector(BaseSelector):
     def __init__(self, params):
         super().__init__(params)
+        self.document_names = {}
         self.documents = self.get_layer_data()
         self.select_params = []
 
@@ -43,10 +45,12 @@ class DocumentSelector(BaseSelector):
         db_documents = session.exec(statement).all()
         documents = []
         for document in db_documents:
+            document_id = document.document_id.__str__()
             documents.append({
-                'document_id': document.document_id.__str__(),
+                'document_id': document_id,
                 'document_description': document.document_description
             })
+            self.document_names[document_id] = document.document_name
         return documents
 
     def collate_select_params(self, selected_categories: List[Dict] = None):
@@ -73,6 +77,7 @@ class DocumentSelector(BaseSelector):
         document_system_messages[0]['content'] = template.substitute(
             now=now
         )
+        logger.debug(f'文档选择器 system prompt:{document_system_messages}')
 
         document_user_prompt = copy.deepcopy(DOCUMENT_USER_PROMPT)
         template = Template(document_user_prompt[0]['content'])
@@ -80,8 +85,9 @@ class DocumentSelector(BaseSelector):
             input_text=question,
             documents=self.select_params
         )
-
+        logger.debug(f'文档选择器 user prompt:{document_user_prompt}')
         response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=10)
         selected_documents = set(response_chat)
 
-        return selected_documents
+        documents = [{'document_id': doc, 'document_name': self.document_names[doc]}for doc in selected_documents]
+        return selected_documents, documents

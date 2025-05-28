@@ -14,6 +14,7 @@ from string import Template
 from typing import List, Dict, Sequence
 from sqlmodel import select
 from selector.base import BaseSelector
+from tools.log_tools import selector_logger as logger
 from tools.prompt_load import TextFileReader
 from web_server.ai.models import Domain, Category
 
@@ -38,6 +39,7 @@ class CategorySelector(BaseSelector):
 
     def __init__(self, params):
         super().__init__(params)
+        self.category_names = {}
         self.categories = self.get_layer_data()
         self.select_params = []
 
@@ -48,10 +50,13 @@ class CategorySelector(BaseSelector):
         db_categories = session.exec(statement).all()
         categories = []
         for category in db_categories:
+            category_id = category.category_id.__str__()
             categories.append({
-                'category_id': category.category_id.__str__(),
+                'category_id': category_id,
                 'category_description': category.category_description
             })
+            self.category_names[category_id] = category.category_name
+
         return categories
 
     def collate_select_params(self, selected_domains: List[Dict] = None):
@@ -78,6 +83,7 @@ class CategorySelector(BaseSelector):
         category_system_messages[0]['content'] = template.substitute(
             now=now
         )
+        logger.debug(f'类别选择器 system prompt:{category_system_messages}')
 
         category_user_messages = copy.deepcopy(CATEGORY_USER_MESSAGES)
         template = Template(category_user_messages[0]['content'])
@@ -85,8 +91,9 @@ class CategorySelector(BaseSelector):
             input_text=question,
             categories=self.select_params
         )
-
+        logger.debug(f'类别选择器 user prompt:{category_user_messages}')
         response_chat = llm.chat(category_system_messages + CATEGORY_FEW_SHOT_MESSAGES + category_user_messages)
         selected_categories = set(response_chat['selected_categories'])
 
-        return selected_categories
+        categories = [{'category_id': category, 'category_name': self.category_names[category]} for category in selected_categories]
+        return selected_categories, categories

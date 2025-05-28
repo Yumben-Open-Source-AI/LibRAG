@@ -15,6 +15,7 @@ from pathlib import Path
 
 from parser.chinese_text_splitter import FlexibleRecursiveSplitter
 from parser.load_api import convert_pdf_to_md, convert_file_type, PDFLoader
+from tools.log_tools import parser_logger as logger
 from tools.prompt_load import TextFileReader
 from web_server.ai.models import Document, Paragraph
 
@@ -83,7 +84,7 @@ class ParagraphParser(BaseParser):
             convert_file_type(file_path, temp_dir)
             name = file_obj.name.replace(file_obj.suffix, '.pdf')
             file_path = os.path.join(temp_dir, name)
-            print(file_path)
+            logger.debug(file_path)
 
         if file_path.endswith('.pdf'):
             # TODO rm temp_dir
@@ -185,7 +186,7 @@ class ParagraphParser(BaseParser):
                 pat = _build_pattern(t)
                 m = re.search(pat, full_text[last_pos:], flags=re.MULTILINE)
                 if not m:  # 找不到就跳过
-                    print(f"[SKIP] 未匹配标题 -> {t}")
+                    logger.debug(f'[SKIP] 未匹配标题 -> {t}')
                     continue
 
                 start = last_pos + m.start()
@@ -214,7 +215,6 @@ class ParagraphParser(BaseParser):
             return sections
 
         pdf_content = convert_pdf_to_md(file_path)
-
         catalog_messages = copy.deepcopy(FULL_TEXT_CATALOG_MESSAGES)
         template = Template(catalog_messages[1]['content'])
         catalog_messages[1]['content'] = template.substitute(content=pdf_content)
@@ -223,7 +223,7 @@ class ParagraphParser(BaseParser):
         titles = catalogs
         if isinstance(catalog_result['catalogs'], str):
             titles = catalogs.split('\n')
-        print(titles)
+        logger.debug(f'解析目录:{titles}')
         try:
             result = split_markdown_structured_document(pdf_content, titles)
 
@@ -232,9 +232,9 @@ class ParagraphParser(BaseParser):
             for clean_title, block in result.items():
                 raw_title = block['raw_title']
                 raw_content = block['content']
-                print(f"【Markdown标题】{clean_title}")
-                print(f"【实际匹配标题】{raw_title}")
-                print(f"【内容片段】\n{raw_content}\n")
+                logger.debug(f'【Markdown标题】{clean_title}')
+                logger.debug(f'【实际匹配标题】{raw_title}')
+                logger.debug(f'【内容片段】\n{raw_content}\n')
                 raw_content = raw_content.replace(' ', '').replace('\n', '')
                 if '|' in raw_content:
                     raw_content = raw_content.replace('|', '')
@@ -248,12 +248,11 @@ class ParagraphParser(BaseParser):
                 next_index = next_index if next_index != -1 else cur_index
                 last_index = next_index
                 if len(content) > 0:
-                    print(cur_index)
-                    print(next_index)
+                    logger.debug(f'页码范围: {cur_index} - {next_index}')
                     page_text = f'标题({raw_title}) 内容({raw_content})'
                     self.chat_parse_paragraph(cur_index, next_index, page_text)
         except ValueError as e:
-            print(str(e))
+            logger.error(str(e), exc_info=True)
 
     def __automate_judgment_split(self, file_path):
         """
@@ -278,7 +277,7 @@ class ParagraphParser(BaseParser):
                     current_page_text=current_page_text
                 )
                 judge_result = self.llm.chat(paragraph_judge_messages)
-                print(judge_result)
+                logger.debug(judge_result)
                 if 'is_continuous' in judge_result and judge_result['is_continuous'] == 'false':
                     index = next_index
                     break
@@ -287,8 +286,8 @@ class ParagraphParser(BaseParser):
                 index = next_index
                 next_index += 1
             self.chat_parse_paragraph(cur_index + 1, next_index, previous_page_text)
-            print(cur_index + 1, next_index)
-            print(self.paragraphs)
+            logger.debug(f'页码范围: {cur_index + 1} - {next_index}')
+            logger.debug(self.paragraphs)
             # 截止至文件尾部
             if next_index == len(page_contents):
                 break

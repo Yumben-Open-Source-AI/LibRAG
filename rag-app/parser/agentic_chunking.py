@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from llm.llmchat import LlmChat
 from tools.prompt_load import TextFileReader
+from tools.log_tools import parser_logger as logger
 
 
 # ---------- 数据模型 ----------
@@ -46,7 +47,7 @@ class ChunkOrganizer:
         """
         主入口：接收原始长文本，返回整理后的块列表。
         """
-        print("##process text:" + text)
+        logger.debug(f'##process text: {text}')
         propositions = self._extract_propositions(text)
 
         for prop in propositions:
@@ -63,7 +64,7 @@ class ChunkOrganizer:
             text
         ]
         result = self.llm.chat(messages)  # 预计返回 JSON 数组
-        print("##_extract_propositions result:" + str(result))
+        logger.debug(f'##_extract_propositions result: {str(result)}')
         return result
 
     # ---- 创建新块 ----
@@ -74,7 +75,7 @@ class ChunkOrganizer:
             f"txt_chunk:{proposition};"
         ]
         summary_res = self.llm.chat(messages)
-        print("##_create_new_chunk summary_res:" + str(summary_res))
+        logger.debug(f'##_create_new_chunk summary_res: {str(summary_res)}')
         self.chunks[chunk_id] = ChunkMeta(
             chunk_id=chunk_id,
             paragraph_name=summary_res.get("paragraph_name", ""),
@@ -97,7 +98,7 @@ class ChunkOrganizer:
             f"txt_chunk:{all_text};"
         ]
         summary_res = self.llm.chat(messages)
-        print("##_add_to_chunk summary_res:" + str(summary_res))
+        logger.debug(f'##_add_to_chunk summary_res: {str(summary_res)}')
         chunk.paragraph_name = summary_res.get("paragraph_name", chunk.paragraph_name)
         chunk.keywords = summary_res.get("keywords", chunk.keywords)
         chunk.position = summary_res.get("position", chunk.position)
@@ -115,7 +116,7 @@ class ChunkOrganizer:
             f"已有块信息:{json.dumps(chunks_summaries, ensure_ascii=False)};proposition:{proposition};"
         ]
         alloc_res = self.llm.chat(messages)
-        print("##_dispatch_proposition alloc_res:" + str(alloc_res))
+        logger.debug(f'##_dispatch_proposition alloc_res: {str(alloc_res)}')
         if alloc_res.get("action") == "create_new":
             self._create_new_chunk(proposition)
         else:  # assign

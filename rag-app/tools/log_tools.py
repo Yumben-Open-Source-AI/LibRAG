@@ -1,56 +1,68 @@
-# simple_log.py
-import logging, os, sys, inspect
-from pathlib import Path
+import os
+
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+FATAL = CRITICAL = 50
+ERROR = 40
+WARN = WARNING = 30
+INFO = 20
+DEBUG = 10
+NOTSET = 0
+
+_nameToLevel = {
+    'CRITICAL': CRITICAL,
+    'FATAL': FATAL,
+    'ERROR': ERROR,
+    'WARN': WARNING,
+    'WARNING': WARNING,
+    'INFO': INFO,
+    'DEBUG': DEBUG,
+    'NOTSET': NOTSET,
+}
+
+_home_dir = './logs'
+_datefmt = '%Y-%m-%d %H:%M:%S'
+_formatter = '%(asctime)s 文件名[%(filename)s] 函数名[%(funcName)s] 行数[%(lineno)d] [%(levelname)s]---%(message)s'
 
 
-def setup(log_dir="./logs", level=logging.INFO):
+class Logger:
     """
-    初始化简单日志系统：
-      • 终端 + 文件双输出
-      • 自动创建目录
-      • 默认 INFO 级别，可改 DEBUG/ERROR 等
-      # # ---- 方式 A：显式用 log() --------------------------------------------------
-      # log("服务启动 OK")
-      # log("调试变量:", {"x": 10}, level="debug")
-      # log("发生异常!", level="error")
-      #
-      # # ---- 方式 B：一键把所有 print 劫持成日志 ------------------------------------
-      # hijack_print()
-      # print("这行其实写进日志了")
-      # print("支持", "多个参数", 123)
+    logger 日志记录
     """
-    Path(log_dir).mkdir(parents=True, exist_ok=True)
 
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname).1s] %(filename)s:%(lineno)d | %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler(os.path.join(log_dir, "app.log"),
-                                encoding="utf-8"),
-        ],
-    )
+    def __init__(self, log_name: str, level: str):
+        os.makedirs(_home_dir, exist_ok=True)
+        self.logger = logging.getLogger(log_name)
+        self.logger.setLevel(_nameToLevel[level])
+        self.logger.addHandler(self.get_time_handler(log_name))
+        self.logger.addHandler(self.get_stream_handler())
+
+    @staticmethod
+    def get_time_handler(log_name: str):
+        """ 日志处理器 日志切割轮转按天切割 """
+        time_handler = TimedRotatingFileHandler(
+            f'{_home_dir}/{log_name}.log',
+            when='D',
+            backupCount=7,
+            encoding="utf-8"
+        )
+        time_format = logging.Formatter(_formatter, datefmt=_datefmt)
+        time_handler.setFormatter(time_format)
+        return time_handler
+
+    @staticmethod
+    def get_stream_handler():
+        """ 控制台输出处理器 """
+        console_handler = logging.StreamHandler()
+        console_formatter = logging.Formatter(_formatter, datefmt=_datefmt)
+        console_handler.setFormatter(console_formatter)
+        return console_handler
 
 
-def log(*objects,
-        sep=" ",
-        end="\n",
-        level="info",
-        stacklevel=1):
-    """
-    像 print 一样使用：
-        log("hello", 123)
-        log("warn msg", level="warning")
-    """
-    msg = sep.join(map(str, objects)) + end.rstrip("\n")
-    # 取调用方(原 print 所在行) 的堆栈位置
-    getattr(logging, level.lower(), logging.info)(
-        msg,
-        stacklevel=stacklevel + 1  # 向上再跳一层
-    )
-
-
-def hijack_print():
-    """把内置 print 替换成 log，调用处不用改任何代码"""
-    import builtins
-    builtins.print = lambda *a, **kw: log(*a, **kw, stacklevel=2)
+# 解析器日志
+parser_logger = Logger('parser', 'DEBUG').logger
+# 选择器日志
+selector_logger = Logger('selector', 'DEBUG').logger
+# 管理部分日志
+manage_logger = Logger('manage', 'DEBUG').logger

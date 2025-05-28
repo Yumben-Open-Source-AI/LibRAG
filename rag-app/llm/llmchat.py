@@ -1,8 +1,9 @@
 import os
-from typing import Any, Sequence, Dict, List, Union
+from typing import Any, List, Union
 
 from llama_index.core.base.llms.types import ChatResponse, ChatMessage
-from llama_index.llms.openai_like import OpenAILike #https://docs.llamaindex.ai/en/stable/api_reference/llms/openai_like/
+from llama_index.llms.openai_like import OpenAILike
+
 from tools.decorator import concurrent_decorator
 
 
@@ -52,7 +53,6 @@ class LlmChat(OpenAILike):
                     raise ValueError("Invalid code block format")
             result = ast.literal_eval(response_content.strip())
         except Exception as e:
-            print(response_content)
             import re
             json_match = re.findall(r'(\[.*?\]|\{.*?\})', response_content, re.DOTALL)
             if len(json_match) != 1:

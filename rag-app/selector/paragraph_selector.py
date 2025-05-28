@@ -9,6 +9,7 @@ from sqlmodel import select
 from selector.base import BaseSelector
 from tools.prompt_load import TextFileReader
 from web_server.ai.models import Paragraph, Document
+from tools.log_tools import selector_logger as logger
 
 # system action
 PARAGRAPH_SYSTEM_MESSAGES = [
@@ -70,12 +71,15 @@ class ParagraphSelector(BaseSelector):
         paragraph_system_messages[0]['content'] = template.substitute(
             now=now
         )
+        logger.debug(f'段落选择器 system prompt:{paragraph_system_messages}')
+
         paragraph_user_messages = copy.deepcopy(PARAGRAPH_USER_MESSAGES)
         template = Template(paragraph_user_messages[0]['content'])
         paragraph_user_messages[0]['content'] = template.substitute(
             input_text=question,
             paragraphs=self.select_params
         )
+        logger.debug(f'段落选择器 user prompt:{paragraph_user_messages}')
         response_chat = llm.chat(paragraph_system_messages + PARAGRAPH_FEW_SHOT_MESSAGES + paragraph_user_messages, count=10)
         self.selected_paragraphs = set(response_chat)
 
