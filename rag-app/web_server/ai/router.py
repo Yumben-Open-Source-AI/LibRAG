@@ -42,7 +42,7 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
 
     target_paragraphs = ParagraphSelector(params).collate_select_params(
         selected_documents).start_select().collate_select_result()
-    selector_logger.info(f'{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
+    selector_logger.info(f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
     recall_content = [par['content'] for par in target_paragraphs]
     if not recall_content:
         return []
@@ -77,7 +77,7 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     await asyncio.gather(*(score_one(i, txt) for i, txt in enumerate(recall_content)))
 
     target_paragraphs.sort(key=lambda x: x["total_score"], reverse=True)
-
+    selector_logger.info(f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
     return target_paragraphs
 
 

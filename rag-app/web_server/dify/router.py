@@ -17,7 +17,6 @@ router = APIRouter(tags=['dify'], prefix='/dify')
 
 VALID_API_KEYS = {str(os.getenv('VALID_API_KEYS', default=""))}
 
-print(VALID_API_KEYS)
 
 async def verify_api_key(
         authorization: str = Header(..., alias="Authorization")
@@ -165,7 +164,6 @@ async def inner_recall(kb_id: int, question: str, session: SessionDep) -> List[D
     调用你的 query_with_llm，并把 total_score 归一化到 0~1
     """
     raw = await query_with_llm(kb_id=kb_id, session=session, question=question)
-    print(raw)
     if not raw:
         return []
 
