@@ -1,6 +1,8 @@
+import asyncio
 import json
 import os.path
 import uuid
+from functools import partial
 from typing import Annotated, List
 
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends, File, UploadFile, Form
@@ -18,6 +20,7 @@ from selector.paragraph_selector import ParagraphSelector
 from tools.result_scoring import ResultScoringParser
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink
 from web_server.ai.views import loading_data
+from decimal import Decimal
 
 router = APIRouter(tags=['ai'], prefix='/ai')
 
@@ -45,15 +48,35 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
         return []
 
     scorer_agent = ResultScoringParser(llm_chat)
-    # 遍历每个段落，单独打分
-    for i, par_text in enumerate(recall_content):
-        # 逐段调用评分器
-        score = scorer_agent.rate(question, par_text)
-        # 保存结构化评分结果到目标段落中
-        target_paragraphs[i]['context_relevance'] = float(score.get("context_relevance", 0.0))
-        target_paragraphs[i]['context_sufficiency'] = float(score.get("context_sufficiency", 0.0))
-        target_paragraphs[i]['context_clarity'] = float(score.get("context_clarity", 0.0))
-        target_paragraphs[i]['diagnosis'] = score.get("diagnosis", "")
+    sem = asyncio.Semaphore(8)
+    loop = asyncio.get_running_loop()
+
+    async def score_one(idx: int, par_text: str):
+        async with sem:
+            # ★ 把同步 rate 放到线程池 ★
+            score = await loop.run_in_executor(
+                None,  # None = 默认 ThreadPoolExecutor
+                partial(scorer_agent.rate, question, par_text)
+            )
+
+        # ----- 精度处理 -----
+        rel = Decimal(str(score.get("context_relevance", 0)))
+        suf = Decimal(str(score.get("context_sufficiency", 0)))
+        clr = Decimal(str(score.get("context_clarity", 0)))
+        total = (rel + suf + clr)
+
+        target_paragraphs[idx].update(
+            context_relevance=float(rel),
+            context_sufficiency=float(suf),
+            context_clarity=float(clr),
+            total_score=float(total),
+            diagnosis=score.get("diagnosis", ""),
+        )
+
+    # 并发跑完所有评分任务
+    await asyncio.gather(*(score_one(i, txt) for i, txt in enumerate(recall_content)))
+
+    target_paragraphs.sort(key=lambda x: x["total_score"], reverse=True)
 
     return target_paragraphs
 

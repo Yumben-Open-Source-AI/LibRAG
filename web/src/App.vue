@@ -131,6 +131,7 @@
           <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性"/>
           <el-table-column prop="context_sufficiency" align="center" width="120" label="上下文充分性"/>
           <el-table-column prop="context_clarity" align="center" width="100" label="语境清晰性"/>
+           <el-table-column prop="total_score" align="center" width="100" label="汇总得分"/>
           <el-table-column prop="diagnosis" width="100" label="诊断信息"/>
         </el-table>
       </el-tab-pane>
@@ -512,6 +513,7 @@ async function doRecall() {
     context_relevance: par.context_relevance,
     context_sufficiency: par.context_sufficiency,
     context_clarity: par.context_clarity,
+    total_score:par.total_score,
     diagnosis: par.diagnosis
   }))
 }
