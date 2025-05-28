@@ -121,8 +121,6 @@
               <el-button @click="resetRecall" round>重置查询</el-button>
             </el-col>
           </el-row>
-
-
         </div>
 
         <el-table :data="recallTableData" border height="650">
@@ -130,10 +128,10 @@
           <el-table-column prop="summary" label="段落摘要"/>
           <el-table-column prop="content" label="段落内容"/>
           <el-table-column prop="parent_description" label="来源描述"/>
-          <el-table-column prop="context_relevance" label="语境相关性"/>
-          <el-table-column prop="context_sufficiency" label="上下文充分性"/>
-          <el-table-column prop="context_clarity" label="语境清晰性"/>
-          <el-table-column prop="diagnosis" label="诊断信息"/>
+          <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性"/>
+          <el-table-column prop="context_sufficiency" align="center" width="120" label="上下文充分性"/>
+          <el-table-column prop="context_clarity" align="center" width="100" label="语境清晰性"/>
+          <el-table-column prop="diagnosis" width="100" label="诊断信息"/>
         </el-table>
       </el-tab-pane>
     </el-tabs>
@@ -511,10 +509,10 @@ async function doRecall() {
     summary: par.summary,
     content: par.content,
     parent_description: par.parent_description,
-    context_relevance:par.context_relevance,
-    context_sufficiency:par.context_sufficiency,
-    context_clarity:par.context_clarity,
-    diagnosis:par.diagnosis
+    context_relevance: par.context_relevance,
+    context_sufficiency: par.context_sufficiency,
+    context_clarity: par.context_clarity,
+    diagnosis: par.diagnosis
   }))
 }
 
