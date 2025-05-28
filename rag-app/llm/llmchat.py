@@ -2,8 +2,7 @@ import os
 from typing import Any, Sequence, Dict, List, Union
 
 from llama_index.core.base.llms.types import ChatResponse, ChatMessage
-from llama_index.llms.openai_like import OpenAILike
-
+from llama_index.llms.openai_like import OpenAILike #https://docs.llamaindex.ai/en/stable/api_reference/llms/openai_like/
 from tools.decorator import concurrent_decorator
 
 
@@ -15,6 +14,7 @@ class LlmChat(OpenAILike):
         kwargs['api_key'] = os.getenv('OPENAI_API_KEY')
         kwargs['context_window'] = 128000
         kwargs['max_tokens'] = 8192
+        kwargs['temperature'] = 0.7
         kwargs['is_chat_model'] = True
         kwargs['is_function_calling_model'] = False
         kwargs['max_retries'] = 3

@@ -18,9 +18,9 @@
           <el-aside width="25%" class="left-panel">
             <el-card shadow="hover">
               <template #header>
-                <div class="card-header" >
+                <div class="card-header">
                   <span style="font-size: 15px;">知识库列表</span>
-                  <el-button style="float: right;"  @click="openCreateDialog"  round>创建知识库</el-button>
+                  <el-button style="float: right;" @click="openCreateDialog" round>创建知识库</el-button>
                 </div>
               </template>
 
@@ -42,8 +42,8 @@
 
                   <p class="kb-desc">{{ kb.kb_description }}</p>
 
-                  <template #footer >
-                    <div class="flex flex-col gap-2" >
+                  <template #footer>
+                    <div class="flex flex-col gap-2">
                       <el-button type="primary" size="small" :disabled="kb !== selectedKB"
                                  @click.stop="openAppendDialog" round>追加新文件
                       </el-button>
@@ -75,13 +75,22 @@
                 <el-card v-for="doc in fileTableData" :key="doc.document_id" class="mb-4" shadow="always">
                   <el-descriptions :title="doc['文档名称']" :column="3" size="small" border>
                     <template #extra>
-                      <el-button type="info" size="small" @click="handleDocRowClick(null, doc)" round>查看段落</el-button>
-                      <el-button type="danger" size="small" style="margin-left:4px;" @click="openDeleteDocDialog(null, doc)" round>删除文档</el-button>
+                      <el-button type="info" size="small" @click="handleDocRowClick(null, doc)" round>查看段落
+                      </el-button>
+                      <el-button type="danger" size="small" style="margin-left:4px;"
+                                 @click="openDeleteDocDialog(null, doc)" round>删除文档
+                      </el-button>
                     </template>
-                    <el-descriptions-item width="70px" label="文档描述" :span="3">{{ doc['文档描述'] }}</el-descriptions-item>
+                    <el-descriptions-item width="70px" label="文档描述" :span="3">{{
+                        doc['文档描述']
+                      }}
+                    </el-descriptions-item>
                     <el-descriptions-item label="文档ID">{{ doc.document_id }}</el-descriptions-item>
                     <el-descriptions-item label="切割策略">{{ doc['切割策略'] }}</el-descriptions-item>
-                    <el-descriptions-item label="更新时间">{{ doc.meta_data?.['最后更新时间'] || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="更新时间">{{
+                        doc.meta_data?.['最后更新时间'] || '-'
+                      }}
+                    </el-descriptions-item>
 
                   </el-descriptions>
                 </el-card>
@@ -121,6 +130,10 @@
           <el-table-column prop="summary" label="段落摘要"/>
           <el-table-column prop="content" label="段落内容"/>
           <el-table-column prop="parent_description" label="来源描述"/>
+          <el-table-column prop="context_relevance" label="语境相关性"/>
+          <el-table-column prop="context_sufficiency" label="上下文充分性"/>
+          <el-table-column prop="context_clarity" label="语境清晰性"/>
+          <el-table-column prop="diagnosis" label="诊断信息"/>
         </el-table>
       </el-tab-pane>
     </el-tabs>
@@ -497,7 +510,11 @@ async function doRecall() {
     paragraph_id: par.paragraph_id,
     summary: par.summary,
     content: par.content,
-    parent_description: par.parent_description
+    parent_description: par.parent_description,
+    context_relevance:par.context_relevance,
+    context_sufficiency:par.context_sufficiency,
+    context_clarity:par.context_clarity,
+    diagnosis:par.diagnosis
   }))
 }
 

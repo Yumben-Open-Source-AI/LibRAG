@@ -1,0 +1,4 @@
+【用户问题】
+{$UserQuestion}
+【检索上下文】
+{$SearchContext}

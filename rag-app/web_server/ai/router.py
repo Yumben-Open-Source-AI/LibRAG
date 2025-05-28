@@ -15,6 +15,7 @@ from selector.class_selector import CategorySelector
 from selector.document_selector import DocumentSelector
 from selector.domain_selector import DomainSelector
 from selector.paragraph_selector import ParagraphSelector
+from tools.result_scoring import ResultScoringParser
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink
 from web_server.ai.views import loading_data
 
@@ -23,10 +24,8 @@ router = APIRouter(tags=['ai'], prefix='/ai')
 
 @router.get('/recall')
 async def query_with_llm(kb_id: int, session: SessionDep, question: str):
-    from rank_bm25 import BM25Okapi
-    import numpy as np
-
-    params = SelectorParam(LlmChat(), kb_id, session, question)
+    llm_chat = LlmChat()
+    params = SelectorParam(llm_chat, kb_id, session, question)
     selected_domains = DomainSelector(params).collate_select_params().start_select()
     print(selected_domains)
     selected_categories = CategorySelector(params).collate_select_params(selected_domains).start_select()
@@ -44,14 +43,18 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     recall_content = [par['content'] for par in target_paragraphs]
     if not recall_content:
         return []
-    # # BM25进行段落召回评分
-    # tokenized_paragraphs = [list(jieba.cut(par)) for par in recall_content]
-    # tokenized_question = list(jieba.cut(question))
-    # bm25 = BM25Okapi(tokenized_paragraphs, k1=1.5, b=0.6)
-    # par_scores = bm25.get_scores(tokenized_question)
-    # exp_scores = [np.exp(s) for s in par_scores]
-    # for i, score in enumerate(exp_scores):
-    #     target_paragraphs[i]['score'] = score
+
+    scorer_agent = ResultScoringParser(llm_chat)
+    # 遍历每个段落，单独打分
+    for i, par_text in enumerate(recall_content):
+        # 逐段调用评分器
+        score = scorer_agent.rate(question, par_text)
+        # 保存结构化评分结果到目标段落中
+        target_paragraphs[i]['context_relevance'] = float(score.get("context_relevance", 0.0))
+        target_paragraphs[i]['context_sufficiency'] = float(score.get("context_sufficiency", 0.0))
+        target_paragraphs[i]['context_clarity'] = float(score.get("context_clarity", 0.0))
+        target_paragraphs[i]['diagnosis'] = score.get("diagnosis", "")
+
     return target_paragraphs
 
 
@@ -91,7 +94,7 @@ async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
 
 @router.patch('/index/{kb_id}')
 async def update_kb_index(kb_id: int, session: SessionDep):
-    qwen = Qwen()
+    llm_chat = LlmChat()
     try:
         # 重建索引过程不能影响查询
         db_categories = session.query(Category).filter_by(kb_id=kb_id).all()
@@ -104,10 +107,10 @@ async def update_kb_index(kb_id: int, session: SessionDep):
         statement = select(Document).where(Document.kb_id == kb_id)
         db_documents = session.exec(statement)
         for doc in db_documents:
-            doc_parser = DocumentParser(qwen, kb_id, session)
+            doc_parser = DocumentParser(llm_chat, kb_id, session)
             doc_parser.document = doc
-            cat_parser = CategoryParser(qwen, kb_id, session)
-            domain_parser = DomainParser(qwen, kb_id, session)
+            cat_parser = CategoryParser(llm_chat, kb_id, session)
+            domain_parser = DomainParser(llm_chat, kb_id, session)
 
             new_category = cat_parser.parse(**{
                 'document': doc,
