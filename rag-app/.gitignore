@@ -1,6 +1,13 @@
+# Editor
 .idea
+*.pyc
+
 files
 *.jpg
 .env
-web_server/librag.db
-*.pyc
+
+# DB
+librag.db
+
+# Logs
+*.log
