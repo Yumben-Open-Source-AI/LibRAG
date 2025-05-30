@@ -7,7 +7,7 @@ files
 .env
 
 # DB
-librag.db
+librag.db*
 
 # Logs
 *.log

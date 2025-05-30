@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlmodel import Session, SQLModel
 
 sqlite_file_name = "librag.db"
@@ -14,6 +14,16 @@ engine = create_engine(
     pool_size=30,
     pool_timeout=30,
 )
+
+
+@event.listens_for(engine, 'connect')
+def sqlite_connect(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute('PRAGMA journal_mode=WAL')
+        cursor.execute('PRAGMA wal_autocheckpoint=100')
+    finally:
+        cursor.close()
 
 
 def get_session():
