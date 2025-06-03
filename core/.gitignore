@@ -10,4 +10,4 @@ files
 librag.db*
 
 # Logs
-*.log
+*.log*
