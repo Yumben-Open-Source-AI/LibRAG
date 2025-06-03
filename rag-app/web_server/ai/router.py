@@ -43,7 +43,7 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     target_paragraphs = ParagraphSelector(params).collate_select_params(
         selected_documents).start_select().collate_select_result()
     selector_logger.info(f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
-    recall_content = [par['content'] for par in target_paragraphs]
+    recall_content = [par['parent_description']+par['content'] for par in target_paragraphs]
     if not recall_content:
         return []
 

@@ -3,6 +3,7 @@ from string import Template
 from llm.llmchat import LlmChat
 from parser.base import BaseParser
 from tools.prompt_load import TextFileReader
+from tools.log_tools import selector_logger as logger
 
 # 全局加载提示词模板
 RESULT_SCORING_MESSAGES = [
@@ -37,6 +38,7 @@ class ResultScoringParser():
             UserQuestion=user_question,
             SearchContext=search_context
         )
+        logger.debug(f'召回打分评估 system prompt:{result_scoring_messages}')
         # 调用 LLM 聊天接口
         response = self.llm.chat(result_scoring_messages)
 
