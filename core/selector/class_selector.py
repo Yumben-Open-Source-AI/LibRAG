@@ -1,5 +1,5 @@
 """
-@Project ：rag-app 
+@Project ：LibRAG
 @File    ：class_selector.py
 @IDE     ：PyCharm 
 @Author  ：XMAN
