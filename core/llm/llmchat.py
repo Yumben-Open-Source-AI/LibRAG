@@ -4,8 +4,6 @@ from typing import Any, List, Union
 from llama_index.core.base.llms.types import ChatResponse, ChatMessage
 from llama_index.llms.openai_like import OpenAILike
 
-from tools.decorator import concurrent_decorator
-
 
 class LlmChat(OpenAILike):
 
@@ -61,7 +59,6 @@ class LlmChat(OpenAILike):
 
         return result
 
-    @concurrent_decorator
     def chat(self, messages: List[Union[str, dict]], count: int = 0, **kwargs: Any) -> ChatResponse:
         processed_messages = []
         for i, msg in enumerate(messages):

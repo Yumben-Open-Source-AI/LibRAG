@@ -1,13 +1,15 @@
+import os.path
 from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy import create_engine, event
 from sqlmodel import Session, SQLModel
 
-sqlite_file_name = "librag.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}?charset=utf8"
+sqlite_name = 'librag.db'
+sqlite_path = os.path.join(os.path.dirname(__file__), sqlite_name)
+sqlite_url = f"sqlite:///{sqlite_path}?charset=utf8"
 
-connect_args = {"check_same_thread": False}
+connect_args = {'check_same_thread': False}
 engine = create_engine(
     sqlite_url,
     connect_args=connect_args,

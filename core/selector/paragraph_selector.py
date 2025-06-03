@@ -81,7 +81,7 @@ class ParagraphSelector(BaseSelector):
         )
         logger.debug(f'段落选择器 user prompt:{paragraph_user_messages}')
         response_chat = llm.chat(paragraph_system_messages + PARAGRAPH_FEW_SHOT_MESSAGES + paragraph_user_messages, count=10)
-        self.selected_paragraphs = set(response_chat)
+        self.selected_paragraphs = set(response_chat['selected_paragraphs'])
 
         return self
 
