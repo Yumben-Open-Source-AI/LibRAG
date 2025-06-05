@@ -2,26 +2,28 @@ import asyncio
 import json
 import os.path
 import uuid
+from decimal import Decimal
 from functools import partial
-from typing import Annotated, List, Dict
+from typing import Annotated, List
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, File, UploadFile, Form
 from sqlmodel import select
-from db.database import SessionDep, get_engine
+
+from db.database import SessionDep
 from llm.llmchat import LlmChat
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
+from parser.parser_worker import create_new_process
 from selector.base import SelectorParam
 from selector.class_selector import CategorySelector
 from selector.document_selector import DocumentSelector
 from selector.domain_selector import DomainSelector
 from selector.paragraph_selector import ParagraphSelector
-from tools.result_scoring import ResultScoringParser
 from tools.log_tools import selector_logger, parser_logger
-from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink
-from web_server.ai.views import loading_data
-from decimal import Decimal
+from tools.result_scoring import ResultScoringParser
+from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink, \
+    ProcessingTask
 
 router = APIRouter(tags=['ai'], prefix='/ai')
 
@@ -42,8 +44,9 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
 
     target_paragraphs = ParagraphSelector(params).collate_select_params(
         selected_documents).start_select().collate_select_result()
-    selector_logger.info(f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
-    recall_content = [par['parent_description']+par['content'] for par in target_paragraphs]
+    selector_logger.info(
+        f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
+    recall_content = [par['parent_description'] + par['content'] for par in target_paragraphs]
     if not recall_content:
         return []
 
@@ -77,7 +80,8 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
     await asyncio.gather(*(score_one(i, txt) for i, txt in enumerate(recall_content)))
 
     target_paragraphs.sort(key=lambda x: x["total_score"], reverse=True)
-    selector_logger.info(f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
+    selector_logger.info(
+        f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
     return target_paragraphs
 
 
@@ -169,21 +173,33 @@ async def update_kb_index(kb_id: int, session: SessionDep):
 
 @router.post('/upload')
 async def upload_file(
+        session: SessionDep,
         background_tasks: BackgroundTasks,
         items: str = Form(...),
-        files: List[UploadFile] = File(...),
-        engine=Depends(get_engine)
+        files: List[UploadFile] = File(...)
 ):
-    items = json.loads(items)
-    base_dir = os.path.abspath('./files')
-    os.makedirs(base_dir, exist_ok=True)
-    for i, file in enumerate(files):
-        content = await file.read()
-        file_path = os.path.join(base_dir, file.filename)
-        with open(file_path, 'wb') as f:
-            f.write(content)
-        items[i]['file_path'] = file_path
-    background_tasks.add_task(loading_data, items, engine)
+    try:
+        items = json.loads(items)
+        base_dir = os.path.abspath('./files')
+        os.makedirs(base_dir, exist_ok=True)
+        for i, file in enumerate(files):
+            content = await file.read()
+            file_path = os.path.join(base_dir, file.filename)
+            with open(file_path, 'wb') as f:
+                f.write(content)
+            items[i]['file_path'] = file_path
+            task = ProcessingTask(**{
+                'status': 'pending',
+                'file_path': file_path,
+                'kb_id': items[i]['kb_id'],
+                'parse_strategy': items[i]['policy_type']
+            })
+            session.add(task)
+            session.commit()
+    except Exception as e:
+        session.rollback()
+        parser_logger.error(f'{e}', exc_info=True)
+
     return {'message': '知识库文件加载任务后台处理中'}
 
 
@@ -193,6 +209,7 @@ async def create_knowledge_bases(kb: KbBase, session: SessionDep):
     session.add(db_kb)
     session.commit()
     session.refresh(db_kb)
+    create_new_process(db_kb.kb_id)
     return db_kb
 
 

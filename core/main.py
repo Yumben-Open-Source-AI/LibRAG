@@ -4,6 +4,8 @@ from fastapi import FastAPI, Request
 from dotenv import load_dotenv
 from db.database import create_db_and_tables
 from fastapi.middleware.cors import CORSMiddleware
+
+from parser.parser_worker import worker_loop, init_process
 from web_server.ai.router import router as ai_router
 from web_server.dify.router import router as dify_router
 from tools.log_tools import manage_logger as logger
@@ -49,7 +51,10 @@ async def log_request(request: Request, call_next):
 
 @app.on_event("startup")
 def on_startup():
+    # 初始化数据库
     create_db_and_tables()
+    # 启动预处理进程
+    init_process()
 
 
 if __name__ == '__main__':

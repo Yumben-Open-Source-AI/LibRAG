@@ -5,8 +5,8 @@
 @Author  ：XMAN
 @Date    ：2025/4/25 上午10:21 
 """
-import json
 import uuid
+from datetime import datetime
 from sqlmodel import Field, SQLModel, JSON, Relationship
 from sqlalchemy import Column, TEXT
 
@@ -28,6 +28,7 @@ class KnowledgeBase(KbBase, table=True):
     categories: list['Category'] = Relationship(back_populates='know_base')
     documents: list['Document'] = Relationship(back_populates='know_base')
     paragraphs: list['Paragraph'] = Relationship(back_populates='know_base')
+    processing_tasks: list['ProcessingTask'] = Relationship(back_populates='know_base')
 
 
 class Domain(SQLModel, table=True):
@@ -100,3 +101,18 @@ class Paragraph(SQLModel, table=True):
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
                               sa_column_kwargs={'comment': '知识库id'})
     know_base: KnowledgeBase = Relationship(back_populates='paragraphs')
+
+
+class ProcessingTask(SQLModel, table=True):
+    __tablename__ = 'processing_task'
+
+    task_id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    file_path: str = Field(default='', sa_column_kwargs={'comment': '文档路径'})
+    parse_strategy: str = Field(default='', sa_column_kwargs={'comment': '解析文档策略'})
+    status: str = Field(default='pending')  # pending, processing, succeed, failed
+    created_at: datetime = Field(default=datetime.now())
+    started_at: datetime | None = Field(nullable=True)
+    completed_at: datetime | None = Field(nullable=True)
+    kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
+                              sa_column_kwargs={'comment': '知识库id'})
+    know_base: KnowledgeBase = Relationship(back_populates='processing_tasks')
