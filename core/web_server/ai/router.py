@@ -174,7 +174,6 @@ async def update_kb_index(kb_id: int, session: SessionDep):
 @router.post('/upload')
 async def upload_file(
         session: SessionDep,
-        background_tasks: BackgroundTasks,
         items: str = Form(...),
         files: List[UploadFile] = File(...)
 ):
