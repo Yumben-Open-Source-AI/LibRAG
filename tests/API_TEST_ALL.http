@@ -1,0 +1,150 @@
+###
+#############################################
+# 环境变量
+#############################################
+@host = http://localhost:13113
+
+### ---------------------------------------------------------------------------
+### 1. 创建知识库 – POST /ai/knowledge_bases
+### ---------------------------------------------------------------------------
+POST {{host}}/ai/knowledge_bases
+Content-Type: application/json
+
+{
+  "kb_name": "Demo 知识库",
+  "kb_description": "接口联调演示库",
+  "keywords": "demo,api,pytest"
+}
+
+> {% client.global.set("kb_id", response.body.kb_id); %}
+
+### ---------------------------------------------------------------------------
+### 2. 获取全部知识库 – GET /ai/knowledge_bases
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/knowledge_bases
+
+### ---------------------------------------------------------------------------
+### 3. 更新知识库备注 – PATCH /ai/knowledge_base/{kb_id}
+### ---------------------------------------------------------------------------
+PATCH {{host}}/ai/knowledge_base/{{kb_id}}
+Content-Type: application/json
+
+{
+  "kb_description": "（已修改）接口测试库"
+}
+
+### ---------------------------------------------------------------------------
+### 4. 查询单个知识库详情 – GET /ai/knowledge_base/{kb_id}
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/knowledge_base/{{kb_id}}
+
+### ---------------------------------------------------------------------------
+### 5. 上传文档并后台解析 – POST /ai/upload
+###    * items 是 JSON 字符串
+###    * files 支持多个；这里演示单文件 sample.pdf
+###   '按页切割': 'page_split',
+###   '按目录切割': 'catalog_split',
+###   '智能上下文切割': 'automate_judgment_split',
+###   '智能语义分块切割': 'agentic_chunking'
+### ---------------------------------------------------------------------------
+POST {{host}}/ai/upload
+Content-Type: multipart/form-data; boundary=BOUNDARY123
+
+--BOUNDARY123
+Content-Disposition: form-data; name="items"
+Content-Type: application/json
+
+[{"kb_id": {{kb_id}}, "policy_type": "page_split"}]
+
+--BOUNDARY123
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./sample.pdf
+--BOUNDARY123--
+### ---------------------------------------------------------------------------
+POST {{host}}/ai/upload
+Content-Type: multipart/form-data; boundary=BOUNDARY123
+
+--BOUNDARY123
+Content-Disposition: form-data; name="items"
+Content-Type: application/json
+
+[{"kb_id": {{kb_id}}, "policy_type": "catalog_split"}]
+
+--BOUNDARY123
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./sample.pdf
+--BOUNDARY123--
+### ---------------------------------------------------------------------------
+POST {{host}}/ai/upload
+Content-Type: multipart/form-data; boundary=BOUNDARY123
+
+--BOUNDARY123
+Content-Disposition: form-data; name="items"
+Content-Type: application/json
+
+[{"kb_id": {{kb_id}}, "policy_type": "automate_judgment_split"}]
+
+--BOUNDARY123
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./sample.pdf
+--BOUNDARY123--
+### ---------------------------------------------------------------------------
+POST {{host}}/ai/upload
+Content-Type: multipart/form-data; boundary=BOUNDARY123
+
+--BOUNDARY123
+Content-Disposition: form-data; name="items"
+Content-Type: application/json
+
+[{"kb_id": {{kb_id}}, "policy_type": "agentic_chunking"}]
+
+--BOUNDARY123
+Content-Disposition: form-data; name="files"; filename="sample.pdf"
+Content-Type: application/pdf
+
+< ./sample.pdf
+--BOUNDARY123--
+
+### ---------------------------------------------------------------------------
+### 6. 召回流程验证 – GET /ai/recall
+###    * 待文档解析完后再执行，可换成自己的 question
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/recall?kb_id={{kb_id}}&question=超值理财宝产品编号是多少？
+
+### ---------------------------------------------------------------------------
+### 7. 查看各层元数据 – GET /ai/meta_data/{kb_id}/{meta_type}
+###    meta_type ∈ paragraph | document | category | domain
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/meta_data/{{kb_id}}/domain
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/meta_data/{{kb_id}}/category
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/meta_data/{{kb_id}}/document
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/meta_data/{{kb_id}}/paragraph
+
+### ---------------------------------------------------------------------------
+### 8. 传入文档ID查询该文档内段落列表
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/paragraphs/f4141992-5488-4d92-8ba9-d2aa243c778e
+
+### ---------------------------------------------------------------------------
+### 9. 重建索引 – PATCH /ai/index/{kb_id}
+### ---------------------------------------------------------------------------
+PATCH {{host}}/ai/index/{{kb_id}}
+
+### ---------------------------------------------------------------------------
+### 10. 删除知识库 – DELETE /ai/knowledge_base/{kb_id}
+### ---------------------------------------------------------------------------
+DELETE {{host}}/ai/knowledge_base/{{kb_id}}
+
+### ---------------------------------------------------------------------------
+### 11. 再次列出知识库 – 确认已删除
+### ---------------------------------------------------------------------------
+GET {{host}}/ai/knowledge_bases
