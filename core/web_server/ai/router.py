@@ -14,7 +14,6 @@ from llm.llmchat import LlmChat
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
-from parser.parser_worker import create_new_process
 from selector.base import SelectorParam
 from selector.class_selector import CategorySelector
 from selector.document_selector import DocumentSelector
@@ -208,7 +207,6 @@ async def create_knowledge_bases(kb: KbBase, session: SessionDep):
     session.add(db_kb)
     session.commit()
     session.refresh(db_kb)
-    create_new_process(db_kb.kb_id)
     return db_kb
 
 

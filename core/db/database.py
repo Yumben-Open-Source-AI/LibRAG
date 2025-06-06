@@ -13,8 +13,11 @@ connect_args = {'check_same_thread': False}
 engine = create_engine(
     sqlite_url,
     connect_args=connect_args,
-    pool_size=30,
-    pool_timeout=30,
+    pool_size=30,  # 进程池大小
+    max_overflow=20,  # 额外连接数
+    pool_timeout=30,  # 等待连接超时时间
+    pool_recycle=300,  # 5分钟回收连接避免超时
+    pool_pre_ping=True,  # 执行前检查连接活性
 )
 
 
