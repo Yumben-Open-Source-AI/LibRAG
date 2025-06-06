@@ -75,7 +75,7 @@ def worker_loop(pending_task):
         category_parser.storage_parser_data(domain)
         domain_parser.storage_parser_data(None)
         pending_task.status = 'succeed'
-        pending_task.started_at = datetime.datetime.now()
+        pending_task.completed_at = datetime.datetime.now()
         session.add(pending_task)
         session.commit()
         logger.info(f'文件:{file_name} 处理完毕 耗时:{datetime.datetime.now() - start_time}')
