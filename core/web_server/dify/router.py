@@ -265,7 +265,7 @@ async def dify_retrieval(
             # 生成 Record
             records.append(
                 Record(
-                    content=p.get("content", ""),
+                    content=p.get("content", "")+p.get("parent_description", ""),
                     score=score,
                     title=title,
                     metadata=meta,
