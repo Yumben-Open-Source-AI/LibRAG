@@ -1,6 +1,7 @@
 import os
 from typing import Any, List, Union
 
+from tools.log_tools import parser_logger as logger
 from llama_index.core.base.llms.types import ChatResponse, ChatMessage
 from llama_index.llms.openai_like import OpenAILike
 
@@ -61,13 +62,20 @@ class LlmChat(OpenAILike):
 
     def chat(self, messages: List[Union[str, dict]], count: int = 0, **kwargs: Any) -> ChatResponse:
         processed_messages = []
-        for i, msg in enumerate(messages):
-            if isinstance(msg, dict):
-                # 如果消息是字典，直接使用其role/content
-                processed_messages.append(ChatMessage(**msg))
-            else:
-                # 自动分配角色：偶数索引为system，奇数索引为user
-                role = "system" if i % 2 == 0 else "user"
-                processed_messages.append(ChatMessage(role=role, content=msg))
-        response = super().chat(processed_messages, **kwargs).message.content
-        return self.literal_eval(response)
+
+        retries = 0
+        while retries < 3:
+            try:
+                for i, msg in enumerate(messages):
+                    if isinstance(msg, dict):
+                        # 如果消息是字典，直接使用其role/content
+                        processed_messages.append(ChatMessage(**msg))
+                    else:
+                        # 自动分配角色：偶数索引为system，奇数索引为user
+                        role = "system" if i % 2 == 0 else "user"
+                        processed_messages.append(ChatMessage(role=role, content=msg))
+                response = super().chat(processed_messages, **kwargs).message.content
+                return self.literal_eval(response)
+            except Exception as e:
+                logger.error(e, exc_info=True)
+                retries += 1
