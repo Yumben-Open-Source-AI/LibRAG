@@ -84,6 +84,8 @@ def worker_loop(pending_task):
         session.add(pending_task)
         session.rollback()
         logger.error(f'task {pending_task} error: {e} sleep 10s', exc_info=True)
+    finally:
+        session.close()
 
 
 def err_call_back(err):
@@ -104,5 +106,6 @@ def init_process():
                 process_pool.apply_async(worker_loop, args=(pending_task,), error_callback=err_call_back)
         process_pool.close()
         process_pool.join()
+        session.close()
         # 完成所有数据库检查休眠
-        time.sleep(20)
+        time.sleep(60)
