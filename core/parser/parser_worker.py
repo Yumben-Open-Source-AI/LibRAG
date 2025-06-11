@@ -108,4 +108,4 @@ def init_process():
         process_pool.join()
         session.close()
         # 完成所有数据库检查休眠
-        time.sleep(10)
+        time.sleep(60)
