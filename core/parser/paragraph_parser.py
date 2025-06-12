@@ -316,7 +316,7 @@ class ParagraphParser(BaseParser):
         场景: 处理速度最慢，能够保持极致的上下文语义连贯
         """
         page_contents = ''.join(PDFLoader(file_path).load_file())
-
+        logger.debug(f'AGENTIC_CHUNKING切割前文本:{page_contents}')
         ps = FlexibleRecursiveSplitter(granularity="sentence", chunk_size=1024, overlap_units=2)
         organizer = ChunkOrganizer()
         chunks = []

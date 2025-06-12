@@ -7,36 +7,12 @@ WHITESPACE_RE = re.compile(r"[ \t\u3000\x0b\x0c\r]+")  # 半角/全角空格、T
 _SOFT_BREAK = re.compile(r'(?<![。！？!?])\n(?!\n)')
 _SENT_END = re.compile(r'[^。！？!?\.]*?(?:[。！？!?]|(?<!\d)\.(?!\d))')
 
-def unwrap_soft_break(text: str) -> str:
-    """把 PDF 强制换行合并成空格"""
-    return _SOFT_BREAK.sub(' ', text)
-
-def preprocess(text: str) -> str:
-    """一步到位的预处理：行尾、软换行、空白行"""
-    # 1) 统一行结束符
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    # 2) 合并 PDF 软换行
-    text = _SOFT_BREAK.sub(" ", text)
-    # 3) 压缩 ≥3 连续空行为两个
-    text = re.sub(r"(?:\n\s*){3,}", "\n\n", text)
-    # 4) 全角/半角空格、制表符等 → 普通空格
-    text = WHITESPACE_RE.sub(" ", text)
-    return text
-
-# 预处理：把所有 “看不见的空白” 压成普通换行
-def normalize_blanklines(text: str) -> str:
-    text = WHITESPACE_RE.sub(" ", text)  # 先统一成普通空格，保留行内空格
-    text = text.replace("\u2029", "\n")  # 段落分隔符
-    # 压缩 >=4 连续换行 → 两个换行
-    return re.sub(r"(?:\n\s*){4,}", "\n\n", text)
-
-
 # ========= 1) 原子切分器工厂 ========= #
 def char_split(text: str) -> List[str]:
     return list(text)
 
 def sentence_split(text: str) -> List[str]:
-    text = unwrap_soft_break(text)
+    text = _SOFT_BREAK.sub(' ', text)
     text = WHITESPACE_RE.sub(' ', text)
     sentences = [m.group(0).strip() for m in _SENT_END.finditer(text)]
     if not sentences:                       # 全文没句尾 → 整段返回
@@ -44,7 +20,6 @@ def sentence_split(text: str) -> List[str]:
     return sentences
 
 def paragraph_split(text: str) -> list[str]:
-    text = preprocess(text)
     # “一个或多个空行（可带列表符/缩进）” 视为段落分隔
     pieces = re.split(r"(?:\n[ \t\-\*\u2022]*\n)+", text, flags=re.MULTILINE)
     # 只保留真正含内容的段落
@@ -61,7 +36,7 @@ class FlexibleRecursiveSplitter:
     def __init__(
             self,
             granularity: str = "sentence",
-            chunk_size: int = 200,
+            chunk_size: int = 1024,
             overlap_units: int = 2,
             char_separators: List[str] | None = None,
     ):
@@ -186,6 +161,7 @@ if __name__ == "__main__":
 一、信息收集
 在遵循合法、正当、必要原则的前提下，您在办理理财业务签约、购买理财产品、办理定投等业务时，您授权贵阳农商银行处理您的如下信息：
 姓名、身份证号码、银行卡卡号、银行卡有效期、银行预留手机号等与业务办理相关的信息。
+
 二、信息使用
 为完整地向您提供服务以及保护各方的合法权益，您理解和同意贵阳农商银行可能会将您的信息用于如下用途：
 1.采取密码验证、短信验证码等手段以便于验证您的身份，确保完成理财产品交易。
@@ -194,14 +170,17 @@ if __name__ == "__main__":
 4.预防或阻止违法、违规的活动，如识别、打击洗钱等。
 5.为维护您的权益(例如预防或阻止非法或危及您人身、财产安全的活动)，或者为了解决服务提供方与您之间的争议。
 6.根据法律法规、政府机构、监管部门要求或其他经您另行明确同意的用途。
+
 三、信息提供
 贵阳农商银行承诺会根据法律法规及监管规定严格保护您的信息，不会在提供金融服务目的外向第三方披露您的信息，您同意贵阳农商银行可能会在下列情况下将必要的信息提供给第三方，该等第三方将会在贵阳农商银行官方网站上进行公示，您可以在贵阳农商银行官方网站上查询:
 1.当向您提供的金融服务需要由贵阳农商银行与第三方共同提供时。
 2.用于核实您的身份、处理与您相关的争议、或维护您和/或贵阳农商银行的合法权益的特定情况。
 3.向审计机构或审计监管机构提供审计所需的必要信息。
 4.根据法律法规、政府机构及其监管部门的要求提供。
+
 四、授权期限
 自您签署本授权书之日起，至贵阳农商银行与您的合同义务履行完毕之日止。超过本授权有效期的，为了后续异议或者纠纷处理的需要，从而保障贵阳农商银行及您的合法权益，您同意贵阳农商银行为实现本授权书声明的目的所必须的时限来确定个人信息保存期限，并在此期限内保留个人信息，在留存期限届满后，贵阳农商银行会删除您的信息或采取安全保护措施。法律、行政法规、政府规章、监管规范对投资者个人信息资料有更长保存期限要求的，遵守其规定。
+
 五、信息安全
 在使用您信息时，贵阳农商银行会采取必要措施保障信息安全，防止信息非法泄露或不当使用。贵阳农商银行超出本授权范围进行数据查询和使用的一切后果及法律责任由贵阳农商银行自行承担。
 六、权利告知
