@@ -8,7 +8,7 @@
 import datetime
 import os.path
 import time
-from multiprocessing import pool
+from concurrent.futures import ThreadPoolExecutor
 
 from sqlmodel import select
 
@@ -22,9 +22,8 @@ from tools.log_tools import parser_logger as logger
 from web_server.ai.models import KnowledgeBase, ProcessingTask
 
 
-def worker_loop(pending_task):
+def worker_loop(pending_task, session):
     """ 预处理主进程 """
-    session = next(get_session())
     try:
         kb_id = pending_task.kb_id
         file_path = pending_task.file_path
@@ -80,32 +79,32 @@ def worker_loop(pending_task):
         session.commit()
         logger.info(f'文件:{file_name} 处理完毕 耗时:{datetime.datetime.now() - start_time}')
     except Exception as e:
+        session.rollback()
         pending_task.status = 'failed'
         session.add(pending_task)
-        session.rollback()
+        session.commit()
         logger.error(f'task {pending_task} error: {e} sleep 10s', exc_info=True)
-    finally:
-        session.close()
 
 
-def err_call_back(err):
-    logger.error(f'error：{str(err)}', exc_info=True)
+def thread_call_back(task):
+    exception = task.exception(120)
+    if exception:
+        logger.error(exception)
 
 
 def init_process():
     while True:
-        process_pool = pool.Pool(processes=8)
         session = next(get_session())
-        knowledge_bases = session.exec(select(KnowledgeBase)).all()
-        for knowledge_base in knowledge_bases:
-            kb_id = knowledge_base.kb_id
-            pending_task = session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id,
-                                                                ProcessingTask.status == 'pending').first()
-            if pending_task:
-                # 执行任务
-                process_pool.apply_async(worker_loop, args=(pending_task,), error_callback=err_call_back)
-        process_pool.close()
-        process_pool.join()
+        with ThreadPoolExecutor(8) as executor:
+            knowledge_bases = session.exec(select(KnowledgeBase)).all()
+            for knowledge_base in knowledge_bases:
+                kb_id = knowledge_base.kb_id
+                pending_task = session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id,
+                                                                    ProcessingTask.status == 'pending').first()
+                if pending_task:
+                    # 执行任务
+                    thead = executor.submit(worker_loop, pending_task, session)
+                    thead.add_done_callback(thread_call_back)
         session.close()
         # 完成所有数据库检查休眠
         time.sleep(60)
