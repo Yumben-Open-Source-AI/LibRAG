@@ -11,6 +11,20 @@ from sqlmodel import Field, SQLModel, JSON, Relationship
 from sqlalchemy import Column, TEXT
 
 
+class User(SQLModel, table=True):
+    __tablename__ = 'user'
+
+    user_id: int = Field(primary_key=True)
+    email: str = Field(default='', sa_column_kwargs={'comment': '邮箱'})
+    user_name: str = Field(default='', sa_column_kwargs={'comment': '用户名'})
+    full_name: str = Field(default='', sa_column_kwargs={'comment': '用户全名'})
+    hashed_password: str = Field(default='', sa_column_kwargs={'comment': '密码'})
+    phone: str = Field(default='', sa_column_kwargs={'comment': '手机号'}, nullable=True)
+    disabled: bool = Field(default=False, nullable=True)
+    expire_time: datetime | None = Field(nullable=True)
+    know_bases: list['KnowledgeBase'] = Relationship(back_populates='user')
+
+
 class KbBase(SQLModel):
     """ knowledge_base base model """
     kb_name: str = Field(default='')
@@ -23,12 +37,16 @@ class KnowledgeBase(KbBase, table=True):
     __tablename__ = "knowledge_base"
 
     kb_id: int | None = Field(default=None, primary_key=True)
+    user_id: int | None = Field(default=None, foreign_key='user.user_id', sa_column_kwargs={
+        'comment': '用户id外键'
+    })
 
     domains: list['Domain'] = Relationship(back_populates='know_base')
     categories: list['Category'] = Relationship(back_populates='know_base')
     documents: list['Document'] = Relationship(back_populates='know_base')
     paragraphs: list['Paragraph'] = Relationship(back_populates='know_base')
     processing_tasks: list['ProcessingTask'] = Relationship(back_populates='know_base')
+    user: User = Relationship(back_populates='know_bases')
 
 
 class Domain(SQLModel, table=True):

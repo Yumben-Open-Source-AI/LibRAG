@@ -1,13 +1,21 @@
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
 
-import { createApp } from 'vue'
-import { api } from './http.js'
-import App from './App.vue'
+import { createApp } from 'vue';
+import { api } from './http.js';
+import { createPinia } from 'pinia';
+import piniaPluginPersist from 'pinia-plugin-persist'
+import { router } from '@/router/index.js';
+import './style.css';
+import App from '@/App.vue';
 
-const app = createApp(App)
+const app = createApp(App);
+app.provide('$api', api);
+app.use(ElementPlus);
+app.use(router);
 
-app.provide('$api', api)
-app.use(ElementPlus)
-app.mount('#app')
+const pinia = createPinia();
+pinia.use(piniaPluginPersist);
+app.use(pinia);
+app.mount('#app');
 

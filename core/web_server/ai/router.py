@@ -2,11 +2,12 @@ import asyncio
 import json
 import os.path
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from functools import partial
 from typing import Annotated, List
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends, status
 from sqlmodel import select
 
 from db.database import SessionDep
@@ -23,12 +24,14 @@ from tools.log_tools import selector_logger, parser_logger
 from tools.result_scoring import ResultScoringParser
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink, \
     ProcessingTask
+from web_server.ai.schemas import Token, UserTokenConfig, User
+from web_server.ai.views import authenticate_user, create_access_token, get_current_user, verify_token
 
 router = APIRouter(tags=['ai'], prefix='/ai')
 
 
 @router.get('/recall')
-async def query_with_llm(kb_id: int, session: SessionDep, question: str):
+async def query_with_llm(kb_id: int, session: SessionDep, question: str, token=Depends(verify_token)):
     llm_chat = LlmChat()
     params = SelectorParam(llm_chat, kb_id, session, question)
     selected_domains, domains = DomainSelector(params).collate_select_params().start_select()
@@ -85,7 +88,7 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str):
 
 
 @router.get('/meta_data/{kb_id}/{meta_type}')
-async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
+async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep, token=Depends(verify_token)):
     all_parser = {
         'paragraph': Paragraph,
         'document': Document,
@@ -119,7 +122,7 @@ async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep):
 
 
 @router.patch('/index/{kb_id}')
-async def update_kb_index(kb_id: int, session: SessionDep):
+async def update_kb_index(kb_id: int, session: SessionDep, token=Depends(verify_token)):
     llm_chat = LlmChat()
     try:
         # 重建索引过程不能影响查询
@@ -174,7 +177,8 @@ async def update_kb_index(kb_id: int, session: SessionDep):
 async def upload_file(
         session: SessionDep,
         items: str = Form(...),
-        files: List[UploadFile] = File(...)
+        files: List[UploadFile] = File(...),
+        token=Depends(verify_token)
 ):
     try:
         items = json.loads(items)
@@ -202,7 +206,7 @@ async def upload_file(
 
 
 @router.post('/knowledge_bases', response_model=KnowledgeBase)
-async def create_knowledge_bases(kb: KbBase, session: SessionDep):
+async def create_knowledge_bases(kb: KbBase, session: SessionDep, token=Depends(verify_token)):
     db_kb = KnowledgeBase.model_validate(kb)
     session.add(db_kb)
     session.commit()
@@ -211,7 +215,7 @@ async def create_knowledge_bases(kb: KbBase, session: SessionDep):
 
 
 @router.get('/knowledge_base/{kb_id}')
-async def query_knowledge_base(kb_id: int, session: SessionDep):
+async def query_knowledge_base(kb_id: int, session: SessionDep, token=Depends(verify_token)):
     know_base = session.get(KnowledgeBase, kb_id)
     documents = know_base.documents
     know_base = know_base.dict()
@@ -228,12 +232,13 @@ async def query_knowledge_bases(
         session: SessionDep,
         offset: int = 0,
         limit: Annotated[int, Query(le=100)] = 100,
+        token=Depends(verify_token)
 ):
     return session.exec(select(KnowledgeBase).offset(offset).limit(limit)).all()
 
 
 @router.patch('/knowledge_base/{kb_id}', response_model=KbBase)
-def update_knowledge_base(kb_id: int, kb: KbBase, session: SessionDep):
+def update_knowledge_base(kb_id: int, kb: KbBase, session: SessionDep, token=Depends(verify_token)):
     kb_db = session.get(KnowledgeBase, kb_id)
     if not kb_db:
         raise HTTPException(status_code=404, detail="Hero not found")
@@ -246,7 +251,7 @@ def update_knowledge_base(kb_id: int, kb: KbBase, session: SessionDep):
 
 
 @router.delete('/knowledge_base/{kb_id}')
-async def delete_knowledge_base(kb_id: int, session: SessionDep):
+async def delete_knowledge_base(kb_id: int, session: SessionDep, token=Depends(verify_token)):
     session.query(Paragraph).filter_by(kb_id=kb_id).delete()
     db_documents = session.query(Document).filter_by(kb_id=kb_id)
     db_documents_ids = [doc.document_id for doc in db_documents]
@@ -264,7 +269,7 @@ async def delete_knowledge_base(kb_id: int, session: SessionDep):
 
 
 @router.delete('/document/{document_id}')
-async def delete_document(document_id: str, session: SessionDep):
+async def delete_document(document_id: str, session: SessionDep, token=Depends(verify_token)):
     document_id = uuid.UUID(document_id)
     session.query(Paragraph).filter_by(parent_id=document_id).delete()
     db_documents = session.query(Document).filter_by(document_id=document_id)
@@ -276,11 +281,36 @@ async def delete_document(document_id: str, session: SessionDep):
 
 
 @router.get('/paragraphs/{document_id}')
-async def query_paragraphs(document_id: str, session: SessionDep):
+async def query_paragraphs(document_id: str, session: SessionDep, token=Depends(verify_token)):
     return session.query(Paragraph).filter_by(parent_id=uuid.UUID(document_id)).all()
 
 
 @router.get('/paragraph/{paragraph_id}')
-async def query_paragraph(paragraph_id: str, session: SessionDep):
+async def query_paragraph(paragraph_id: str, session: SessionDep, token=Depends(verify_token)):
     paragraph_id = uuid.UUID(paragraph_id)
     return session.query(Paragraph).get(paragraph_id)
+
+
+@router.post("/token")
+async def login_for_access_token(
+        session: SessionDep,
+        password: str = Form(...),
+        username: str = Form(...)
+) -> Token:
+    user = authenticate_user(session, username, password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或者密码错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=UserTokenConfig.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.user_name}, expires_delta=access_token_expires
+    )
+    return Token(access_token=access_token, token_type="bearer")
+
+
+@router.get("/users/me/", response_model=User)
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user

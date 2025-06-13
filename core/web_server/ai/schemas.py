@@ -1,12 +1,28 @@
-from typing import List
+import os
+
 from pydantic import BaseModel
 
 
-class Item(BaseModel):
-    file_path: str
-    policy_type: str
-    kb_id: int
+class UserTokenConfig:
+    ALGORITHM: str = 'HS256'
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
+
+    @staticmethod
+    def get_secret_key():
+        return os.getenv('SECRET_KEY')
 
 
-class FileInfo(BaseModel):
-    items: List[Item]
+class User(BaseModel):
+    user_name: str
+    email: str | None = None
+    full_name: str | None = None
+    disabled: bool | None = None
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: str | None = None
