@@ -5,6 +5,7 @@
 @Author  ：XMAN
 @Date    ：2025/6/9 上午10:08 
 """
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -25,6 +26,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/ai/token")
 
 def verify_token(token: str = Depends(oauth2_scheme)):
     """验证token并检查过期时间"""
+    api_keys = set(os.getenv('VALID_API_KEYS').split(','))
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="无效的认证凭据",
@@ -37,13 +39,14 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             raise credentials_exception
         return TokenData(username=username)
     except ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token已过期，请重新登录",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        pass
     except InvalidTokenError:
-        raise credentials_exception
+        pass
+
+    if token in api_keys:
+        return
+
+    raise credentials_exception
 
 
 def verify_password(plain_password, hashed_password):
