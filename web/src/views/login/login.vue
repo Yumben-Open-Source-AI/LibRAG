@@ -2,7 +2,10 @@
   <div class="login-wrapper">
     <el-form :model="form" :rules="rules" ref="loginForm" class="login-container" @submit.prevent="submitForm">
       <div class="login-header">
-        <h2>嗨，最近如何？</h2>
+        <el-image style="width: 100px; height: 100px" :src="logUrl" :fit="fit"/>
+        <h2>
+          嗨，最近如何？
+        </h2>
         <h3>欢迎来到 LibRAG, 登录以继续👏</h3>
       </div>
 
@@ -31,6 +34,7 @@ import { ElMessage } from 'element-plus'
 import { getToken } from '@/api/login'
 import { Lock, User } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/store/modules/auth';
+import logUrl from '@/static/log(500x500).png';
 
 const router = useRouter()
 const loginForm = ref(null)

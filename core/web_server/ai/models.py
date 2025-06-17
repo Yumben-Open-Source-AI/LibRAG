@@ -131,6 +131,7 @@ class ProcessingTask(SQLModel, table=True):
     created_at: datetime = Field(default=datetime.now())
     started_at: datetime | None = Field(nullable=True)
     completed_at: datetime | None = Field(nullable=True)
+    progress: int | None = Field(default=0)
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',
                               sa_column_kwargs={'comment': '知识库id'})
     know_base: KnowledgeBase = Relationship(back_populates='processing_tasks')

@@ -217,13 +217,21 @@ async def create_knowledge_bases(kb: KbBase, session: SessionDep, token=Depends(
 @router.get('/knowledge_base/{kb_id}')
 async def query_knowledge_base(kb_id: int, session: SessionDep, token=Depends(verify_token)):
     know_base = session.get(KnowledgeBase, kb_id)
-    documents = know_base.documents
+    documents = [doc.model_dump() for doc in know_base.documents]
     know_base = know_base.dict()
 
     if not know_base:
         raise HTTPException(status_code=404, detail="KnowledgeBase not found")
 
     know_base['documents'] = documents
+    all_tasks = session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id).all()
+    document_paths = {document['file_path'] for document in documents}
+    for task in all_tasks:
+        if task.file_path not in document_paths:
+            know_base['documents'].append({
+                'task': task
+            })
+
     return know_base
 
 
@@ -291,7 +299,7 @@ async def query_paragraph(paragraph_id: str, session: SessionDep, token=Depends(
     return session.query(Paragraph).get(paragraph_id)
 
 
-@router.post("/token")
+@router.post('/token')
 async def login_for_access_token(
         session: SessionDep,
         password: str = Form(...),
@@ -311,6 +319,6 @@ async def login_for_access_token(
     return Token(access_token=access_token, token_type="bearer")
 
 
-@router.get("/users/me/", response_model=User)
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    return current_user
+@router.get('/tasks')
+async def query_processing_tasks(kb_id: int, session: SessionDep, token=Depends(verify_token)):
+    return session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id).all()

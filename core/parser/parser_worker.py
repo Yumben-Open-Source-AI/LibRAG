@@ -31,6 +31,7 @@ def worker_loop(pending_task, session):
         file_name = os.path.basename(file_path)
         start_time = datetime.datetime.now()
         pending_task.status = 'processing'
+        pending_task.progress = 0
         pending_task.started_at = datetime.datetime.now()
         session.add(pending_task)
         session.commit()
@@ -45,6 +46,9 @@ def worker_loop(pending_task, session):
         }
         all_paragraphs = par_parser.parse(**paragraph_params)
         logger.info(f'文件:{file_name} 段落解析:{all_paragraphs}')
+        pending_task.progress = 1
+        session.add(pending_task)
+        session.commit()
 
         # 解析文档信息
         doc_parser = DocumentParser(llm, kb_id, session)
@@ -55,18 +59,27 @@ def worker_loop(pending_task, session):
         }
         document = doc_parser.parse(**document_params)
         logger.info(f'文件:{file_name} 文档解析:{document}')
+        pending_task.progress = 2
+        session.add(pending_task)
+        session.commit()
 
         # 解析文档所属分类
         category_parser = CategoryParser(llm, kb_id, session)
         category_params = {'document': document}
         category = category_parser.parse(**category_params)
         logger.info(f'文件:{file_name} 类别解析:{category}')
+        pending_task.progress = 3
+        session.add(pending_task)
+        session.commit()
 
         # 解析文档所属领域
         domain_parser = DomainParser(llm, kb_id, session)
         domain_params = {'category': category}
         domain = domain_parser.parse(**domain_params)
         logger.info(f'文件:{file_name} 领域解析:{domain}')
+        pending_task.progress = 4
+        session.add(pending_task)
+        session.commit()
 
         # 回填及存储数据
         par_parser.storage_parser_data(document)
