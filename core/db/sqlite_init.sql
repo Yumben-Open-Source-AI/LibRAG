@@ -82,9 +82,11 @@ create table processing_task
     created_at     DATETIME not null,
     started_at     DATETIME,
     completed_at   DATETIME,
+    progress       INTEGER,
     kb_id          INTEGER
         references knowledge_base
 );
+
 
 create table user
 (
