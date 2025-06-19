@@ -437,7 +437,7 @@ async function submitCreate() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  await api.post('upload', formData)
+  api.post('upload', formData)
 
   ElMessage.success(`知识库『${createForm.name}』创建成功，共 ${createFileRows.value.length} 个文件后台解析中`)
   createDialogVisible.value = false
@@ -466,13 +466,11 @@ async function submitAppend() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  await api.post('upload', formData)
+  api.post('upload', formData)
 
   ElMessage.success(`成功追加 ${appendFileRows.value.length} 个文件`)
   appendDialogVisible.value = false
   await fetchDocuments(selectedKB.value.kb_id)
-
-  // if 
 }
 
 /*  删除 KB  */
