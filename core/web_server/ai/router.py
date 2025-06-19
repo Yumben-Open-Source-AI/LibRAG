@@ -186,6 +186,7 @@ async def upload_file(
         os.makedirs(base_dir, exist_ok=True)
         for i, file in enumerate(files):
             content = await file.read()
+            parser_logger.info(f'目前正在上传文件:{file}')
             file_path = os.path.join(base_dir, file.filename)
             with open(file_path, 'wb') as f:
                 f.write(content)
@@ -196,6 +197,7 @@ async def upload_file(
                 'kb_id': items[i]['kb_id'],
                 'parse_strategy': items[i]['policy_type']
             })
+            parser_logger.info(f'文件上传完毕:{file}')
             session.add(task)
             session.commit()
     except Exception as e:
@@ -288,7 +290,7 @@ async def delete_document(document_id: str, session: SessionDep, token=Depends(v
     db_document = session.query(Document).filter_by(document_id=document_id).first()
     session.query(CategoryDocumentLink).filter_by(document_id=document_id).delete()
     tasks = session.query(ProcessingTask).filter_by(file_path=db_document.file_path,
-                                                 parse_strategy=db_document.parse_strategy)
+                                                    parse_strategy=db_document.parse_strategy)
     for task in tasks:
         task.status = 'filing'
     # TODO 暂不同步调整category summary
@@ -299,7 +301,11 @@ async def delete_document(document_id: str, session: SessionDep, token=Depends(v
 
 @router.get('/paragraphs/{document_id}')
 async def query_paragraphs(document_id: str, session: SessionDep, token=Depends(verify_token)):
-    return session.query(Paragraph).filter_by(parent_id=uuid.UUID(document_id)).all()
+    import re
+    all_paragraphs = session.query(Paragraph).filter_by(parent_id=uuid.UUID(document_id)).all()
+    if session.get(Document, uuid.UUID(document_id)).parse_strategy == 'page_split':
+        all_paragraphs.sort(key=lambda x: int(re.findall(r'\d+', x.position)[0]))
+    return all_paragraphs
 
 
 @router.get('/paragraph/{paragraph_id}')
