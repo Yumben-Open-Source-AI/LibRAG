@@ -121,3 +121,15 @@ def init_process():
         session.close()
         # 完成所有数据库检查休眠
         time.sleep(60)
+
+
+def process_exit():
+    """ 预处理退出前检查 """
+    session = next(get_session())
+    all_processing = session.query(ProcessingTask).filter_by(status='processing')
+    for task in all_processing:
+        task.status = 'pending'
+        task.progress = 0
+    session.add_all(all_processing)
+    session.commit()
+    session.close()

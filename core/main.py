@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from db.database import create_db_and_tables
 from fastapi.middleware.cors import CORSMiddleware
 
-from parser.parser_worker import init_process
+from parser.parser_worker import init_process, process_exit
 from web_server.ai.router import router as ai_router
 from web_server.dify.router import router as dify_router
 from tools.log_tools import manage_logger as logger
@@ -64,3 +64,5 @@ if __name__ == '__main__':
         timeout_keep_alive=3,  # 指定3s内保持活动状态的连接
         backlog=4096  # 等待处理最大连接数
     )
+    # 预处理退出流程
+    process_exit()
