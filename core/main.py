@@ -50,14 +50,10 @@ async def log_request(request: Request, call_next):
     return response
 
 
-@app.on_event('startup')
-def on_startup():
-    # 初始化数据库
-    create_db_and_tables()
-
-
 if __name__ == '__main__':
     load_dotenv()
+    # 初始化数据库
+    create_db_and_tables()
     # 启动预处理流程
     threading.Thread(target=init_process, daemon=True).start()
     uvicorn.run(

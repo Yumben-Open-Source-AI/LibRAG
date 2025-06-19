@@ -225,12 +225,16 @@ async def query_knowledge_base(kb_id: int, session: SessionDep, token=Depends(ve
 
     know_base['documents'] = documents
     all_tasks = session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id).all()
-    document_paths = {document['file_path'] for document in documents}
+    document_paths = {(document['file_path'], document['parse_strategy']) for document in documents}
     for task in all_tasks:
-        if task.file_path not in document_paths:
+        if task.status == 'filing':
+            continue
+
+        if (task.file_path, task.parse_strategy) not in document_paths:
             know_base['documents'].append({
                 'task': task
             })
+            document_paths.add((task.file_path, task.parse_strategy))
 
     return know_base
 
@@ -272,6 +276,7 @@ async def delete_knowledge_base(kb_id: int, session: SessionDep, token=Depends(v
     db_categories.delete()
 
     session.query(Domain).filter_by(kb_id=kb_id).delete()
+    session.query(ProcessingTask).filter_by(kb_id=kb_id).delete()
     session.query(KnowledgeBase).filter_by(kb_id=kb_id).delete()
     session.commit()
 
@@ -280,11 +285,15 @@ async def delete_knowledge_base(kb_id: int, session: SessionDep, token=Depends(v
 async def delete_document(document_id: str, session: SessionDep, token=Depends(verify_token)):
     document_id = uuid.UUID(document_id)
     session.query(Paragraph).filter_by(parent_id=document_id).delete()
-    db_documents = session.query(Document).filter_by(document_id=document_id)
-    db_documents_ids = [doc.document_id for doc in db_documents]
-    session.query(CategoryDocumentLink).filter(CategoryDocumentLink.document_id.in_(db_documents_ids)).delete()
+    db_document = session.query(Document).filter_by(document_id=document_id).first()
+    session.query(CategoryDocumentLink).filter_by(document_id=document_id).delete()
+    tasks = session.query(ProcessingTask).filter_by(file_path=db_document.file_path,
+                                                 parse_strategy=db_document.parse_strategy)
+    for task in tasks:
+        task.status = 'filing'
     # TODO 暂不同步调整category summary
-    db_documents.delete()
+    session.delete(db_document)
+    session.add_all(tasks)
     session.commit()
 
 

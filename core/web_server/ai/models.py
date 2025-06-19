@@ -127,7 +127,7 @@ class ProcessingTask(SQLModel, table=True):
     task_id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     file_path: str = Field(default='', sa_column_kwargs={'comment': '文档路径'})
     parse_strategy: str = Field(default='', sa_column_kwargs={'comment': '解析文档策略'})
-    status: str = Field(default='pending')  # pending, processing, succeed, failed
+    status: str = Field(default='pending')  # pending 队列等待, processing 处理中, succeed 成功, failed 失败, filing 归档
     created_at: datetime = Field(default=datetime.now())
     started_at: datetime | None = Field(nullable=True)
     completed_at: datetime | None = Field(nullable=True)
