@@ -169,8 +169,8 @@
           </el-col>
         </el-row>
         <el-form-item label="上传文件：">
-          <el-upload multiple :auto-upload="false" :file-list="createFileList" :on-change="handleCreateUpload" drag
-            style="width: 100%;">
+          <el-upload multiple :auto-upload="false" :file-list="createFileList" :on-change="handleCreateUpload"
+            :on-remove="handleCreateRemove" drag style="width: 100%;">
             <i class="el-icon-upload" />
             <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
           </el-upload>
@@ -199,7 +199,8 @@
 
     <!-- 追加文件 Dialog -->
     <el-dialog v-model="appendDialogVisible" title="追加新文件" width="800px">
-      <el-upload multiple :auto-upload="false" :file-list="appendFileList" :on-change="handleAppendUpload" drag>
+      <el-upload multiple :auto-upload="false" :file-list="appendFileList" :on-change="handleAppendUpload"
+        :on-remove="handleAppendRemove" drag>
         <i class="el-icon-upload" />
         <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
       </el-upload>
@@ -336,8 +337,6 @@ async function fetchDocuments(kbId) {
     文档描述: d.document_description,
     切割策略: d.parse_strategy || ''
   }))
-  console.log(fileTableData.value);
-
 }
 
 async function fetchParagraphs(documentId) {
@@ -395,14 +394,55 @@ function fileInfoFromRawFile(raw) {
   }
 }
 
+/*  创建知识库时删除文件  */
+function handleCreateRemove(file, fileList) {
+  handleCreateUpload(file, fileList)
+}
+
+/*  创建知识库时文件发生变更  */
 function handleCreateUpload(file, fileList) {
   createFileRows.value = fileList.map(f => fileInfoFromRawFile(f.raw))
   createFileList.value = fileList
+
+  let strategies = {}
+  if (createFileRows.value.length > 0) {
+    createFileRows.value.forEach(item => strategies[item.file.uid] = item.strategy)
+  }
+
+  createFileRows.value = fileList.map(f => fileInfoFromRawFile(f.raw))
+  createFileList.value = fileList
+
+  if (Reflect.ownKeys(strategies).length > 0) {
+    createFileRows.value.forEach(f => {
+      if (f.file.uid in strategies) {
+        f.strategy = strategies[f.file.uid]
+      }
+    })
+  }
 }
 
+/*  追加文件时删除文件  */
+function handleAppendRemove(file, fileList) {
+  handleAppendUpload(file, fileList)
+}
+
+/*  追加文件时文件发生变更  */
 function handleAppendUpload(file, fileList) {
+  let strategies = {}
+  if (appendFileList.value.length > 0) {
+    appendFileRows.value.forEach(item => strategies[item.file.uid] = item.strategy)
+  }
+
   appendFileRows.value = fileList.map(f => fileInfoFromRawFile(f.raw))
   appendFileList.value = fileList
+
+  if (Reflect.ownKeys(strategies).length > 0) {
+    appendFileRows.value.forEach(f => {
+      if (f.file.uid in strategies) {
+        f.strategy = strategies[f.file.uid]
+      }
+    })
+  }
 }
 
 /*  创建 KB & 提交文件  */
