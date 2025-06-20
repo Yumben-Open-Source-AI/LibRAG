@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Any, Dict, List, Optional
 
@@ -163,6 +164,8 @@ async def inner_recall(kb_id: int, question: str, session: SessionDep) -> List[D
     """
     调用你的 query_with_llm，并把 total_score 归一化到 0~1
     """
+    import codecs
+    question = codecs.encode(question).decode('utf-8')
     raw = await query_with_llm(kb_id=kb_id, session=session, question=question)
     if not raw:
         return []
