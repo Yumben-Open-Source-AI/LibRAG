@@ -10,13 +10,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from jwt import encode, decode
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, UploadFile
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 from passlib.context import CryptContext
+from sqlmodel import select
 
 from db.database import SessionDep
-from web_server.ai.models import User
+from web_server.ai.models import User, ProcessingTask, Document
 from web_server.ai.schemas import UserTokenConfig, TokenData
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -99,3 +100,37 @@ async def get_current_user(db: SessionDep, token: Annotated[str, Depends(oauth2_
     if user is None:
         raise credentials_exception
     return user
+
+
+def check_file_md5(file: UploadFile, session: SessionDep, chunk_size: int = 8192) -> tuple[ProcessingTask, str]:
+    """计算上传文件的 MD5 哈希值"""
+    import hashlib
+    md5 = hashlib.md5()
+    file.file.seek(0)
+    while chunk := file.file.read(chunk_size):
+        md5.update(chunk)
+    file.file.seek(0)
+    file_md5 = md5.hexdigest()
+    query = session.query(ProcessingTask).filter_by(file_size=file.size, file_md5=file_md5)
+    db_file = query.first()
+    return db_file, file_md5
+
+
+def check_file_strategy(file: UploadFile, session: SessionDep, kb_id: int, strategy: str):
+    """ 校验上传文件的 策略重复性"""
+    filename = file.filename
+    # 相同文件相同切割策略不允许上传
+    statement = select(Document).where(
+        Document.file_path.like(f"%{filename}%"),
+        Document.parse_strategy == strategy,
+        Document.kb_id == kb_id
+    )
+    db_strategies = session.exec(statement).all()
+    statement = select(ProcessingTask).where(
+        ProcessingTask.file_path.like(f"%{filename}%"),
+        ProcessingTask.parse_strategy == strategy,
+        ProcessingTask.kb_id == kb_id,
+        ProcessingTask.status != 'filing'
+    )
+    db_tasks = session.exec(statement).all()
+    return len(db_strategies) > 0 or len(db_tasks) > 0

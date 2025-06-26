@@ -477,9 +477,9 @@ async function submitCreate() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  api.post('upload', formData)
+  const {data} = await api.post('upload', formData)
 
-  ElMessage.success(`知识库『${createForm.name}』创建成功，共 ${createFileRows.value.length} 个文件后台解析中`)
+  ElMessage.success(`知识库『${createForm.name}』创建成功，${data.message}`)
   createDialogVisible.value = false
   await fetchKnowledgeBases()
   activeTab.value = kb
@@ -506,9 +506,9 @@ async function submitAppend() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  api.post('upload', formData)
+  const {data} = await api.post('upload', formData)
 
-  ElMessage.success(`成功追加 ${appendFileRows.value.length} 个文件`)
+  ElMessage.success(`${data.message}`)
   appendDialogVisible.value = false
   await fetchDocuments(selectedKB.value.kb_id)
 }

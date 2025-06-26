@@ -77,6 +77,8 @@ create table processing_task
     task_id        CHAR(32) not null
         primary key,
     file_path      VARCHAR  not null,
+    file_size      BIGINT   not null,
+    file_md5       CHAR(32) not null,
     parse_strategy VARCHAR  not null,
     status         VARCHAR  not null,
     created_at     DATETIME not null,

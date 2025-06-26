@@ -8,7 +8,7 @@
 import uuid
 from datetime import datetime
 from sqlmodel import Field, SQLModel, JSON, Relationship
-from sqlalchemy import Column, TEXT
+from sqlalchemy import Column, TEXT, CHAR, BigInteger
 
 
 class User(SQLModel, table=True):
@@ -126,6 +126,14 @@ class ProcessingTask(SQLModel, table=True):
 
     task_id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     file_path: str = Field(default='', sa_column_kwargs={'comment': '文档路径'})
+    file_size: int = Field(
+        default=0,
+        sa_column=Column(BigInteger(), nullable=False, comment='文档大小（字节）')
+    )
+    file_md5: str = Field(
+        default='',
+        sa_column=Column(CHAR(32), nullable=False, comment='文档MD5哈希值')
+    )
     parse_strategy: str = Field(default='', sa_column_kwargs={'comment': '解析文档策略'})
     status: str = Field(default='pending')  # pending 队列等待, processing 处理中, succeed 成功, failed 失败, filing 归档
     created_at: datetime = Field(default=datetime.now())

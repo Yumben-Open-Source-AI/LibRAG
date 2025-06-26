@@ -30,6 +30,9 @@ def worker_loop(pending_task, session):
         policy_type = pending_task.parse_strategy
         file_name = os.path.basename(file_path)
         start_time = datetime.datetime.now()
+
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f'{file_path} 文件路径不存在，请检查')
         pending_task.status = 'processing'
         pending_task.progress = 0
         pending_task.started_at = datetime.datetime.now()

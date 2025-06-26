@@ -1,6 +1,6 @@
 import asyncio
 import json
-import os.path
+import os
 import uuid
 from datetime import timedelta
 from decimal import Decimal
@@ -24,8 +24,9 @@ from tools.log_tools import selector_logger, parser_logger
 from tools.result_scoring import ResultScoringParser
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink, \
     ProcessingTask
-from web_server.ai.schemas import Token, UserTokenConfig, User
-from web_server.ai.views import authenticate_user, create_access_token, get_current_user, verify_token
+from web_server.ai.schemas import Token, UserTokenConfig
+from web_server.ai.views import authenticate_user, create_access_token, verify_token, check_file_strategy
+from web_server.ai.views import check_file_md5
 
 router = APIRouter(tags=['ai'], prefix='/ai')
 
@@ -180,31 +181,51 @@ async def upload_file(
         files: List[UploadFile] = File(...),
         token=Depends(verify_token)
 ):
+    message = ''
+    count = 0
+
     try:
-        items = json.loads(items)
+        items: list = json.loads(items)
         base_dir = os.path.abspath('./files')
         os.makedirs(base_dir, exist_ok=True)
+
         for i, file in enumerate(files):
-            content = await file.read()
-            parser_logger.info(f'目前正在上传文件:{file}')
-            file_path = os.path.join(base_dir, file.filename)
-            with open(file_path, 'wb') as f:
-                f.write(content)
-            items[i]['file_path'] = file_path
+            kb_id = items[i]['kb_id']
+            strategy = items[i]['policy_type']
+            is_strategy_repeat = check_file_strategy(file, session, kb_id, strategy)
+            if is_strategy_repeat:
+                # 预校验上传文件切割策略
+                message += f'\n已存在重复切割策略文件:{file.filename} 切割策略:{strategy}\n'
+                items.pop(i)
+                continue
+
+            count += 1
+            db_file, md5 = check_file_md5(file, session)
+            if not db_file:
+                # 预校验上传文件MD5
+                parser_logger.info(f'正在上传文件:{file}')
+                file_path = os.path.join(base_dir, file.filename)
+                with open(file_path, 'wb') as f:
+                    f.write(await file.read())
+                parser_logger.info(f'文件上传完毕:{file}')
+            else:
+                file_path = db_file.file_path
             task = ProcessingTask(**{
                 'status': 'pending',
+                'file_size': file.size,
                 'file_path': file_path,
-                'kb_id': items[i]['kb_id'],
-                'parse_strategy': items[i]['policy_type']
+                'kb_id': kb_id,
+                'file_md5': md5,
+                'parse_strategy': strategy,
             })
-            parser_logger.info(f'文件上传完毕:{file}')
             session.add(task)
             session.commit()
     except Exception as e:
         session.rollback()
         parser_logger.error(f'{e}', exc_info=True)
 
-    return {'message': '知识库文件加载任务后台处理中'}
+    response_count = f'共{count}个文件成功解析' if count > 0 else ''
+    return {'message': response_count + message}
 
 
 @router.post('/knowledge_bases', response_model=KnowledgeBase)
