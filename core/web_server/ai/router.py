@@ -322,6 +322,7 @@ async def delete_document(document_id: str, session: SessionDep, token=Depends(v
 
 @router.get('/paragraphs/{document_id}')
 async def query_paragraphs(document_id: str, session: SessionDep, token=Depends(verify_token)):
+    """ 查询单个文档所有段落 """
     import re
     all_paragraphs = session.query(Paragraph).filter_by(parent_id=uuid.UUID(document_id)).all()
     if session.get(Document, uuid.UUID(document_id)).parse_strategy == 'page_split':
@@ -331,8 +332,40 @@ async def query_paragraphs(document_id: str, session: SessionDep, token=Depends(
 
 @router.get('/paragraph/{paragraph_id}')
 async def query_paragraph(paragraph_id: str, session: SessionDep, token=Depends(verify_token)):
-    paragraph_id = uuid.UUID(paragraph_id)
-    return session.query(Paragraph).get(paragraph_id)
+    """ 查询单个段落 """
+    return session.query(Paragraph).get(uuid.UUID(paragraph_id))
+
+
+@router.get('/documents/{category_id}')
+async def query_documents(category_id: str, session: SessionDep, token=Depends(verify_token)):
+    """ 查询单个分类下所有文档 """
+    document_ids = session.query(CategoryDocumentLink).filter_by(category_id=uuid.UUID(category_id)).all()
+    document_ids = [document.document_id for document in document_ids]
+    return session.query(Document).filter(Document.document_id.in_(document_ids)).all()
+
+
+@router.get('/document/{document_id}')
+async def query_document(document_id: str, session: SessionDep, token=Depends(verify_token)):
+    """ 查询单个文档"""
+    return session.query(Document).get(uuid.UUID(document_id))
+
+
+@router.get('/categories/{domain_id}')
+async def query_categories(domain_id: str, session: SessionDep, token=Depends(verify_token)):
+    """ 查询单个领域下所有分类 """
+    return session.query(Category).filter_by(parent_id=uuid.UUID(domain_id)).all()
+
+
+@router.get('/category/{category_id}')
+async def query_category(category_id: str, session: SessionDep, token=Depends(verify_token)):
+    """ 查询单个分类 """
+    return session.query(Category).get(uuid.UUID(category_id))
+
+
+@router.get('/domain/{domain_id}')
+async def query_domain(domain_id: str, session: SessionDep, token=Depends(verify_token)):
+    """ 查询单个领域 """
+    return session.query(Domain).get(uuid.UUID(domain_id))
 
 
 @router.post('/token')
