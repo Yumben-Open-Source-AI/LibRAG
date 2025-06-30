@@ -92,7 +92,7 @@
     {
         "role": "assistant",
         "content": {
-            "selected_domains": ["law"]
+            "selected_domains": ["tech","education"]
         }
     }
 ]
