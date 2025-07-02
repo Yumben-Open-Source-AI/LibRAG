@@ -52,7 +52,7 @@ def concurrent_decorator(func):
 
         tasks = []
         all_messages_result = []
-        max_workers = max(ceil(len(values) / count), 10)
+        max_workers = min(ceil(len(values) / count), 35)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             for i in range(0, len(values), count):
                 thread_messages = copy.deepcopy(messages)

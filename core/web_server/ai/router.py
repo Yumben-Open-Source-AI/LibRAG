@@ -54,7 +54,7 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str, token=D
         return []
 
     scorer_agent = ResultScoringParser(llm_chat)
-    sem = asyncio.Semaphore(8)
+    sem = asyncio.Semaphore(35)
     loop = asyncio.get_running_loop()
 
     async def score_one(idx: int, par_text: str):
