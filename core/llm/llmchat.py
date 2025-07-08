@@ -76,7 +76,8 @@ class LlmChat(OpenAILike):
                         # 自动分配角色：偶数索引为system，奇数索引为user
                         role = "system" if i % 2 == 0 else "user"
                         processed_messages.append(ChatMessage(role=role, content=msg))
-                response = super().chat(processed_messages, **kwargs).message.content
+                chat = super().chat(processed_messages, **kwargs)
+                response = chat.message.content
                 return self.literal_eval(response)
             except Exception as e:
                 logger.error(e, exc_info=True)

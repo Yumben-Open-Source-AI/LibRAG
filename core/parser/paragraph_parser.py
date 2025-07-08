@@ -14,7 +14,7 @@ from parser.base import BaseParser
 from pathlib import Path
 
 from parser.chinese_text_splitter import FlexibleRecursiveSplitter
-from parser.load_api import convert_pdf_to_md, convert_file_type, PDFLoader
+from parser.load_api import convert_file_type, DataLoader
 from tools.log_tools import parser_logger as logger
 from tools.prompt_load import TextFileReader
 from web_server.ai.models import Document, Paragraph
@@ -78,15 +78,15 @@ class ParagraphParser(BaseParser):
         self.parse_strategy = kwargs.get('parse_strategy')
         file_obj = Path(file_path)
 
-        # 文件转换为pdf
         if file_obj.suffix in ['.doc', '.docx']:
+            # word文件转换为pdf
             temp_dir = tempfile.mkdtemp()
             convert_file_type(file_path, temp_dir)
             name = file_obj.name.replace(file_obj.suffix, '.pdf')
             file_path = os.path.join(temp_dir, name)
             logger.debug(file_path)
 
-        if file_path.endswith('.pdf'):
+        if file_obj.suffix in ['.pdf', '.png', '.jpeg', '.jpg']:
             # TODO rm temp_dir
             return self.pdf_parse(file_path)
 
@@ -214,7 +214,7 @@ class ParagraphParser(BaseParser):
 
             return sections
 
-        pdf_content = convert_pdf_to_md(file_path)
+        pdf_content = ''.join(DataLoader(file_path).to_parse_file())
         catalog_messages = copy.deepcopy(FULL_TEXT_CATALOG_MESSAGES)
         template = Template(catalog_messages[1]['content'])
         catalog_messages[1]['content'] = template.substitute(content=pdf_content)
@@ -260,7 +260,7 @@ class ParagraphParser(BaseParser):
         按页轮询自主大模型判断上下文
         场景: 目录层级多、文件结构复杂优先
         """
-        page_contents = PDFLoader(file_path).load_file()
+        page_contents = DataLoader(file_path).to_parse_file()
         index = 0
 
         # 上下文连贯判断
@@ -297,7 +297,7 @@ class ParagraphParser(BaseParser):
         文本切割策略-按页切割
         场景: 目录层级多、文件结构复杂优先
         """
-        page_contents = PDFLoader(file_path).load_file()
+        page_contents = DataLoader(file_path).to_parse_file()
         with ThreadPoolExecutor(max_workers=25) as executor:
             tasks_page = []
             for page_count, doc_markdown in enumerate(page_contents, start=1):
@@ -315,7 +315,7 @@ class ParagraphParser(BaseParser):
         文本切割策略-agentic_chunking
         场景: 处理速度最慢，能够保持极致的上下文语义连贯
         """
-        page_contents = ''.join(PDFLoader(file_path).load_file())
+        page_contents = ''.join(DataLoader(file_path).to_parse_file())
         logger.debug(f'AGENTIC_CHUNKING切割前文本:{page_contents}')
         ps = FlexibleRecursiveSplitter(granularity="sentence", chunk_size=1024, overlap_units=2)
         organizer = ChunkOrganizer()
