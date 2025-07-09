@@ -32,7 +32,13 @@ router = APIRouter(tags=['ai'], prefix='/ai')
 
 
 @router.get('/recall')
-async def query_with_llm(kb_id: int, session: SessionDep, question: str, token=Depends(verify_token)):
+async def query_with_llm(
+        kb_id: int,
+        session: SessionDep,
+        question: str,
+        score_threshold: float | None = None,
+        token=Depends(verify_token)
+):
     llm_chat = LlmChat()
     params = SelectorParam(llm_chat, kb_id, session, question)
     selected_domains, domains = DomainSelector(params).collate_select_params().start_select()
@@ -83,6 +89,11 @@ async def query_with_llm(kb_id: int, session: SessionDep, question: str, token=D
     await asyncio.gather(*(score_one(i, txt) for i, txt in enumerate(recall_content)))
 
     target_paragraphs.sort(key=lambda x: x["total_score"], reverse=True)
+
+    # 增加分数阈值返回
+    if score_threshold:
+        selector_logger.info(f'过滤分数小于阈值：{score_threshold}的段落')
+        target_paragraphs = list(filter(lambda x: x["total_score"] >= score_threshold, target_paragraphs))
     selector_logger.info(
         f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
     return target_paragraphs
