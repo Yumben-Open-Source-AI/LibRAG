@@ -401,9 +401,6 @@ function handleCreateRemove(file, fileList) {
 
 /*  创建知识库时文件发生变更  */
 function handleCreateUpload(file, fileList) {
-  createFileRows.value = fileList.map(f => fileInfoFromRawFile(f.raw))
-  createFileList.value = fileList
-
   let strategies = {}
   if (createFileRows.value.length > 0) {
     createFileRows.value.forEach(item => strategies[item.file.uid] = item.strategy)
