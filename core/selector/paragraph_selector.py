@@ -92,6 +92,11 @@ class ParagraphSelector(BaseSelector):
         session = self.params.session
         result = []
         for paragraph_id in self.selected_paragraphs:
-            result.append(session.get(Paragraph, uuid.UUID(paragraph_id)).dict())
+            try:
+                paragraph_uuid = uuid.UUID(paragraph_id)
+                result.append(session.get(Paragraph, paragraph_uuid).dict())
+            except Exception as e:
+                logger.error(str(e) + '段落选择器异常输出选择', exc_info=True)
+                pass
 
         return result
