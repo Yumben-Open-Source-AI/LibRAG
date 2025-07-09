@@ -86,7 +86,7 @@ class DocumentSelector(BaseSelector):
             documents=self.select_params
         )
         logger.debug(f'文档选择器 user prompt:{document_user_prompt}')
-        response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=5)
+        response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=10)
         selected_documents = set(response_chat)
 
         documents = [{'document_id': doc, 'document_name': self.document_names[doc]}for doc in selected_documents]
