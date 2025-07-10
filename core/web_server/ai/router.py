@@ -60,7 +60,7 @@ async def query_with_llm(
         return []
 
     scorer_agent = ResultScoringParser(llm_chat)
-    sem = asyncio.Semaphore(35)
+    sem = asyncio.Semaphore(80)
     loop = asyncio.get_running_loop()
 
     async def score_one(idx: int, par_text: str):
