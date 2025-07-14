@@ -84,6 +84,7 @@ class ParagraphParser(BaseParser):
             convert_file_type(file_path, temp_dir)
             name = file_obj.name.replace(file_obj.suffix, '.pdf')
             file_path = os.path.join(temp_dir, name)
+            file_obj = Path(file_path)
             logger.debug(file_path)
 
         if file_obj.suffix in ['.pdf', '.png', '.jpeg', '.jpg']:
