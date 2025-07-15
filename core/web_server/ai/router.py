@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import uuid
+from pathlib import Path
 from datetime import timedelta
 from decimal import Decimal
 from functools import partial
@@ -201,12 +202,19 @@ async def upload_file(
         os.makedirs(base_dir, exist_ok=True)
 
         for i, file in enumerate(files):
+            file_name = file.filename
+            file_suffix = Path(file_name).suffix
+            if file_suffix not in ['.doc', '.docx', '.pdf', '.png', '.jpeg', '.jpg']:
+                # 预校验上传文件后缀
+                message += f'\n{file_name}文件无法处理不支持格式，支持格式:[.doc, .docx, .pdf, png, jpeg, jpg]'
+                continue
+
             kb_id = items[i]['kb_id']
             strategy = items[i]['policy_type']
             is_strategy_repeat = check_file_strategy(file, session, kb_id, strategy)
             if is_strategy_repeat:
                 # 预校验上传文件切割策略
-                message += f'\n已存在重复切割策略文件:{file.filename} 切割策略:{strategy}\n'
+                message += f'\n已存在重复切割策略文件:{file_name} 切割策略:{strategy}\n'
                 items.pop(i)
                 continue
 
@@ -215,7 +223,7 @@ async def upload_file(
             if not db_file:
                 # 预校验上传文件MD5
                 parser_logger.info(f'正在上传文件:{file}')
-                file_path = os.path.join(base_dir, file.filename)
+                file_path = os.path.join(base_dir, file_name)
                 with open(file_path, 'wb') as f:
                     f.write(await file.read())
                 parser_logger.info(f'文件上传完毕:{file}')
