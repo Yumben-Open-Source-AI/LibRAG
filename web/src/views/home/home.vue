@@ -390,7 +390,7 @@ function fileInfoFromRawFile(raw) {
     filename: raw.name,
     size: (raw.size / 1024).toFixed(2),
     type: raw.name.split('.').pop(),
-    strategy: '智能上下文切割'
+    strategy: '按页切割'
   }
 }
 

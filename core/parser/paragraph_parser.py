@@ -279,10 +279,10 @@ class ParagraphParser(BaseParser):
                 )
                 judge_result = self.llm.chat(paragraph_judge_messages)
                 logger.debug(judge_result)
-                if 'is_continuous' in judge_result and judge_result['is_continuous'] == 'false':
+                if judge_result and 'is_continuous' in judge_result and judge_result['is_continuous'] == 'false':
                     index = next_index
                     break
-
+                # 将上一页与当前页归为一组
                 previous_page_text += current_page_text
                 index = next_index
                 next_index += 1
