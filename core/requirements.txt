@@ -12,4 +12,5 @@ bcrypt==4.0.1
 PyMuPDF==1.24.14
 mineru[core]==2.0.6
 llama-index==0.12.37
+fastapi-pagination==0.13.3
 llama-index-llms-openai-like==0.3.5
