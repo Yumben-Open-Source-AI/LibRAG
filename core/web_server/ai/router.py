@@ -9,6 +9,7 @@ from functools import partial
 from typing import Annotated, List
 
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends, status
+from fastapi_pagination import Page, paginate
 from sqlmodel import select
 
 from db.database import SessionDep
@@ -39,7 +40,25 @@ async def query_with_llm(
         question: str,
         score_threshold: float | None = None,
         token=Depends(verify_token)
-):
+) -> List[object]:
+    """
+    领域-分类-文档-段落召回
+    Arag:
+        kb_id: 知识库id
+        session: 数据库连接
+        question: 用户问题
+        score_threshold: 分数阈值
+        token: 请求token
+    Return:
+        target_paragraphs: 用户问题相关的段落答案
+    """
+    # params init
+    if score_threshold and not isinstance(score_threshold, float):
+        score_threshold = float(str(score_threshold))
+
+    if not session.get(KnowledgeBase, kb_id):
+        raise HTTPException(status_code=404, detail="数据库无此知识库，请检查")
+
     llm_chat = LlmChat()
     params = SelectorParam(llm_chat, kb_id, session, question)
     selected_domains, domains = DomainSelector(params).collate_select_params().start_select()
@@ -257,28 +276,34 @@ async def create_knowledge_bases(kb: KbBase, session: SessionDep, token=Depends(
 
 
 @router.get('/knowledge_base/{kb_id}')
-async def query_knowledge_base(kb_id: int, session: SessionDep, token=Depends(verify_token)):
+async def query_knowledge_base(
+        kb_id: int,
+        session: SessionDep,
+        token=Depends(verify_token)
+) -> Page[dict]:
     know_base = session.get(KnowledgeBase, kb_id)
-    documents = [doc.model_dump() for doc in know_base.documents]
-    know_base = know_base.dict()
-
     if not know_base:
         raise HTTPException(status_code=404, detail="KnowledgeBase not found")
 
-    know_base['documents'] = documents
+    # 获取文档列表
+    documents = [doc.model_dump() for doc in know_base.documents]
+
+    # 获取处理中的任务
     all_tasks = session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id).all()
     document_paths = {(document['file_path'], document['parse_strategy']) for document in documents}
+
+    # 合并文档和任务
     for task in all_tasks:
         if task.status == 'filing':
             continue
 
         if (task.file_path, task.parse_strategy) not in document_paths:
-            know_base['documents'].append({
-                'task': task
+            documents.append({
+                'task': task.model_dump()  # 使用model_dump转换任务对象
             })
             document_paths.add((task.file_path, task.parse_strategy))
 
-    return know_base
+    return paginate(documents)
 
 
 @router.get('/knowledge_bases', response_model=list[KnowledgeBase])

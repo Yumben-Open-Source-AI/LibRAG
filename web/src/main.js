@@ -1,4 +1,5 @@
 import ElementPlus from 'element-plus';
+import zhCN from "element-plus/dist/locale/zh-cn.mjs"
 import 'element-plus/dist/index.css';
 
 import { createApp } from 'vue';
@@ -11,7 +12,7 @@ import App from '@/App.vue';
 
 const app = createApp(App);
 app.provide('$api', api);
-app.use(ElementPlus);
+app.use(ElementPlus, {locale:zhCN})
 app.use(router);
 
 const pinia = createPinia();

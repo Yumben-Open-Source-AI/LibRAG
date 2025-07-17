@@ -61,7 +61,7 @@
                 <div class="card-header">
                   <div v-if="selectedKB" class="sub-title">
                     知识库：{{ selectedKB.kb_name }}
-                    <el-tag type="info">{{ fileTableData.length }}篇文档</el-tag>
+                    <el-tag type="info">{{ documerntTotal }}篇文档</el-tag>
                   </div>
                 </div>
               </template>
@@ -110,6 +110,12 @@
                   </div>
                 </el-card>
               </el-scrollbar>
+
+              <el-pagination v-if="selectedKB" style="float: right; margin-bottom: 5px;margin-top: 5px;"
+                v-model:current-page="currentDocumentPage" v-model:page-size="documentPageSize"
+                :page-sizes="[10, 20, 50, 100]" :disabled="disabled" :background="true" :pager-count="5"
+                layout="sizes, prev, pager, next, jumper" :total="documerntTotal" @size-change="handleSizeChange"
+                @current-change="handleCurrentChange" />
 
             </el-card>
           </el-main>
@@ -316,6 +322,11 @@ const createFileRows = ref([]) // [{file,filename,size,type,strategy}]
 const appendFileList = ref([])
 const appendFileRows = ref([])
 
+/* 分页 */
+const documentPageSize = ref(10)
+const currentDocumentPage = ref(1)
+const documerntTotal = ref(100)
+
 /* 计算属性 */
 const kbOptions = computed(() =>
   kbTableData.value.map(k => ({
@@ -330,8 +341,16 @@ async function fetchKnowledgeBases() {
 }
 
 async function fetchDocuments(kbId) {
-  const { data } = await api.get(`knowledge_base/${kbId}`)
-  fileTableData.value = data.documents.map(d => ({
+  const { data } = await api.get(`knowledge_base/${kbId}`, {
+    params: {
+      page: currentDocumentPage.value,
+      size: documentPageSize.value
+    }
+  })
+
+  documerntTotal.value = data.total
+
+  fileTableData.value = data.items.map(d => ({
     ...d,
     文档名称: d.document_name,
     文档描述: d.document_description,
@@ -418,6 +437,16 @@ function handleCreateUpload(file, fileList) {
   }
 }
 
+async function handleSizeChange(val) {
+  documentPageSize.value = val
+  await fetchDocuments(selectedKB.value.kb_id)
+}
+
+async function handleCurrentChange(val) {
+  currentDocumentPage.value = val
+  await fetchDocuments(selectedKB.value.kb_id)
+}
+
 /*  追加文件时删除文件  */
 function handleAppendRemove(file, fileList) {
   handleAppendUpload(file, fileList)
@@ -474,7 +503,7 @@ async function submitCreate() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  const {data} = await api.post('upload', formData)
+  const { data } = await api.post('upload', formData)
 
   ElMessage.success(`知识库『${createForm.name}』创建成功，${data.message}`)
   createDialogVisible.value = false
@@ -503,7 +532,7 @@ async function submitAppend() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  const {data} = await api.post('upload', formData)
+  const { data } = await api.post('upload', formData)
 
   ElMessage.success(`${data.message}`)
   appendDialogVisible.value = false

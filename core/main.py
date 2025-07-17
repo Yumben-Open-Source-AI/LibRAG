@@ -2,17 +2,36 @@ import datetime
 import threading
 
 import uvicorn
-from fastapi import FastAPI, Request
 from dotenv import load_dotenv
-from db.database import create_db_and_tables
+from fastapi import FastAPI, Request
+from fastapi import applications
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi_pagination import add_pagination
 
+from db.database import create_db_and_tables
 from parser.parser_worker import init_process, process_exit
+from tools.log_tools import manage_logger as logger
 from web_server.ai.router import router as ai_router
 from web_server.dify.router import router as dify_router
-from tools.log_tools import manage_logger as logger
+
+
+def swagger_monkey_patch(*args, **kwargs):
+    """
+    Wrap the function which is generating the HTML for the /docs endpoint and
+    overwrite the default values for the swagger js and css.
+    """
+
+    return get_swagger_ui_html(
+        *args, **kwargs,
+        swagger_js_url="https://cdn.staticfile.org/swagger-ui/5.2.0/swagger-ui-bundle.min.js",
+        swagger_css_url="https://cdn.staticfile.org/swagger-ui/5.2.0/swagger-ui.min.css")
+
+
+applications.get_swagger_ui_html = swagger_monkey_patch
 
 app = FastAPI()
+add_pagination(app)
 app.include_router(ai_router)
 app.include_router(dify_router)
 
