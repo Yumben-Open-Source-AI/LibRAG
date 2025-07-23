@@ -10,6 +10,7 @@ from typing import Annotated, List
 
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends, status
 from fastapi_pagination import Page, paginate
+from fastapi_pagination.utils import disable_installed_extensions_check
 from sqlmodel import select
 
 from db.database import SessionDep
