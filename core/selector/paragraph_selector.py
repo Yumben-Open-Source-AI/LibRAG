@@ -86,6 +86,7 @@ class ParagraphSelector(BaseSelector):
         return self
 
     def collate_select_result(self) -> List:
+        documents = {}
         if len(self.selected_paragraphs) == 0:
             return []
 
@@ -94,7 +95,14 @@ class ParagraphSelector(BaseSelector):
         for paragraph_id in self.selected_paragraphs:
             try:
                 paragraph_uuid = uuid.UUID(paragraph_id)
-                result.append(session.get(Paragraph, paragraph_uuid).dict())
+                target_paragraph = session.get(Paragraph, paragraph_uuid).dict()
+                document_id = target_paragraph['parent_id']
+                if document_id not in documents:
+                    # 新增文档名称
+                    document = session.get(Document, document_id).dict()
+                    documents[document_id] = document['file_path'].split('/')[-1]
+                target_paragraph['document_name'] = documents[document_id]
+                result.append(target_paragraph)
             except Exception as e:
                 logger.error(str(e) + '段落选择器异常输出选择', exc_info=True)
                 pass

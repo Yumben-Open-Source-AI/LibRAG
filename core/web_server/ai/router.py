@@ -10,6 +10,7 @@ from typing import Annotated, List
 
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends, status
 from fastapi_pagination import Page, paginate
+from fastapi_pagination.ext.sqlalchemy import paginate as sqlalchemy_paginate
 from fastapi_pagination.utils import disable_installed_extensions_check
 from sqlmodel import select
 
@@ -388,6 +389,17 @@ async def query_documents(category_id: str, session: SessionDep, token=Depends(v
     document_ids = session.query(CategoryDocumentLink).filter_by(category_id=uuid.UUID(category_id)).all()
     document_ids = [document.document_id for document in document_ids]
     return session.query(Document).filter(Document.document_id.in_(document_ids)).all()
+
+
+@router.get('/documents/')
+async def query_documents(
+        document_name: str,
+        session: SessionDep,
+        token=Depends(verify_token)
+) -> Page[Document]:
+    """ 模糊筛选条件文档 """
+    filter_condition = f"%{document_name}%"
+    return sqlalchemy_paginate(session, select(Document).filter(Document.file_path.like(filter_condition)))
 
 
 @router.get('/document/{document_id}')

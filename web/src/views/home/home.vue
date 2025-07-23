@@ -62,6 +62,17 @@
                   <div v-if="selectedKB" class="sub-title">
                     知识库：{{ selectedKB.kb_name }}
                     <el-tag type="info">{{ documerntTotal }}篇文档</el-tag>
+
+                    <div style="float: right; display: flex; gap: 8px; align-items: center;">
+                      <el-input v-model="docFilterText" placeholder="筛选文档名称" style="width: 300px;" clearable />
+                      <el-button type="info" @click="resetDocFilter">
+                        重置
+                      </el-button>
+
+                      <el-button type="primary" @click="filteredFileTableData">
+                        筛选
+                      </el-button>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -88,7 +99,7 @@
                     </el-descriptions>
                   </div>
                   <div v-else>
-                    <el-descriptions :title="doc['文档名称']" :column="3" size="small" border>
+                    <el-descriptions :title="doc['文件名']" :column="3" size="small" border>
                       <template #extra>
                         <el-button type="info" size="small" @click="handleDocRowClick(null, doc)" round>查看段落
                         </el-button>
@@ -150,6 +161,7 @@
           <el-table-column prop="summary" label="段落摘要" />
           <el-table-column prop="content" label="段落内容" />
           <el-table-column prop="parent_description" label="来源描述" />
+          <el-table-column prop="document_name" label="来源文档" />
           <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性" />
           <el-table-column prop="context_sufficiency" align="center" width="120" label="上下文充分性" />
           <el-table-column prop="context_clarity" align="center" width="100" label="语境清晰性" />
@@ -327,6 +339,34 @@ const documentPageSize = ref(10)
 const currentDocumentPage = ref(1)
 const documerntTotal = ref(100)
 
+/* 文档筛选相关 */
+const docFilterText = ref('') // 文档名筛选
+
+async function filteredFileTableData() {
+  const { data } = await api.get(`documents`, {
+    params: {
+      document_name: docFilterText.value,
+      page: currentDocumentPage.value,
+      size: documentPageSize.value
+    }
+  })
+  documerntTotal.value = data.total;
+
+  fileTableData.value = data.items.map(d => ({
+    ...d,
+    文件名: d.file_path ? d.file_path.split("/").pop() || '' : '',
+    文档名称: d.document_name,
+    文档描述: d.document_description,
+    切割策略: d.parse_strategy || ''
+  }))
+}
+
+// 重置筛选条件
+async function resetDocFilter() {
+  docFilterText.value = '';
+  await fetchDocuments(selectedKB.value.kb_id);
+}
+
 /* 计算属性 */
 const kbOptions = computed(() =>
   kbTableData.value.map(k => ({
@@ -348,10 +388,11 @@ async function fetchDocuments(kbId) {
     }
   })
 
-  documerntTotal.value = data.total
+  documerntTotal.value = data.total;
 
   fileTableData.value = data.items.map(d => ({
     ...d,
+    文件名: d.file_path ? d.file_path.split("/").pop() || '' : '',
     文档名称: d.document_name,
     文档描述: d.document_description,
     切割策略: d.parse_strategy || ''
@@ -593,6 +634,7 @@ async function doRecall() {
     paragraph_id: par.paragraph_id,
     summary: par.summary,
     content: par.content,
+    document_name: par.document_name,
     parent_description: par.parent_description,
     context_relevance: par.context_relevance,
     context_sufficiency: par.context_sufficiency,
