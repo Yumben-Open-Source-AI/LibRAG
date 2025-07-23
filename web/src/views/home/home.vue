@@ -343,7 +343,7 @@ const documerntTotal = ref(100)
 const docFilterText = ref('') // 文档名筛选
 
 async function filteredFileTableData() {
-  const { data } = await api.get('documents/filter', {
+  const { data } = await api.get('filter_documents', {
     params: {
       document_name: docFilterText.value,
       page: 1,

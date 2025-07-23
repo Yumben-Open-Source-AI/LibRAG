@@ -391,7 +391,7 @@ async def query_documents(category_id: str, session: SessionDep, token=Depends(v
     return session.query(Document).filter(Document.document_id.in_(document_ids)).all()
 
 
-@router.get('/documents/filter')
+@router.get('/filter_documents')
 async def query_documents(
         document_name: str,
         session: SessionDep,
