@@ -52,6 +52,12 @@ class DocumentParser(BaseParser):
         self.session.add(self.document)
 
     def rebuild_parser_data(self, parent: Category):
+        import uuid
+        if not isinstance(parent.category_id, uuid.UUID):
+            try:
+                parent.category_id = uuid.UUID(str(parent.category_id))
+            except ValueError:
+                raise ValueError(f"异常category_id: {parent.category_id}")
         # 解绑旧类别
         self.document.categories = []
         self.document.categories.append(parent)

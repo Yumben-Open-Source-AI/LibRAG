@@ -32,9 +32,10 @@ class CategoryParser(BaseParser):
         document = kwargs.get('document')
         parse_type = kwargs.get('parse_type', 'default')
         ext_categories = kwargs.get('ext_categories', [])
-        known_categories = self.__get_known_categories()
         if parse_type == 'rebuild':
             known_categories = self.tidy_up_known_categories(ext_categories)
+        else:
+            known_categories = self.__get_known_categories()
         parse_params = {
             'document_name': document.document_name,
             'document_description': document.document_description,
@@ -50,11 +51,23 @@ class CategoryParser(BaseParser):
             del self.category['category_id']
             self.category = Category(**self.category)
         else:
-            db_category = self.session.get(Category, uuid.UUID(self.category['category_id']))
+            category_id_str = self.category.get('category_id', '').strip()
+            # 验证UUID格式
+            try:
+                category_uuid = uuid.UUID(category_id_str)
+            except ValueError as e:
+                raise ValueError(f"无法解析UUID: {category_id_str}, 错误: {e}")
+
             if parse_type == 'rebuild':
-                for category in ext_categories:
-                    if category.category_id.__str__() == self.category['category_id']:
-                        db_category = category
+                # 重构建优先从ext_categories匹配
+                matched = [c for c in ext_categories if str(c.category_id) == category_id_str]
+                if not matched:
+                    # raise ValueError(f"rebuild模式下未找到category_id: {category_id_str}")
+                    matched = ext_categories[0]
+                db_category = matched[0]
+            else:
+                # 预处理优先从数据库查找
+                db_category = self.session.get(Category, category_uuid)
 
             if not db_category:
                 raise ValueError('new_classification judge is wrong, db category does not exist')

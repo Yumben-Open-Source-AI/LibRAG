@@ -225,7 +225,7 @@ async def upload_file(
             file_suffix = Path(file_name).suffix
             if file_suffix not in ['.doc', '.docx', '.pdf', '.png', '.jpeg', '.jpg']:
                 # 预校验上传文件后缀
-                message += f'\n{file_name}文件无法处理不支持格式，支持格式:[.doc, .docx, .pdf, png, jpeg, jpg]'
+                message += f'\n{file_name}文件无法处理不支持格式，支持格式:[.doc, .docx, .pdf, .png, .jpeg, .jpg]'
                 continue
 
             kb_id = items[i]['kb_id']
@@ -303,6 +303,7 @@ async def query_knowledge_base(
             })
             document_paths.add((task.file_path, task.parse_strategy))
 
+    disable_installed_extensions_check()
     return paginate(documents)
 
 
