@@ -346,7 +346,7 @@ async function filteredFileTableData() {
   const { data } = await api.get(`documents`, {
     params: {
       document_name: docFilterText.value,
-      page: currentDocumentPage.value,
+      page: 1,
       size: documentPageSize.value
     }
   })
