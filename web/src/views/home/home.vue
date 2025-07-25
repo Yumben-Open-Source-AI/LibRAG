@@ -124,10 +124,9 @@
 
               <el-pagination v-if="selectedKB" style="float: right; margin-bottom: 5px;margin-top: 5px;"
                 v-model:current-page="currentDocumentPage" v-model:page-size="documentPageSize"
-                :page-sizes="[10, 20, 50, 100]" :disabled="disabled" :background="true" :pager-count="5"
+                :page-sizes="[10, 20, 50, 100]" :background="true" :pager-count="5"
                 layout="sizes, prev, pager, next, jumper" :total="documerntTotal" @size-change="handleSizeChange"
                 @current-change="handleCurrentChange" />
-
             </el-card>
           </el-main>
         </el-container>
@@ -172,7 +171,7 @@
     </el-tabs>
 
     <!-- 创建 KB & 提交文件 Dialog -->
-    <el-dialog v-model="createDialogVisible" title="创建新知识库 & 提交文件" width="40%">
+    <el-dialog v-model="createDialogVisible" title="创建新知识库 & 提交文件" width="50%">
       <el-form :model="createForm" label-width="100px">
         <el-row>
           <el-col :span="24">
@@ -188,28 +187,37 @@
         </el-row>
         <el-form-item label="上传文件：">
           <el-upload multiple :auto-upload="false" :file-list="createFileList" :on-change="handleCreateUpload"
-            :on-remove="handleCreateRemove" drag style="width: 100%;">
+            :on-remove="handleCreateRemove" drag style="width: 100%;" :show-file-list="false">
             <i class="el-icon-upload" />
             <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
           </el-upload>
         </el-form-item>
       </el-form>
 
-      <!-- Files preview & strategy table -->
-      <el-table :data="createFileRows" border v-if="createFileRows.length" size="small" class="mb-4">
+      <el-table :data="currentCreateFileRows" border v-if="createFileRows.length" size="small">
         <el-table-column prop="filename" label="文件名" />
-        <el-table-column prop="size" label="大小(KB)" width="120" />
-        <el-table-column prop="type" label="文件类型" width="120" />
-        <el-table-column label="切割策略" width="200">
+        <el-table-column prop="size" label="大小(KB)" width="80" />
+        <el-table-column prop="type" label="文件类型" width="80" />
+        <el-table-column label="切割策略" width="150">
           <template #default="{ row }">
             <el-select v-model="row.strategy" placeholder="选择策略" size="small">
               <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label" />
             </el-select>
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="80">
+          <template #default="{ row }">
+            <el-button type="danger" size="small" text-color="#ff4d4f" @click="handleCreateRemoveFile(row)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <template #footer>
+        <el-pagination style="float: left" v-model:current-page="createDocumentPage" :page-size="10" :background="true"
+          :pager-count="5" layout="total, prev, pager, next, jumper" :total="createFileRows.length"
+          @current-change="createCurrentChange" />
         <el-button @click="createDialogVisible = false" round>取消</el-button>
         <el-button type="primary" @click="submitCreate" round>创建</el-button>
       </template>
@@ -217,26 +225,36 @@
 
     <!-- 追加文件 Dialog -->
     <el-dialog v-model="appendDialogVisible" title="追加新文件" width="800px">
+      <!-- 上传区域 -->
       <el-upload multiple :auto-upload="false" :file-list="appendFileList" :on-change="handleAppendUpload"
-        :on-remove="handleAppendRemove" drag>
+        :on-remove="handleAppendRemove" drag style="margin-bottom: 20px;" :show-file-list="false">
         <i class="el-icon-upload" />
         <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
       </el-upload>
 
-      <el-table :data="appendFileRows" v-if="appendFileRows.length" size="small" class="my-4">
+      <el-table :data="currentAppendFileRows" v-if="currentAppendFileRows.length" size="small" border>
         <el-table-column prop="filename" label="文件名" />
-        <el-table-column prop="size" label="大小(KB)" width="120" />
-        <el-table-column prop="type" label="文件类型" width="120" />
-        <el-table-column label="切割策略" width="200">
+        <el-table-column prop="size" label="大小(KB)" width="80" />
+        <el-table-column prop="type" label="文件类型" width="80" />
+        <el-table-column label="切割策略" width="150">
           <template #default="{ row }">
             <el-select v-model="row.strategy" placeholder="选择策略" size="small">
               <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label" />
             </el-select>
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="80">
+          <template #default="{ row }">
+            <el-button type="danger" size="small" text-color="#ff4d4f" @click="handleRemoveFile(row)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
-
       <template #footer>
+        <el-pagination style="float: left" v-model:current-page="appendDocumentPage" :page-size="10" :background="true"
+          :pager-count="5" layout="total, prev, pager, next, jumper" :total="appendFileRows.length"
+          @current-change="appendCurrentChange" />
         <el-button @click="appendDialogVisible = false" round>取消</el-button>
         <el-button type="primary" @click="submitAppend" round>追加</el-button>
       </template>
@@ -327,12 +345,16 @@ const fullscreenLoading = ref(false)
 
 /*  创建 KB 表单 */
 const createForm = reactive({ name: '', desc: '' })
-const createFileList = ref([]) // el-upload list 格式
-const createFileRows = ref([]) // [{file,filename,size,type,strategy}]
+const createFileList = ref([]);
+const createFileRows = ref([]);
+const currentCreateFileRows = ref([]);
+const createDocumentPage = ref(1);
 
 /*  追加文件 */
 const appendFileList = ref([])
 const appendFileRows = ref([])
+const currentAppendFileRows = ref([]);
+const appendDocumentPage = ref(1)
 
 /* 分页 */
 const documentPageSize = ref(10)
@@ -425,9 +447,10 @@ function openCreateDialog() {
 }
 
 function openAppendDialog() {
-  appendDialogVisible.value = true
-  appendFileList.value = []
-  appendFileRows.value = []
+  appendDialogVisible.value = true;
+  appendFileList.value = [];
+  appendFileRows.value = [];
+  currentAppendFileRows.value = [];
 }
 
 function openUpdateIndexDialog() {
@@ -476,6 +499,32 @@ function handleCreateUpload(file, fileList) {
       }
     })
   }
+
+  // 重新计算当前页数据
+  createCurrentChange(createDocumentPage.value);
+}
+
+function createCurrentChange(val) {
+  createDocumentPage.value = val;
+  // 起始索引
+  const startIndex = (val - 1) * 10;
+  // 结束索引
+  const endIndex = startIndex + 10;
+  // 截取对应范围数据
+  currentCreateFileRows.value = createFileRows.value.slice(startIndex, endIndex);
+}
+
+function handleCreateRemoveFile(row) {
+  // 找到文件在列表中的索引
+  const index = createFileRows.value.findIndex(item => item.file.uid === row.file.uid);
+
+  if (index !== -1) {
+    // 从数据列表中移除
+    createFileRows.value.splice(index, 1);
+    // 同步更新上传组件的文件列表
+    createFileList.value.splice(index, 1);
+    createCurrentChange(createDocumentPage.value);
+  }
 }
 
 async function handleSizeChange(val) {
@@ -488,28 +537,54 @@ async function handleCurrentChange(val) {
   await fetchDocuments(selectedKB.value.kb_id)
 }
 
+function appendCurrentChange(val) {
+  appendDocumentPage.value = val;
+  // 起始索引
+  const startIndex = (val - 1) * 10;
+  // 结束索引
+  const endIndex = startIndex + 10;
+  // 截取对应范围数据
+  currentAppendFileRows.value = appendFileRows.value.slice(startIndex, endIndex);
+}
+
 /*  追加文件时删除文件  */
 function handleAppendRemove(file, fileList) {
   handleAppendUpload(file, fileList)
 }
 
+function handleRemoveFile(row) {
+  // 找到文件在列表中的索引
+  const index = appendFileRows.value.findIndex(item => item.file.uid === row.file.uid);
+
+  if (index !== -1) {
+    // 从数据列表中移除
+    appendFileRows.value.splice(index, 1);
+    // 同步更新上传组件的文件列表
+    appendFileList.value.splice(index, 1);
+    appendCurrentChange(appendDocumentPage.value);
+  }
+}
+
 /*  追加文件时文件发生变更  */
 function handleAppendUpload(file, fileList) {
-  let strategies = {}
+  let strategies = {};
   if (appendFileList.value.length > 0) {
-    appendFileRows.value.forEach(item => strategies[item.file.uid] = item.strategy)
+    appendFileRows.value.forEach(item => strategies[item.file.uid] = item.strategy);
   }
 
-  appendFileRows.value = fileList.map(f => fileInfoFromRawFile(f.raw))
-  appendFileList.value = fileList
+  appendFileRows.value = fileList.map(f => fileInfoFromRawFile(f.raw));
+  appendFileList.value = fileList;
 
   if (Reflect.ownKeys(strategies).length > 0) {
     appendFileRows.value.forEach(f => {
       if (f.file.uid in strategies) {
-        f.strategy = strategies[f.file.uid]
+        f.strategy = strategies[f.file.uid];
       }
-    })
+    });
   }
+
+  // 重新计算当前页数据
+  appendCurrentChange(appendDocumentPage.value);
 }
 
 /*  创建 KB & 提交文件  */
