@@ -3,11 +3,12 @@ import threading
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
-from fastapi import applications
+from fastapi import Request, applications
+from fastapi import FastAPI as FastAPIBase
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi_pagination import add_pagination
+from starlette.staticfiles import StaticFiles
 
 from db.database import create_db_and_tables
 from parser.parser_worker import init_process, process_exit
@@ -16,24 +17,35 @@ from web_server.ai.router import router as ai_router
 from web_server.dify.router import router as dify_router
 
 
-def swagger_monkey_patch(*args, **kwargs):
-    """
-    Wrap the function which is generating the HTML for the /docs endpoint and
-    overwrite the default values for the swagger js and css.
-    """
+class FastAPI(FastAPIBase):
+    def __init__(self, *args, **kwargs) -> None:
+        # 排除默认js & css
+        if "swagger_js_url" in kwargs:
+            self.swagger_js_url = kwargs.pop("swagger_js_url")
+        if "swagger_css_url" in kwargs:
+            self.swagger_css_url = kwargs.pop("swagger_css_url")
 
-    return get_swagger_ui_html(
-        *args, **kwargs,
-        swagger_js_url="https://cdn.staticfile.org/swagger-ui/5.2.0/swagger-ui-bundle.min.js",
-        swagger_css_url="https://cdn.staticfile.org/swagger-ui/5.2.0/swagger-ui.min.css")
+        def get_swagger_ui_html_with_local(*args, **kwargs):
+            return get_swagger_ui_html(
+                *args,
+                **kwargs,
+                swagger_js_url=self.swagger_js_url,
+                swagger_css_url=self.swagger_css_url,
+            )
+
+        applications.get_swagger_ui_html = get_swagger_ui_html_with_local
+        super(FastAPI, self).__init__(*args, **kwargs)
 
 
-applications.get_swagger_ui_html = swagger_monkey_patch
-
-app = FastAPI()
+app = FastAPI(
+    title="LibRAG API",
+    swagger_js_url="/static/swagger-ui/swagger-ui-bundle.min.js",
+    swagger_css_url="/static/swagger-ui/swagger-ui.min.css"
+)
 add_pagination(app)
 app.include_router(ai_router)
 app.include_router(dify_router)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 origins = [
     '*'
@@ -79,7 +91,6 @@ if __name__ == '__main__':
         app='main:app',
         host='0.0.0.0',
         port=13113,
-        workers=10,
         timeout_keep_alive=3,  # 指定3s内保持活动状态的连接
         backlog=4096  # 等待处理最大连接数
     )
