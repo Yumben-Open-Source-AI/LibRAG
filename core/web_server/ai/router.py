@@ -61,6 +61,13 @@ async def query_with_llm(
     if not session.get(KnowledgeBase, kb_id):
         raise HTTPException(status_code=404, detail="数据库无此知识库，请检查")
 
+    if question and isinstance(question, str):
+        # TODO 问题字符串格式校验不够优雅
+        question = question.replace('\r\n', '')
+        question = question.replace('\n', '')
+        question = question.replace('"', '')
+        question = question.replace("'", '')
+
     llm_chat = LlmChat()
     params = SelectorParam(llm_chat, kb_id, session, question)
     selected_domains, domains = DomainSelector(params).collate_select_params().start_select()

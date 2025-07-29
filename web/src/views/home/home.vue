@@ -137,7 +137,8 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="请输入查询：">
-                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" class="flex-1" />
+                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" class="flex-1"
+                  @keydown.enter="handlerKeyDown($event)" />
               </el-form-item>
             </el-col>
             <el-col :span="4">
@@ -363,6 +364,14 @@ const documerntTotal = ref(100)
 
 /* 文档筛选相关 */
 const docFilterText = ref('') // 文档名筛选
+
+// 处理回车事件
+function handlerKeyDown(event) {
+  if (event.keyCode == 13) {
+    event.preventDefault();
+    doRecall();
+  }
+}
 
 async function filteredFileTableData() {
   const { data } = await api.get('filter_documents', {
