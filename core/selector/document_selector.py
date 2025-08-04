@@ -89,5 +89,10 @@ class DocumentSelector(BaseSelector):
         response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=10)
         selected_documents = set(response_chat)
 
-        documents = [{'document_id': doc, 'document_name': self.document_names[doc]}for doc in selected_documents]
+        documents = []
+        for doc in selected_documents.copy():
+            if doc in self.document_names:
+                documents.append({'document_id': doc, 'document_name': self.document_names[doc]})
+            else:
+                selected_documents.remove(doc)
         return selected_documents, documents
