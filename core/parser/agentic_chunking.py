@@ -16,6 +16,7 @@ class ChunkMeta(BaseModel):
     keywords: List[str]
     position: str
     propositions: List[str]
+    source_text: List[str]
 
 
 # ---------- 业务类 ----------
@@ -51,14 +52,13 @@ class ChunkOrganizer:
         propositions = self._extract_propositions(text)
 
         for prop in propositions:
-            self._dispatch_proposition(prop)
+            self._dispatch_proposition(prop, text)
 
         # 返回 Pydantic 模型列表，供外部使用
         return list(self.chunks.values())
 
-    # ======== 私有工具 ========
-    # ---- proposition 提取 ----
     def _extract_propositions(self, text: str) -> List[str]:
+        """ 提取proposition """
         messages = [
             self._proposition_system,
             text
@@ -67,8 +67,8 @@ class ChunkOrganizer:
         logger.debug(f'##_extract_propositions result: {str(result)}')
         return result
 
-    # ---- 创建新块 ----
-    def _create_new_chunk(self, proposition: str) -> str:
+    def _create_new_chunk(self, proposition: str, source_text: str) -> str:
+        """ 初始化创建新块 """
         chunk_id = str(uuid.uuid4())
         messages = [
             self._summary_system,
@@ -82,12 +82,13 @@ class ChunkOrganizer:
             summary=summary_res.get("summary", ""),
             keywords=summary_res.get("keywords", []),
             position=summary_res.get("position", ""),
-            propositions=[proposition]
+            propositions=[proposition],
+            source_text=[source_text]
         )
         return chunk_id
 
-    # ---- 将命题追加到已有块并更新摘要 ----
-    def _add_to_chunk(self, chunk_id: str, proposition: str):
+    def _add_to_chunk(self, chunk_id: str, proposition: str, source_text: str):
+        """ 将命题追加到已有块并更新摘要 """
         chunk = self.chunks[chunk_id]
         chunk.propositions.append(proposition)
 
@@ -103,11 +104,12 @@ class ChunkOrganizer:
         chunk.keywords = summary_res.get("keywords", chunk.keywords)
         chunk.position = summary_res.get("position", chunk.position)
         chunk.summary = summary_res.get("summary", chunk.summary)
+        chunk.source_text.append(source_text)
 
     # ---- 判定归属 ----
-    def _dispatch_proposition(self, proposition: str):
+    def _dispatch_proposition(self, proposition: str, source_text: str):
         if not self.chunks:
-            self._create_new_chunk(proposition)
+            self._create_new_chunk(proposition, source_text)
             return
 
         chunks_summaries = {cid: c.summary for cid, c in self.chunks.items()}
@@ -118,14 +120,14 @@ class ChunkOrganizer:
         alloc_res = self.llm.chat(messages)
         logger.debug(f'##_dispatch_proposition alloc_res: {str(alloc_res)}')
         if alloc_res.get("action") == "create_new":
-            self._create_new_chunk(proposition)
+            self._create_new_chunk(proposition, source_text)
         else:  # assign
             target_id = alloc_res.get("target_block_id")
             if target_id in self.chunks:
-                self._add_to_chunk(target_id, proposition)
+                self._add_to_chunk(target_id, proposition, source_text)
             else:
                 # 保险起见，目标不存在时新建块
-                self._create_new_chunk(proposition)
+                self._create_new_chunk(proposition, source_text)
 
 
 if __name__ == "__main__":

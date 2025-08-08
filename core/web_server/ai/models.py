@@ -114,6 +114,7 @@ class Paragraph(SQLModel, table=True):
     meta_data: dict = Field(sa_type=JSON, default={}, sa_column_kwargs={'comment': '元数据'})
     keywords: list[str] | None = Field(sa_type=JSON, default=[], sa_column_kwargs={'comment': '提取关键词'})
     parent_description: str
+    source_text: list[str] | None = Field(sa_type=JSON, default=[], sa_column_kwargs={'comment': '原文段落'})
     parent_id: uuid.UUID | None = Field(foreign_key='document.document_id')
     document: Document = Relationship(back_populates='paragraphs')
     kb_id: int | None = Field(default=None, foreign_key='knowledge_base.kb_id',

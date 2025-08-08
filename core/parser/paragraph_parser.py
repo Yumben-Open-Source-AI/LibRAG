@@ -1,18 +1,16 @@
 import copy
-import json
+import datetime
 import os
-import re
+import shutil
 import tempfile
 import uuid
-import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from string import Template
+
 from llm.llmchat import LlmChat
 from parser.agentic_chunking import ChunkOrganizer
 from parser.base import BaseParser
-
-from pathlib import Path
-
 from parser.chinese_text_splitter import FlexibleRecursiveSplitter
 from parser.load_api import convert_file_type, DataLoader
 from tools.log_tools import parser_logger as logger
@@ -74,6 +72,7 @@ class ParagraphParser(BaseParser):
         return all_paragraphs
 
     def parse(self, **kwargs):
+        temp_dir = None
         file_path = kwargs.get('path')
         self.parse_strategy = kwargs.get('parse_strategy')
         file_obj = Path(file_path)
@@ -88,8 +87,11 @@ class ParagraphParser(BaseParser):
             logger.debug(file_path)
 
         if file_obj.suffix in ['.pdf', '.png', '.jpeg', '.jpg']:
-            # TODO rm temp_dir
-            return self.pdf_parse(file_path)
+            parse_result = self.pdf_parse(file_path)
+            if temp_dir:
+                # rm temp_dir
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            return parse_result
 
     def storage_parser_data(self, parent: Document):
         paragraphs = []
@@ -99,22 +101,30 @@ class ParagraphParser(BaseParser):
             paragraphs.append(Paragraph(**paragraph))
         self.session.add_all(paragraphs)
 
-    def collate_paragraphs(self, paragraph_content):
+    def collate_paragraphs(self, paragraph_content, source_content):
+        """
+        整理模型输出数据 应用场景:按页切割 按目录切割 智能上下文切割
+        Args:
+            paragraph_content: 模型解析提取段落数据
+            source_content: 原文数据
+        """
         if isinstance(paragraph_content, dict):
             paragraph_content['kb_id'] = self.kb_id
             paragraph_content['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            paragraph_content['source_text'] = [source_content]
             self.paragraphs.append(paragraph_content)
         elif isinstance(paragraph_content, list):
             for paragraph in paragraph_content:
                 paragraph['kb_id'] = self.kb_id
                 paragraph['meta_data'] = {'最后更新时间': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                paragraph['source_text'] = [source_content]
             self.paragraphs.extend(paragraph_content)
 
     def chat_parse_paragraph(self, cur_index, next_index, page_text):
         parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
         parse_messages[1]['content'] += f"```<当前页:{cur_index}至{next_index}, 段落原文:{page_text}>```"
         paragraph_content = self.llm.chat(parse_messages)
-        self.collate_paragraphs(paragraph_content)
+        self.collate_paragraphs(paragraph_content, page_text)
 
     def __catalog_split(self, file_path):
         """
@@ -124,16 +134,11 @@ class ParagraphParser(BaseParser):
         """
 
         def find_text_page(target_text):
-            """ 查找文本所在PDF中的页码 """
-            import fitz
-            doc = fitz.open(file_path)
-
-            for page_num in range(len(doc)):
-                text = doc.load_page(page_num).get_text().replace('\n', '').replace(' ', '')
-
+            """ 查找文本在原文中的页码 """
+            for page_num, source_content in enumerate(source_parse_content):
+                text = source_content.replace(' ', '').replace('\n', '')
                 if target_text in text and page_num >= last_index - 1:
                     return page_num + 1
-
             return -1
 
         def split_markdown_structured_document(full_text: str,
@@ -143,20 +148,8 @@ class ParagraphParser(BaseParser):
             - 找不到的标题自动跳过，不影响后续切割。
             - 返回 {clean_title: {"raw_title": 原始标题, "content": 对应内容}}
             """
-            import re, unicodedata
-
-            PUNCT_CLASSES = {
-                "(": r"[\(\（]",
-                ")": r"[\)\）]",
-                ",": r"[,，]",
-                ":": r"[:：]",
-                ";": r"[;；]",
-                ".": r"[\.。]",
-                "!": r"[!！]",
-                "?": r"[\?？]",
-                "-": r"[-－﹣_]",
-                "/": r"[/／]",
-            }
+            import re
+            import unicodedata
 
             def _clean(t: str) -> str:
                 # 去掉井号、空白并做全角→半角归一
@@ -164,9 +157,22 @@ class ParagraphParser(BaseParser):
 
             def _build_pattern(title: str) -> str:
                 """
-                把中文符号和英文符号视为同一个：
-                例：'三、投资管理（二）费用' → S∙a∙v∙e…
+                构建正则匹配pattern
+                忽略中英文符号干扰，将不同符号视为同一个便于原文匹配
+                e.g. '三、投资管理（二）费用' → S∙a∙v∙e
                 """
+                PUNCT_CLASSES = {
+                    "(": r"[\(\（]",
+                    ")": r"[\)\）]",
+                    ",": r"[,，]",
+                    ":": r"[:：]",
+                    ";": r"[;；]",
+                    ".": r"[\.。]",
+                    "!": r"[!！]",
+                    "?": r"[\?？]",
+                    "-": r"[-－﹣_]",
+                    "/": r"[/／]",
+                }
                 parts = []
                 for ch in title:
                     if ch.isspace():
@@ -215,10 +221,11 @@ class ParagraphParser(BaseParser):
 
             return sections
 
-        pdf_content = ''.join(DataLoader(file_path).to_parse_file())
+        source_parse_content = DataLoader(file_path).to_parse_file()
+        markdown_content = ''.join(source_parse_content)
         catalog_messages = copy.deepcopy(FULL_TEXT_CATALOG_MESSAGES)
         template = Template(catalog_messages[1]['content'])
-        catalog_messages[1]['content'] = template.substitute(content=pdf_content)
+        catalog_messages[1]['content'] = template.substitute(content=markdown_content)
         catalog_result = self.llm.chat(catalog_messages)
         catalogs = catalog_result['catalogs']
         titles = catalogs
@@ -226,7 +233,7 @@ class ParagraphParser(BaseParser):
             titles = catalogs.split('\n')
         logger.debug(f'解析目录:{titles}')
         try:
-            result = split_markdown_structured_document(pdf_content, titles)
+            result = split_markdown_structured_document(markdown_content, titles)
 
             last_index = 0
             # 根据目录层级分割文本块
@@ -251,7 +258,7 @@ class ParagraphParser(BaseParser):
                 if len(content) > 0:
                     logger.debug(f'页码范围: {cur_index} - {next_index}')
                     page_text = f'标题({raw_title}) 内容({raw_content})'
-                    self.chat_parse_paragraph(cur_index, next_index, page_text)
+                    self.chat_parse_paragraph(cur_index, next_index, raw_content)
         except ValueError as e:
             logger.error(str(e), exc_info=True)
 
@@ -300,16 +307,16 @@ class ParagraphParser(BaseParser):
         """
         page_contents = DataLoader(file_path).to_parse_file()
         with ThreadPoolExecutor(max_workers=25) as executor:
-            tasks_page = []
+            tasks_page = {}
             for page_count, doc_markdown in enumerate(page_contents, start=1):
                 parse_messages = copy.deepcopy(PARAGRAPH_PARSE_MESSAGES)
                 parse_messages[1]['content'] += f"```<当前页:{page_count}, 段落原文:{doc_markdown}>```"
                 task = executor.submit(self.llm.chat, parse_messages)
-                tasks_page.append(task)
+                tasks_page.update({task: doc_markdown})
 
-            for task in as_completed(tasks_page):
+            for task in as_completed(tasks_page.keys()):
                 paragraph_content = task.result()
-                self.collate_paragraphs(paragraph_content)
+                self.collate_paragraphs(paragraph_content, tasks_page[task])
 
     def __agentic_chunking(self, file_path):
         """

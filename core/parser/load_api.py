@@ -164,9 +164,6 @@ class DataLoader:
                 # 如果提取内容不为空则追加
                 return_content_list.append(cur_md_file)
         shutil.rmtree(temp_base_dir, ignore_errors=True)
-
-        print(return_content_list)
-
         return return_content_list
 
     def __use_pipeline_parse_file(

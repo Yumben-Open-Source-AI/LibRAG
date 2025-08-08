@@ -7,17 +7,22 @@ WHITESPACE_RE = re.compile(r"[ \t\u3000\x0b\x0c\r]+")  # 半角/全角空格、T
 _SOFT_BREAK = re.compile(r'(?<![。！？!?])\n(?!\n)')
 _SENT_END = re.compile(r'[^。！？!?\.]*?(?:[。！？!?]|(?<!\d)\.(?!\d))')
 
+
 # ========= 1) 原子切分器工厂 ========= #
 def char_split(text: str) -> List[str]:
+    """ 字符切割 将文本拆分为单个字符列表 """
     return list(text)
 
+
 def sentence_split(text: str) -> List[str]:
-    text = _SOFT_BREAK.sub(' ', text)
-    text = WHITESPACE_RE.sub(' ', text)
+    """ 句子切割 句尾正则提取句子"""
+    text = _SOFT_BREAK.sub(' ', text)  # 消除软换行替换为空格
+    text = WHITESPACE_RE.sub(' ', text)  # 消除空白替换为空格
     sentences = [m.group(0).strip() for m in _SENT_END.finditer(text)]
-    if not sentences:                       # 全文没句尾 → 整段返回
+    if not sentences:  # 全文没句尾 → 整段返回
         sentences = [text.strip()]
     return sentences
+
 
 def paragraph_split(text: str) -> list[str]:
     # “一个或多个空行（可带列表符/缩进）” 视为段落分隔
@@ -25,11 +30,13 @@ def paragraph_split(text: str) -> list[str]:
     # 只保留真正含内容的段落
     return [p.strip() for p in pieces if p.strip()]
 
+
 SPLITTERS: dict[str, Callable[[str], List[str]]] = {
     "char": char_split,
     "sentence": sentence_split,
     "paragraph": paragraph_split,
 }
+
 
 # ========= 2) 通用递归分割器 ========= #
 class FlexibleRecursiveSplitter:
@@ -46,10 +53,11 @@ class FlexibleRecursiveSplitter:
         self.granularity = granularity
         self.chunk_size = chunk_size
         self.overlap_units = overlap_units
-        self.char_separators = char_separators or ["\n\n", "\n", " ","", None]
+        self.char_separators = char_separators or ["\n\n", "\n", " ", "", None]
 
     # ---- 主入口 ---- #
     def split(self, text: str) -> List[str]:
+        # 补充句尾 
         text += '.'
         units = self.split_fn(text)
         return self._assemble(units)

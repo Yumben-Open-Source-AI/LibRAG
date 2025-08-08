@@ -159,7 +159,16 @@
         <el-table :data="recallTableData" border height="650">
           <el-table-column prop="paragraph_id" label="段落ID" width="150" />
           <el-table-column prop="summary" label="段落摘要" />
-          <el-table-column prop="content" label="段落内容" />
+          <el-table-column label="段落内容">
+            <template #default="{ row }">
+              <el-input v-model="row.content" style="width: 100%" :rows="18" type="textarea" />
+            </template>
+          </el-table-column>
+          <el-table-column label="原文" v-if="parTableData.some(row => row.source_text)">
+            <template #default="{ row }">
+              <el-input v-model="row.source_text" style="width: 100%" :rows="18" type="textarea" />
+            </template>
+          </el-table-column>
           <el-table-column prop="parent_description" label="来源描述" />
           <el-table-column prop="document_name" label="来源文档" />
           <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性" />
@@ -290,7 +299,17 @@
         <el-table-column prop="paragraph_id" label="段落id" width="120" />
         <el-table-column prop="paragraph_name" label="段落名" width="120" />
         <el-table-column prop="summary" label="段落摘要" />
-        <el-table-column prop="content" label="段落内容" />
+        <el-table-column label="段落内容">
+          <template #default="{ row }">
+            <el-input v-model="row.content" style="width: 100%" :rows="18" type="textarea" placeholder="Please input" />
+          </template>
+        </el-table-column>
+        <el-table-column label="原文" v-if="parTableData.some(row => row.source_text)">
+          <template #default="{ row }">
+            <el-input v-model="row.source_text" style="width: 100%" :rows="18" type="textarea" v-if="row.source_text"
+              placeholder="Please input" />
+          </template>
+        </el-table-column>
         <el-table-column prop="position" label="段落位置" width="90" />
       </el-table>
     </el-dialog>
@@ -719,6 +738,7 @@ async function doRecall() {
     summary: par.summary,
     content: par.content,
     document_name: par.document_name,
+    source_text: par.source_text,
     parent_description: par.parent_description,
     context_relevance: par.context_relevance,
     context_sufficiency: par.context_sufficiency,
