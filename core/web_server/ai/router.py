@@ -294,9 +294,9 @@ async def query_knowledge_base(
     if not know_base:
         raise HTTPException(status_code=404, detail="KnowledgeBase not found")
 
-    # 获取文档列表
-    documents = [doc.model_dump() for doc in know_base.documents]
-
+    documents = session.query(Document).filter(Document.kb_id == kb_id).all()
+    documents = [doc.model_dump() for doc in documents]
+    documents.sort(key=lambda x: x.get('meta_data', {}).get('最后更新时间', ''), reverse=True)
     # 获取处理中的任务
     all_tasks = session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id).all()
     document_paths = {(document['file_path'], document['parse_strategy']) for document in documents}
@@ -307,7 +307,7 @@ async def query_knowledge_base(
             continue
 
         if (task.file_path, task.parse_strategy) not in document_paths:
-            documents.append({
+            documents.insert(0, {
                 'task': task.model_dump()  # 使用model_dump转换任务对象
             })
             document_paths.add((task.file_path, task.parse_strategy))
