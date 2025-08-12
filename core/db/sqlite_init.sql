@@ -62,6 +62,7 @@ create table paragraph
     paragraph_name     VARCHAR  not null,
     summary            VARCHAR  not null,
     content            TEXT,
+    source_text        JSON,
     position           VARCHAR  not null,
     meta_data          JSON     not null,
     keywords           JSON     not null,
