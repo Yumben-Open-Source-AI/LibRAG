@@ -5,18 +5,18 @@
       <el-row>
         <el-col :span="24">
           <el-text class="mx-1" type="primary" size="large"
-            style="display: flex; justify-content: center; font-size: 30px;">LibRAG
+            style="display: flex; justify-content: center; font-size: 30px; padding-top: 20px;">LibRAG
           </el-text>
         </el-col>
       </el-row>
     </el-header>
 
-    <el-tabs v-model="activeTab">
+    <el-tabs v-model="activeTab" class="custom-tabs">
       <el-tab-pane label="知识库管理" name="kb">
-        <el-container class="knowledge-container">
+        <el-container class="knowledge-container" style="display: flex; align-items: stretch;">
           <!-- ---------------- 左侧：知识库列表 ---------------- -->
-          <el-aside width="25%" class="left-panel">
-            <el-card shadow="hover">
+          <el-aside width="25%" class="left-panel" style="display: flex; flex-direction: column;">
+            <el-card shadow="hover" class="custom-card" style="flex: 1;">
               <template #header>
                 <div class="card-header">
                   <span style="font-size: 15px;">知识库列表</span>
@@ -55,8 +55,8 @@
             </el-card>
           </el-aside>
 
-          <el-main class="right-panel">
-            <el-card shadow="hover">
+          <el-main class="right-panel" style="display: flex; flex-direction: column;">
+            <el-card shadow="hover" class="custom-card" style="flex: 1;">
               <template #header>
                 <div class="card-header">
                   <div v-if="selectedKB" class="sub-title">
@@ -137,7 +137,7 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="请输入查询：">
-                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" class="flex-1"
+                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" :rows="1"  class="flex-1"
                   @keydown.enter="handlerKeyDown($event)" />
               </el-form-item>
             </el-col>
@@ -156,7 +156,7 @@
           </el-row>
         </div>
 
-        <el-table :data="recallTableData" border height="650">
+        <el-table :data="recallTableData" border height="650" class="custom-table">
           <el-table-column prop="paragraph_id" label="段落ID" width="150" />
           <el-table-column prop="summary" label="段落摘要" />
           <el-table-column label="段落内容">
@@ -301,12 +301,12 @@
         <el-table-column prop="summary" label="段落摘要" />
         <el-table-column label="段落内容">
           <template #default="{ row }">
-            <el-input v-model="row.content" style="width: 100%" :rows="18" type="textarea" placeholder="Please input" />
+            <el-input v-model="row.content" style="width: 100%" :rows="10" type="textarea" placeholder="Please input" />
           </template>
         </el-table-column>
         <el-table-column label="原文" v-if="parTableData.some(row => row.source_text)">
           <template #default="{ row }">
-            <el-input v-model="row.source_text" style="width: 100%" :rows="18" type="textarea" v-if="row.source_text"
+            <el-input v-model="row.source_text" style="width: 100%" :rows="10" type="textarea" v-if="row.source_text"
               placeholder="Please input" />
           </template>
         </el-table-column>
@@ -762,11 +762,11 @@ fetchKnowledgeBases()
 .lib-rag-app {
   max-width: 1850px;
   margin: 0 auto;
+  padding: 0px;
 }
 
 .knowledge-container {
   height: auto;
-  /* background: #f5f7fa; */
 }
 
 .left-panel {
@@ -809,5 +809,35 @@ fetchKnowledgeBases()
 .el-step__title {
   font-size: 13px;
   line-height: 38px;
+}
+
+/* 全局样式 */
+.custom-tabs {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 卡片样式 */
+.custom-card {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 表格样式 */
+.custom-table {
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.custom-table th {
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.kb-card {
+  transition: all 0.3s ease;
+}
+.kb-card:hover {
+  transform: translateY(-3px);
 }
 </style>
