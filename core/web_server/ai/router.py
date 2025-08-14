@@ -40,6 +40,7 @@ async def query_with_llm(
         kb_id: int,
         session: SessionDep,
         question: str,
+        has_source_text: bool = False,
         score_threshold: float | None = None,
         token=Depends(verify_token)
 ) -> List[object]:
@@ -69,7 +70,7 @@ async def query_with_llm(
         question = question.replace("'", '')
 
     llm_chat = LlmChat()
-    params = SelectorParam(llm_chat, kb_id, session, question)
+    params = SelectorParam(llm_chat, kb_id, session, question, has_source_text)
     selected_domains, domains = DomainSelector(params).collate_select_params().start_select()
     selector_logger.info(f'{question} -> {domains}')
     selected_categories, categories = CategorySelector(params).collate_select_params(selected_domains).start_select()

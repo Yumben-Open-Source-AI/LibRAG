@@ -40,7 +40,9 @@ class FastAPI(FastAPIBase):
 app = FastAPI(
     title="LibRAG API",
     swagger_js_url="/static/swagger-ui/swagger-ui-bundle.min.js",
-    swagger_css_url="/static/swagger-ui/swagger-ui.min.css"
+    swagger_css_url="/static/swagger-ui/swagger-ui.min.css",
+    docs_url=None,
+    redoc_url=None
 )
 add_pagination(app)
 app.include_router(ai_router)

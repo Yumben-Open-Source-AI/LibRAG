@@ -6,11 +6,12 @@ from llm.llmchat import LlmChat
 
 
 class SelectorParam:
-    def __init__(self, llm: LlmChat, kb_id: int, session: Session, question: str):
+    def __init__(self, llm: LlmChat, kb_id: int, session: Session, question: str, has_source_text: bool):
         self.llm = llm
         self.kb_id = kb_id
         self.session = session
         self.question = question
+        self.has_source_text = has_source_text
 
 
 class BaseSelector:

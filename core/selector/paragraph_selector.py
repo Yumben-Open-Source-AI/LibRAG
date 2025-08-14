@@ -102,6 +102,9 @@ class ParagraphSelector(BaseSelector):
                     document = session.get(Document, document_id).dict()
                     documents[document_id] = document['file_path'].split('/')[-1]
                 target_paragraph['document_name'] = documents[document_id]
+
+                if not self.params.has_source_text:
+                    del target_paragraph['source_text']
                 result.append(target_paragraph)
             except Exception as e:
                 logger.error(str(e) + '段落选择器异常输出选择', exc_info=True)
