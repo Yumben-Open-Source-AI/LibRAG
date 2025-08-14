@@ -137,7 +137,7 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="请输入查询：">
-                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" :rows="1"  class="flex-1"
+                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" :rows="1" class="flex-1"
                   @keydown.enter="handlerKeyDown($event)" />
               </el-form-item>
             </el-col>
@@ -729,7 +729,8 @@ async function doRecall() {
   const { data } = await api.get('recall', {
     params: {
       kb_id,
-      question: query.value
+      question: query.value,
+      has_source_text: true
     }
   })
   fullscreenLoading.value = false
@@ -837,6 +838,7 @@ fetchKnowledgeBases()
 .kb-card {
   transition: all 0.3s ease;
 }
+
 .kb-card:hover {
   transform: translateY(-3px);
 }

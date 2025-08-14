@@ -50,6 +50,7 @@ async def query_with_llm(
         kb_id: 知识库id
         session: 数据库连接
         question: 用户问题
+        has_source_text: 是否返回原文
         score_threshold: 分数阈值
         token: 请求token
     Return:
