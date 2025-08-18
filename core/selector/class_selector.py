@@ -40,6 +40,8 @@ class CategorySelector(BaseSelector):
     def __init__(self, params):
         super().__init__(params)
         self.category_names = {}
+        self.id_mapping = {}  # 数字ID到原始ID的映射
+        self.reverse_mapping = {}  # 原始ID到数字ID的映射
         self.categories = self.get_layer_data()
         self.select_params = []
 
@@ -49,10 +51,17 @@ class CategorySelector(BaseSelector):
         statement = select(Category).where(Category.kb_id == kb_id)
         db_categories = session.exec(statement).all()
         categories = []
-        for category in db_categories:
+
+        # 使用数字ID
+        for idx, category in enumerate(db_categories, start=1):
             category_id = category.category_id.__str__()
+            num_id = str(idx)
+
+            self.id_mapping[num_id] = category_id
+            self.reverse_mapping[category_id] = num_id
+
             categories.append({
-                'category_id': category_id,
+                'category_id': num_id,  # 使用数字ID
                 'category_description': category.category_description
             })
             self.category_names[category_id] = category.category_name
@@ -63,10 +72,19 @@ class CategorySelector(BaseSelector):
         session = self.params.session
         for domain_id in selected_domains:
             db_domain = session.get(Domain, uuid.UUID(domain_id))
-            self.select_params.extend([{
-                'category_id': category.category_id.__str__(),
-                'category_description': category.category_description
-            } for category in db_domain.sub_categories])
+            # 使用数字ID
+            for idx, category in enumerate(db_domain.sub_categories, start=len(self.id_mapping) + 1):
+                category_id = category.category_id.__str__()
+                num_id = str(idx)
+
+                if category_id not in self.reverse_mapping:  # 避免重复添加
+                    self.id_mapping[num_id] = category_id
+                    self.reverse_mapping[category_id] = num_id
+
+                self.select_params.append({
+                    'category_id': self.reverse_mapping[category_id],  # 使用数字ID
+                    'category_description': category.category_description
+                })
 
         if len(self.select_params) == 0:
             self.select_params = self.categories
@@ -93,7 +111,10 @@ class CategorySelector(BaseSelector):
         )
         logger.debug(f'类别选择器 user prompt:{category_user_messages}')
         response_chat = llm.chat(category_system_messages + CATEGORY_FEW_SHOT_MESSAGES + category_user_messages)
-        selected_categories = set(response_chat['selected_categories'])
+        # 将数字ID转换回原始ID
+        selected_num_categories = set(response_chat['selected_categories'])
+        selected_categories = {self.id_mapping[num_id] for num_id in selected_num_categories}
 
-        categories = [{'category_id': category, 'category_name': self.category_names[category]} for category in selected_categories]
+        categories = [{'category_id': category, 'category_name': self.category_names[category]}
+                      for category in selected_categories]
         return selected_categories, categories

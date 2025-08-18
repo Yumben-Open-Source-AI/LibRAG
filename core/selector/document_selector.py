@@ -35,6 +35,8 @@ class DocumentSelector(BaseSelector):
     def __init__(self, params):
         super().__init__(params)
         self.document_names = {}
+        self.id_mapping = {}  # 数字ID到原始ID的映射
+        self.reverse_mapping = {}  # 原始ID到数字ID的映射
         self.documents = self.get_layer_data()
         self.select_params = []
 
@@ -44,10 +46,16 @@ class DocumentSelector(BaseSelector):
         statement = select(Document).where(Document.kb_id == kb_id)
         db_documents = session.exec(statement).all()
         documents = []
-        for document in db_documents:
+        # 使用数字ID
+        for idx, document in enumerate(db_documents, start=1):
             document_id = document.document_id.__str__()
+            num_id = str(idx)
+
+            self.id_mapping[num_id] = document_id
+            self.reverse_mapping[document_id] = num_id
+
             documents.append({
-                'document_id': document_id,
+                'document_id': num_id,  # 使用数字ID
                 'document_description': document.document_description
             })
             self.document_names[document_id] = document.document_name
@@ -57,10 +65,19 @@ class DocumentSelector(BaseSelector):
         session = self.params.session
         for category_id in selected_categories:
             db_category = session.get(Category, uuid.UUID(category_id))
-            self.select_params.extend([{
-                'document_id': doc.document_id.__str__(),
-                'document_description': doc.document_description
-            } for doc in db_category.documents])
+            # 使用数字ID
+            for idx, doc in enumerate(db_category.documents, start=len(self.id_mapping) + 1):
+                document_id = doc.document_id.__str__()
+                num_id = str(idx)
+
+                if document_id not in self.reverse_mapping:  # 避免重复添加
+                    self.id_mapping[num_id] = document_id
+                    self.reverse_mapping[document_id] = num_id
+
+                self.select_params.append({
+                    'document_id': self.reverse_mapping[document_id],  # 使用数字ID
+                    'document_description': doc.document_description
+                })
 
         if len(self.select_params) == 0:
             self.select_params = self.documents
@@ -87,7 +104,9 @@ class DocumentSelector(BaseSelector):
         )
         logger.debug(f'文档选择器 user prompt:{document_user_prompt}')
         response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=10)
-        selected_documents = set(response_chat)
+        # 将数字ID转换回原始ID
+        selected_num_documents = set(response_chat)
+        selected_documents = {self.id_mapping[num_id] for num_id in selected_num_documents if num_id in self.id_mapping}
 
         documents = []
         for doc in selected_documents.copy():

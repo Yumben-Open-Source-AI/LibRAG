@@ -40,15 +40,24 @@ class DomainSelector(BaseSelector):
         super().__init__(param)
         self.domain_names = {}
         self.select_params = []
+        # 添加数字ID映射
+        self.id_mapping = {}  # 存储数字ID到原始ID的映射
+        self.reverse_mapping = {}  # 存储原始ID到数字ID的映射
 
     def collate_select_params(self, params: List[Dict] = None):
         kb_id = self.params.kb_id
         statement = select(Domain).where(Domain.kb_id == kb_id)
         db_domains = self.params.session.exec(statement).all()
-        for domain in db_domains:
+
+        for idx, domain in enumerate(db_domains, start=1):
             domain_id = domain.domain_id.__str__()
+            num_id = str(idx)  # 使用数字ID
+
+            self.id_mapping[num_id] = domain_id
+            self.reverse_mapping[domain_id] = num_id
+
             self.select_params.append({
-                'domain_id': domain_id,
+                'domain_id': num_id,  # 使用数字ID
                 'domain_description': domain.domain_description,
             })
             self.domain_names[domain_id] = domain.domain_name
@@ -74,7 +83,9 @@ class DomainSelector(BaseSelector):
         )
         logger.debug(f'领域选择器 user prompt:{domain_user_messages}')
         response_chat = llm.chat(domain_system_messages + DOMAIN_FEW_SHOT_MESSAGES + domain_user_messages)
-        selected_domains = set(response_chat['selected_domains'])
+        # 将数字ID转换回原始ID
+        selected_num_domains = set(response_chat['selected_domains'])
+        selected_domains = {self.id_mapping[num_id] for num_id in selected_num_domains}
 
         domains = [{'domain_id': domain, 'domain_name': self.domain_names[domain]} for domain in selected_domains]
         return selected_domains, domains

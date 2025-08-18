@@ -33,6 +33,8 @@ PARAGRAPH_USER_MESSAGES = [
 class ParagraphSelector(BaseSelector):
     def __init__(self, params):
         super().__init__(params)
+        self.id_mapping = {}  # 数字ID到原始ID的映射
+        self.reverse_mapping = {}  # 原始ID到数字ID的映射
         self.categories = self.get_layer_data()
         self.select_params = []
         self.selected_paragraphs = None
@@ -43,9 +45,16 @@ class ParagraphSelector(BaseSelector):
         statement = select(Paragraph).where(Paragraph.kb_id == kb_id)
         db_paragraphs = session.exec(statement).all()
         paragraphs = []
-        for paragraph in db_paragraphs:
+        # 使用数字ID
+        for idx, paragraph in enumerate(db_paragraphs, start=1):
+            paragraph_id = paragraph.paragraph_id.__str__()
+            num_id = str(idx)
+
+            self.id_mapping[num_id] = paragraph_id
+            self.reverse_mapping[paragraph_id] = num_id
+
             paragraphs.append({
-                'paragraph_id': paragraph.paragraph_id.__str__(),
+                'paragraph_id': num_id,  # 使用数字ID
                 'paragraph_description': f'{paragraph.parent_description};{paragraph.parent_description}'
             })
         return paragraphs
@@ -54,10 +63,19 @@ class ParagraphSelector(BaseSelector):
         session = self.params.session
         for doc_id in selected_documents:
             db_doc = session.get(Document, uuid.UUID(doc_id))
-            self.select_params.extend([{
-                'paragraph_id': paragraph.paragraph_id.__str__(),
-                'paragraph_description': f'{paragraph.summary};{paragraph.parent_description}'
-            } for paragraph in db_doc.paragraphs])
+            # 使用数字ID
+            for idx, paragraph in enumerate(db_doc.paragraphs, start=len(self.id_mapping) + 1):
+                paragraph_id = paragraph.paragraph_id.__str__()
+                num_id = str(idx)
+
+                if paragraph_id not in self.reverse_mapping:  # 避免重复添加
+                    self.id_mapping[num_id] = paragraph_id
+                    self.reverse_mapping[paragraph_id] = num_id
+
+                self.select_params.append({
+                    'paragraph_id': self.reverse_mapping[paragraph_id],  # 使用数字ID
+                    'paragraph_description': f'{paragraph.summary};{paragraph.parent_description}'
+                })
 
         return self
 
@@ -81,7 +99,10 @@ class ParagraphSelector(BaseSelector):
         )
         logger.debug(f'段落选择器 user prompt:{paragraph_user_messages}')
         response_chat = llm.chat(paragraph_system_messages + PARAGRAPH_FEW_SHOT_MESSAGES + paragraph_user_messages, count=20)
-        self.selected_paragraphs = set(response_chat)
+        # 将数字ID转换回原始ID
+        selected_num_paragraphs = set(response_chat)
+        self.selected_paragraphs = {self.id_mapping[num_id] for num_id in selected_num_paragraphs if
+                                    num_id in self.id_mapping}
 
         return self
 
