@@ -11,3 +11,13 @@ body {
     width: 100%;
     height: 100%;
 }
+
+:root {
+    --el-color-primary: #0066FF !important;
+    --el-color-primary-light-3: #3385ff !important;
+    --el-color-primary-light-5: #66a3ff !important;
+    --el-color-primary-light-7: #99c2ff !important;
+    --el-color-primary-light-8: #cce0ff !important;
+    --el-color-primary-light-9: #e6f0ff !important;
+    --el-color-primary-dark-2: #0052cc !important;
+}

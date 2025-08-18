@@ -1,4 +1,5 @@
 import ElementPlus from 'element-plus';
+import './style.css';
 import zhCN from "element-plus/dist/locale/zh-cn.mjs"
 import 'element-plus/dist/index.css';
 
@@ -7,7 +8,6 @@ import { api } from './http.js';
 import { createPinia } from 'pinia';
 import piniaPluginPersist from 'pinia-plugin-persist'
 import { router } from '@/router/index.js';
-import './style.css';
 import App from '@/App.vue';
 
 const app = createApp(App);
