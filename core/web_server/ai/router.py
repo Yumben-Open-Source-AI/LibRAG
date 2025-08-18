@@ -103,9 +103,9 @@ async def query_with_llm(
             )
 
         # ----- 精度处理 -----
-        rel = Decimal(str(score.get("context_relevance", 0)))
-        suf = Decimal(str(score.get("context_sufficiency", 0)))
-        clr = Decimal(str(score.get("context_clarity", 0)))
+        rel = Decimal(str(score.get("A", 0)))
+        suf = Decimal(str(score.get("B", 0)))
+        clr = Decimal(str(score.get("C", 0)))
         total = (rel + suf + clr)
 
         target_paragraphs[idx].update(
@@ -113,7 +113,7 @@ async def query_with_llm(
             context_sufficiency=float(suf),
             context_clarity=float(clr),
             total_score=float(total),
-            diagnosis=score.get("diagnosis", ""),
+            diagnosis=score.get("D", ""),
         )
 
     # 并发跑完所有评分任务
