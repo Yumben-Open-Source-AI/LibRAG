@@ -42,7 +42,8 @@ async def query_with_llm(
         question: str,
         has_source_text: bool = False,
         score_threshold: float | None = None,
-        token=Depends(verify_token)
+        token=Depends(verify_token),
+        has_score: bool = True,
 ) -> List[object]:
     """
     领域-分类-文档-段落召回
@@ -82,53 +83,54 @@ async def query_with_llm(
     if not selected_documents:
         return []
 
-    target_paragraphs = ParagraphSelector(params).collate_select_params(
-        selected_documents).start_select().collate_select_result()
-    selector_logger.info(
-        f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
-    recall_content = [par['parent_description'] + par['content'] for par in target_paragraphs]
-    if not recall_content:
-        return []
+    target_paragraphs = ParagraphSelector(params).collate_select_params(selected_documents).start_select().collate_select_result()
 
-    scorer_agent = ResultScoringParser(llm_chat)
-    sem = asyncio.Semaphore(80)
-    loop = asyncio.get_running_loop()
+    if has_score and score_threshold >= 0:
+        selector_logger.info(f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
+        recall_content =[par['parent_description'] + par['content'] for par in target_paragraphs]
+        if not recall_content:
+            return []
 
-    async def score_one(idx: int, par_text: str):
-        async with sem:
-            # ★ 把同步 rate 放到线程池 ★
-            score = await loop.run_in_executor(
-                None,  # None = 默认 ThreadPoolExecutor
-                partial(scorer_agent.rate, question, par_text)
+        scorer_agent = ResultScoringParser(llm_chat)
+        sem = asyncio.Semaphore(80)
+        loop = asyncio.get_running_loop()
+
+        async def score_one(idx: int, par_text: str):
+            async with sem:
+                # ★ 把同步 rate 放到线程池 ★
+                score = await loop.run_in_executor(
+                    None,  # None = 默认 ThreadPoolExecutor
+                    partial(scorer_agent.rate, question, par_text)
+                )
+
+            # ----- 精度处理 -----
+            rel = Decimal(str(score.get("A", 0)))
+            suf = Decimal(str(score.get("B", 0)))
+            clr = Decimal(str(score.get("C", 0)))
+            total = (rel + suf + clr)
+
+            target_paragraphs[idx].update(
+                context_relevance=float(rel),
+                context_sufficiency=float(suf),
+                context_clarity=float(clr),
+                total_score=float(total),
+                diagnosis=score.get("D", ""),
             )
 
-        # ----- 精度处理 -----
-        rel = Decimal(str(score.get("A", 0)))
-        suf = Decimal(str(score.get("B", 0)))
-        clr = Decimal(str(score.get("C", 0)))
-        total = (rel + suf + clr)
+        # 并发跑完所有评分任务
+        await asyncio.gather(*(score_one(i, txt) for i, txt in enumerate(recall_content)))
 
-        target_paragraphs[idx].update(
-            context_relevance=float(rel),
-            context_sufficiency=float(suf),
-            context_clarity=float(clr),
-            total_score=float(total),
-            diagnosis=score.get("D", ""),
-        )
+        target_paragraphs.sort(key=lambda x: x["total_score"], reverse=True)
 
-    # 并发跑完所有评分任务
-    await asyncio.gather(*(score_one(i, txt) for i, txt in enumerate(recall_content)))
-
-    target_paragraphs.sort(key=lambda x: x["total_score"], reverse=True)
-
-    # 增加分数阈值返回
-    if score_threshold:
-        selector_logger.info(f'过滤分数小于阈值：{score_threshold}的段落')
-        target_paragraphs = list(filter(lambda x: x["total_score"] >= score_threshold, target_paragraphs))
-    selector_logger.info(
-        f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
-    return target_paragraphs
-
+        # 增加分数阈值返回
+        if score_threshold:
+            selector_logger.info(f'过滤分数小于阈值：{score_threshold}的段落')
+            target_paragraphs = list(filter(lambda x: x["total_score"] >= score_threshold, target_paragraphs))
+        selector_logger.info(
+            f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
+        return target_paragraphs
+    else:
+        return target_paragraphs
 
 @router.get('/meta_data/{kb_id}/{meta_type}')
 async def get_meta_data(kb_id: int, meta_type: str, session: SessionDep, token=Depends(verify_token)):
