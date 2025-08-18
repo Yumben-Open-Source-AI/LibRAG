@@ -1,9 +1,9 @@
 """
-@Project ：core 
+@Project ：core
 @File    ：parser_worker.py
-@IDE     ：PyCharm 
+@IDE     ：PyCharm
 @Author  ：XMAN
-@Date    ：2025/6/4 下午6:25 
+@Date    ：2025/6/4 下午6:25
 """
 import datetime
 import os.path
@@ -22,8 +22,15 @@ from tools.log_tools import parser_logger as logger
 from web_server.ai.models import KnowledgeBase, ProcessingTask
 
 
-def worker_loop(pending_task, session):
+def worker_loop(pending_task_id):
     """ 预处理主进程 """
+    session = next(get_session())
+
+    pending_task = session.get(ProcessingTask, pending_task_id)
+    if not pending_task:
+        logger.error(f"任务ID {pending_task_id} 不存在")
+        raise Exception(f'任务ID {pending_task_id} 不存在')
+
     try:
         kb_id = pending_task.kb_id
         file_path = pending_task.file_path
@@ -96,10 +103,13 @@ def worker_loop(pending_task, session):
         logger.info(f'文件:{file_name} 处理完毕 耗时:{datetime.datetime.now() - start_time}')
     except Exception as e:
         session.rollback()
-        pending_task.status = 'failed'
-        session.add(pending_task)
-        session.commit()
-        logger.error(f'task {pending_task} error: {e} sleep 10s', exc_info=True)
+        if pending_task:
+            pending_task.status = 'failed'
+            session.add(pending_task)
+            session.commit()
+        logger.error(f'task {pending_task_id} error: {e} sleep 10s', exc_info=True)
+    finally:
+        session.close()
 
 
 def thread_call_back(task):
@@ -110,18 +120,31 @@ def thread_call_back(task):
 
 def init_process():
     while True:
+        # 主线程单独创建管理会话
         session = next(get_session())
-        with ThreadPoolExecutor(8) as executor:
+        try:
             knowledge_bases = session.exec(select(KnowledgeBase)).all()
+            pending_tasks = []
+
             for knowledge_base in knowledge_bases:
                 kb_id = knowledge_base.kb_id
-                pending_task = session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id,
-                                                                    ProcessingTask.status == 'pending').first()
+                pending_task = session.query(ProcessingTask).filter(
+                    ProcessingTask.kb_id == kb_id,
+                    ProcessingTask.status == 'pending'
+                ).first()
                 if pending_task:
-                    # 执行任务
-                    thead = executor.submit(worker_loop, pending_task, session)
-                    thead.add_done_callback(thread_call_back)
-        session.close()
+                    pending_tasks.append(pending_task.task_id)
+
+            with ThreadPoolExecutor(8) as executor:
+                for task_id in pending_tasks:
+                    # 调整传递任务id, 不再共享会话
+                    future = executor.submit(worker_loop, task_id)
+                    future.add_done_callback(thread_call_back)
+        except Exception as e:
+            logger.error(f"查询任务时出错: {e}")
+        finally:
+            session.close()
+
         # 完成所有数据库检查休眠
         time.sleep(60)
 
@@ -129,10 +152,15 @@ def init_process():
 def process_exit():
     """ 预处理退出前检查 """
     session = next(get_session())
-    all_processing = session.query(ProcessingTask).filter_by(status='processing')
-    for task in all_processing:
-        task.status = 'pending'
-        task.progress = 0
-    session.add_all(all_processing)
-    session.commit()
-    session.close()
+    try:
+        all_processing = session.query(ProcessingTask).filter_by(status='processing').all()
+        for task in all_processing:
+            task.status = 'pending'
+            task.progress = 0
+        session.add_all(all_processing)
+        session.commit()
+    except Exception as e:
+        logger.error(f"退出处理时出错: {e}")
+        session.rollback()
+    finally:
+        session.close()
