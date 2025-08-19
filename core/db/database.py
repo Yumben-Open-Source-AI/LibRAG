@@ -26,6 +26,8 @@ def sqlite_connect(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     try:
         cursor.execute('PRAGMA journal_mode=WAL')
+        cursor.execute("PRAGMA synchronous=NORMAL;")
+        cursor.execute("PRAGMA busy_timeout=5000;")
         cursor.execute('PRAGMA wal_autocheckpoint=100')
     finally:
         cursor.close()
