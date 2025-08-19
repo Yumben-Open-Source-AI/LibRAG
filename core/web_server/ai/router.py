@@ -21,6 +21,7 @@ from llm.llmchat import LlmChat
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
+from parser.parser_worker import task_trigger
 from selector.base import SelectorParam
 from selector.class_selector import CategorySelector
 from selector.document_selector import DocumentSelector
@@ -140,6 +141,7 @@ def query_with_llm(
         f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}'
     )
     return target_paragraphs
+
 
 @router.get('/meta_data/{kb_id}/{meta_type}')
 def get_meta_data(kb_id: int, meta_type: str, session: SessionDep, token=Depends(verify_token)):
@@ -280,6 +282,12 @@ def upload_file(
             })
             session.add(task)
             session.commit()
+            session.refresh(task)  # 获取新创建任务的ID
+
+            # 激活线程池立即处理
+            task_trigger.set()
+            parser_logger.info(f'任务 {task.task_id} 已加入处理队列')
+
     except Exception as e:
         session.rollback()
         parser_logger.error(f'{e}', exc_info=True)

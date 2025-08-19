@@ -4,7 +4,8 @@
     <el-header>
       <el-row>
         <el-col :span="24">
-          <el-text class="mx-1" type="primary" size="large" style="display: flex; justify-content: center; font-size: 25px; padding-top: 20px;">LibRAG</el-text>
+          <el-text class="mx-1" type="primary" size="large"
+            style="display: flex; justify-content: center; font-size: 25px; padding-top: 20px;">LibRAG</el-text>
         </el-col>
       </el-row>
     </el-header>
@@ -25,8 +26,8 @@
               <!-- 卡片视图替换表格视图 -->
               <el-scrollbar :height=headerHeight>
                 <el-card v-for="kb in kbTableData" :key="kb.kb_id"
-                         :class="['kb-card', { selected: selectedKB && kb.kb_id === selectedKB.kb_id }]"
-                         @click="handleKBRowClick(kb)" shadow="hover" style="margin-bottom:12px;cursor:pointer;">
+                  :class="['kb-card', { selected: selectedKB && kb.kb_id === selectedKB.kb_id }]"
+                  @click="handleKBRowClick(kb)" shadow="hover" style="margin-bottom:12px;cursor:pointer;">
                   <template #header>
                     <div class="flex justify-between items-center">
                       <span class="font-medium">{{ kb.kb_name }} (KB_ID:{{ kb.kb_id }})</span>
@@ -38,13 +39,13 @@
                   <template #footer>
                     <div class="grid grid-cols-2 gap-3">
                       <el-button type="primary" size="small" :disabled="kb !== selectedKB"
-                                 @click.stop="openAppendDialog" round>追加新文件
+                        @click.stop="openAppendDialog" round>追加新文件
                       </el-button>
                       <el-button type="success" size="small" :disabled="kb !== selectedKB"
-                                 @click.stop="openUpdateIndexDialog" round>重构建索引
+                        @click.stop="openUpdateIndexDialog" round>重构建索引
                       </el-button>
                       <el-button type="danger" size="small" :disabled="kb !== selectedKB"
-                                 @click.stop="openDeleteKBDialog" round>删除知识库
+                        @click.stop="openDeleteKBDialog" round>删除知识库
                       </el-button>
                     </div>
                   </template>
@@ -62,7 +63,7 @@
                     <el-tag type="info">{{ documerntTotal }}篇文档</el-tag>
 
                     <div style="float: right; display: flex; gap: 8px; align-items: center;">
-                      <el-input v-model="docFilterText" placeholder="筛选文档名称" style="width: 300px;" clearable/>
+                      <el-input v-model="docFilterText" placeholder="筛选文档名称" style="width: 300px;" clearable />
                       <el-button type="info" @click="resetDocFilter">
                         重置
                       </el-button>
@@ -87,11 +88,11 @@
                       <el-descriptions-item label="完成时间">{{ doc.task.completed_at }}</el-descriptions-item>
                       <el-descriptions-item label="进度条">
                         <el-steps style="margin-top: 10px; transform: scale(0.95); transform-origin: top; height: 55px;"
-                                  :active="doc.task.progress" finish-status="success" align-center>
-                          <el-step title="解析段落"/>
-                          <el-step title="解析文档"/>
-                          <el-step title="解析类别"/>
-                          <el-step title="解析领域"/>
+                          :active="doc.task.progress" finish-status="success" align-center>
+                          <el-step title="解析段落" />
+                          <el-step title="解析文档" />
+                          <el-step title="解析类别" />
+                          <el-step title="解析领域" />
                         </el-steps>
                       </el-descriptions-item>
                     </el-descriptions>
@@ -102,18 +103,18 @@
                         <el-button type="info" size="small" @click="handleDocRowClick(null, doc)" round>查看段落
                         </el-button>
                         <el-button type="danger" size="small" style="margin-left:4px;"
-                                   @click="openDeleteDocDialog(null, doc)" round>删除文档
+                          @click="openDeleteDocDialog(null, doc)" round>删除文档
                         </el-button>
                       </template>
                       <el-descriptions-item width="70px" label="文档描述" :span="3">{{
-                          doc['文档描述']
-                        }}
+                        doc['文档描述']
+                      }}
                       </el-descriptions-item>
                       <el-descriptions-item label="文档ID">{{ doc.document_id }}</el-descriptions-item>
                       <el-descriptions-item label="切割策略">{{ doc['切割策略'] }}</el-descriptions-item>
                       <el-descriptions-item label="更新时间">{{
-                          doc.meta_data?.['最后更新时间'] || '-'
-                        }}
+                        doc.meta_data?.['最后更新时间'] || '-'
+                      }}
                       </el-descriptions-item>
                     </el-descriptions>
                   </div>
@@ -121,11 +122,10 @@
               </el-scrollbar>
 
               <el-pagination v-if="selectedKB" style="float: right; margin-bottom: 5px;margin-top: 5px;"
-                             v-model:current-page="currentDocumentPage" v-model:page-size="documentPageSize"
-                             :page-sizes="[10, 20, 50, 100]" :background="true" :pager-count="5"
-                             layout="sizes, prev, pager, next, jumper" :total="documerntTotal"
-                             @size-change="handleSizeChange"
-                             @current-change="handleCurrentChange"/>
+                v-model:current-page="currentDocumentPage" v-model:page-size="documentPageSize"
+                :page-sizes="[10, 20, 50, 100]" :background="true" :pager-count="5"
+                layout="sizes, prev, pager, next, jumper" :total="documerntTotal" @size-change="handleSizeChange"
+                @current-change="handleCurrentChange" />
             </el-card>
           </el-main>
         </el-container>
@@ -136,21 +136,20 @@
           <el-row :gutter="20">
             <el-col :span="12">
               <el-form-item label="请输入查询：">
-                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" :rows="1"
-                          class="flex-1"
-                          @keydown.enter="handlerKeyDown($event)"/>
+                <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" :rows="1" class="flex-1"
+                  @keydown.enter="handlerKeyDown($event)" />
               </el-form-item>
             </el-col>
             <el-col :span="4">
               <el-form-item label="知识库：">
                 <el-select v-model="selectedKBOption" placeholder="选择知识库" style="width:220px">
-                  <el-option v-for="opt in kbOptions" :key="opt.value" :label="opt.label" :value="opt.value"/>
+                  <el-option v-for="opt in kbOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="4">
               <el-switch v-model="has_score" active-text="开启打分" inactive-text="关闭打分" @change="handlerSwitch"
-                         inactive-color="#F04134"></el-switch>
+                inactive-color="#F04134"></el-switch>
             </el-col>
             <el-col :span="4">
               <el-button type="primary" @click="doRecall" v-loading.fullscreen.lock="fullscreenLoading" round>测试召回
@@ -161,25 +160,25 @@
         </div>
 
         <el-table :data="recallTableData" border height="650" class="custom-table">
-          <el-table-column prop="paragraph_id" label="段落ID" width="150"/>
-          <el-table-column prop="summary" label="段落摘要"/>
+          <el-table-column prop="paragraph_id" label="段落ID" width="150" />
+          <el-table-column prop="summary" label="段落摘要" />
           <el-table-column label="段落内容">
             <template #default="{ row }">
-              <el-input v-model="row.content" style="width: 100%" :rows="18" type="textarea"/>
+              <el-input v-model="row.content" style="width: 100%" :rows="18" type="textarea" />
             </template>
           </el-table-column>
           <el-table-column label="原文" v-if="parTableData.some(row => row.source_text)">
             <template #default="{ row }">
-              <el-input v-model="row.source_text" style="width: 100%" :rows="18" type="textarea"/>
+              <el-input v-model="row.source_text" style="width: 100%" :rows="18" type="textarea" />
             </template>
           </el-table-column>
-          <el-table-column prop="parent_description" label="来源描述"/>
-          <el-table-column prop="document_name" label="来源文档"/>
-          <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性" v-if="has_score"/>
-          <el-table-column prop="context_sufficiency" align="center" width="120" label="上下文充分性" v-if="has_score"/>
-          <el-table-column prop="context_clarity" align="center" width="100" label="语境清晰性" v-if="has_score"/>
-          <el-table-column prop="total_score" align="center" width="100" label="汇总得分" v-if="has_score"/>
-          <el-table-column prop="diagnosis" width="100" label="诊断信息" v-if="has_score"/>
+          <el-table-column prop="parent_description" label="来源描述" />
+          <el-table-column prop="document_name" label="来源文档" />
+          <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性" v-if="has_score" />
+          <el-table-column prop="context_sufficiency" align="center" width="120" label="上下文充分性" v-if="has_score" />
+          <el-table-column prop="context_clarity" align="center" width="100" label="语境清晰性" v-if="has_score" />
+          <el-table-column prop="total_score" align="center" width="100" label="汇总得分" v-if="has_score" />
+          <el-table-column prop="diagnosis" width="100" label="诊断信息" v-if="has_score" />
         </el-table>
       </el-tab-pane>
     </el-tabs>
@@ -190,32 +189,32 @@
         <el-row>
           <el-col :span="24">
             <el-form-item label="知识库名称：">
-              <el-input v-model="createForm.name" width="100%"/>
+              <el-input v-model="createForm.name" width="100%" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="知识库描述：">
-              <el-input type="textarea" v-model="createForm.desc" width="100%"/>
+              <el-input type="textarea" v-model="createForm.desc" width="100%" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-form-item label="上传文件：">
           <el-upload multiple :auto-upload="false" :file-list="createFileList" :on-change="handleCreateUpload"
-                     :on-remove="handleCreateRemove" drag style="width: 100%;" :show-file-list="false">
-            <i class="el-icon-upload"/>
+            :on-remove="handleCreateRemove" drag style="width: 100%;" :show-file-list="false">
+            <i class="el-icon-upload" />
             <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
           </el-upload>
         </el-form-item>
       </el-form>
 
       <el-table :data="currentCreateFileRows" border v-if="createFileRows.length" size="small">
-        <el-table-column prop="filename" label="文件名"/>
-        <el-table-column prop="size" label="大小(KB)" width="80"/>
-        <el-table-column prop="type" label="文件类型" width="80"/>
+        <el-table-column prop="filename" label="文件名" />
+        <el-table-column prop="size" label="大小(KB)" width="80" />
+        <el-table-column prop="type" label="文件类型" width="80" />
         <el-table-column label="切割策略" width="150">
           <template #default="{ row }">
             <el-select v-model="row.strategy" placeholder="选择策略" size="small">
-              <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label"/>
+              <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label" />
             </el-select>
           </template>
         </el-table-column>
@@ -230,8 +229,8 @@
 
       <template #footer>
         <el-pagination style="float: left" v-model:current-page="createDocumentPage" :page-size="10" :background="true"
-                       :pager-count="5" layout="total, prev, pager, next, jumper" :total="createFileRows.length"
-                       @current-change="createCurrentChange"/>
+          :pager-count="5" layout="total, prev, pager, next, jumper" :total="createFileRows.length"
+          @current-change="createCurrentChange" />
         <el-button @click="createDialogVisible = false" round>取消</el-button>
         <el-button type="primary" @click="submitCreate" round>创建</el-button>
       </template>
@@ -241,19 +240,19 @@
     <el-dialog v-model="appendDialogVisible" title="追加新文件" width="800px">
       <!-- 上传区域 -->
       <el-upload multiple :auto-upload="false" :file-list="appendFileList" :on-change="handleAppendUpload"
-                 :on-remove="handleAppendRemove" drag style="margin-bottom: 20px;" :show-file-list="false">
-        <i class="el-icon-upload"/>
+        :on-remove="handleAppendRemove" drag style="margin-bottom: 20px;" :show-file-list="false">
+        <i class="el-icon-upload" />
         <div class="el-upload__text">拖拽文件到此或 <em>点击上传</em></div>
       </el-upload>
 
       <el-table :data="currentAppendFileRows" v-if="currentAppendFileRows.length" size="small" border>
-        <el-table-column prop="filename" label="文件名"/>
-        <el-table-column prop="size" label="大小(KB)" width="80"/>
-        <el-table-column prop="type" label="文件类型" width="80"/>
+        <el-table-column prop="filename" label="文件名" />
+        <el-table-column prop="size" label="大小(KB)" width="80" />
+        <el-table-column prop="type" label="文件类型" width="80" />
         <el-table-column label="切割策略" width="150">
           <template #default="{ row }">
             <el-select v-model="row.strategy" placeholder="选择策略" size="small">
-              <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label"/>
+              <el-option v-for="(val, label) in ALL_STRATEGY" :key="label" :label="label" :value="label" />
             </el-select>
           </template>
         </el-table-column>
@@ -267,8 +266,8 @@
       </el-table>
       <template #footer>
         <el-pagination style="float: left" v-model:current-page="appendDocumentPage" :page-size="10" :background="true"
-                       :pager-count="5" layout="total, prev, pager, next, jumper" :total="appendFileRows.length"
-                       @current-change="appendCurrentChange"/>
+          :pager-count="5" layout="total, prev, pager, next, jumper" :total="appendFileRows.length"
+          @current-change="appendCurrentChange" />
         <el-button @click="appendDialogVisible = false" round>取消</el-button>
         <el-button type="primary" @click="submitAppend" round>追加</el-button>
       </template>
@@ -300,21 +299,21 @@
       </template>
 
       <el-table :data="parTableData" border class="my-4" height="680">
-        <el-table-column prop="paragraph_id" label="段落id" width="120"/>
-        <el-table-column prop="paragraph_name" label="段落名" width="120"/>
-        <el-table-column prop="summary" label="段落摘要"/>
+        <el-table-column prop="paragraph_id" label="段落id" width="120" />
+        <el-table-column prop="paragraph_name" label="段落名" width="120" />
+        <el-table-column prop="summary" label="段落摘要" />
         <el-table-column label="段落内容">
           <template #default="{ row }">
-            <el-input v-model="row.content" style="width: 100%" :rows="10" type="textarea" placeholder="Please input"/>
+            <el-input v-model="row.content" style="width: 100%" :rows="10" type="textarea" placeholder="Please input" />
           </template>
         </el-table-column>
         <el-table-column label="原文" v-if="parTableData.some(row => row.source_text)">
           <template #default="{ row }">
             <el-input v-model="row.source_text" style="width: 100%" :rows="10" type="textarea" v-if="row.source_text"
-                      placeholder="Please input"/>
+              placeholder="Please input" />
           </template>
         </el-table-column>
-        <el-table-column prop="position" label="段落位置" width="90"/>
+        <el-table-column prop="position" label="段落位置" width="90" />
       </el-table>
     </el-dialog>
 
@@ -330,8 +329,8 @@
 </template>
 
 <script setup>
-import {ElMessage} from 'element-plus'
-import {ref, reactive, computed, inject} from 'vue'
+import { ElMessage } from 'element-plus'
+import { ref, reactive, computed, inject } from 'vue'
 
 const api = inject('$api')
 
@@ -369,7 +368,7 @@ const updateIndexDialogVisible = ref(false)
 const fullscreenLoading = ref(false)
 
 /*  创建 KB 表单 */
-const createForm = reactive({name: '', desc: ''})
+const createForm = reactive({ name: '', desc: '' })
 const createFileList = ref([]);
 const createFileRows = ref([]);
 const currentCreateFileRows = ref([]);
@@ -398,7 +397,7 @@ function handlerKeyDown(event) {
 }
 
 async function filteredFileTableData() {
-  const {data} = await api.get('filter_documents', {
+  const { data } = await api.get('filter_documents', {
     params: {
       document_name: docFilterText.value,
       page: 1,
@@ -424,19 +423,19 @@ async function resetDocFilter() {
 
 /* 计算属性 */
 const kbOptions = computed(() =>
-    kbTableData.value.map(k => ({
-      label: `${k.kb_id}:${k.kb_name}`,
-      value: `${k.kb_id}:${k.kb_name}`
-    }))
+  kbTableData.value.map(k => ({
+    label: `${k.kb_id}:${k.kb_name}`,
+    value: `${k.kb_id}:${k.kb_name}`
+  }))
 )
 
 async function fetchKnowledgeBases() {
-  const {data} = await api.get('knowledge_bases')
+  const { data } = await api.get('knowledge_bases')
   kbTableData.value = data
 }
 
 async function fetchDocuments(kbId) {
-  const {data} = await api.get(`knowledge_base/${kbId}`, {
+  const { data } = await api.get(`knowledge_base/${kbId}`, {
     params: {
       page: currentDocumentPage.value,
       size: documentPageSize.value
@@ -455,7 +454,7 @@ async function fetchDocuments(kbId) {
 }
 
 async function fetchParagraphs(documentId) {
-  const {data} = await api.get(`paragraphs/${documentId}`)
+  const { data } = await api.get(`paragraphs/${documentId}`)
   parTableData.value = data
 }
 
@@ -474,7 +473,7 @@ function handleDocRowClick(index, row) {
 
 function openCreateDialog() {
   createDialogVisible.value = true
-  Object.assign(createForm, {name: '', desc: ''})
+  Object.assign(createForm, { name: '', desc: '' })
   createFileList.value = []
   createFileRows.value = []
 }
@@ -636,7 +635,7 @@ async function submitCreate() {
   }
 
   // 创建 KB
-  const {data: newKB} = await api.post('knowledge_bases', {
+  const { data: newKB } = await api.post('knowledge_bases', {
     kb_name: createForm.name,
     kb_description: createForm.desc,
     keywords: ''
@@ -652,7 +651,7 @@ async function submitCreate() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  const {data} = await api.post('upload', formData)
+  const { data } = await api.post('upload', formData)
 
   ElMessage.success(`知识库『${createForm.name}』创建成功，${data.message}`)
   createDialogVisible.value = false
@@ -681,7 +680,7 @@ async function submitAppend() {
     policy_type: ALL_STRATEGY[row.strategy]
   }))
   formData.append('items', JSON.stringify(items))
-  const {data} = await api.post('upload', formData)
+  const { data } = await api.post('upload', formData)
 
   ElMessage.success(`${data.message}`)
   appendDialogVisible.value = false
@@ -731,7 +730,7 @@ async function doRecall() {
   }
   const [kb_id] = selectedKBOption.value.split(':')
   fullscreenLoading.value = true
-  const {data} = await api.get('recall', {
+  const { data } = await api.get('recall', {
     params: {
       kb_id,
       question: query.value,

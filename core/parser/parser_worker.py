@@ -10,6 +10,7 @@ import os.path
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from threading import Event
 from sqlmodel import select
 
 from db.database import get_session
@@ -20,6 +21,11 @@ from parser.domain_parser import DomainParser
 from parser.paragraph_parser import ParagraphParser
 from tools.log_tools import parser_logger as logger
 from web_server.ai.models import KnowledgeBase, ProcessingTask
+
+# 全局事件(新任务可唤醒线程池)
+task_trigger = Event()
+# 全局长期线程池
+task_executor = ThreadPoolExecutor(8, thread_name_prefix="parser_")
 
 
 def worker_loop(pending_task_id):
@@ -126,33 +132,48 @@ def init_process():
             knowledge_bases = session.exec(select(KnowledgeBase)).all()
             pending_tasks = []
 
-            for knowledge_base in knowledge_bases:
-                kb_id = knowledge_base.kb_id
+            for kb in knowledge_bases:
+                kb_id = kb.kb_id
+                # 检查当前知识库是否有运行中任务
+                has_running = session.query(ProcessingTask).filter(
+                    ProcessingTask.kb_id == kb_id,
+                    ProcessingTask.status == 'processing'
+                ).first() is not None
+
+                if has_running:
+                    logger.info(f'知识库 {kb_id} 有任务正在处理，跳过')
+                    continue
+
+                # 查询当前知识库的待处理任务
                 pending_task = session.query(ProcessingTask).filter(
                     ProcessingTask.kb_id == kb_id,
                     ProcessingTask.status == 'pending'
                 ).first()
                 if pending_task:
                     pending_tasks.append(pending_task.task_id)
+                    logger.info(f'知识库 {kb_id} 存在待处理任务 {pending_task.task_id}')
 
-            with ThreadPoolExecutor(8) as executor:
-                for task_id in pending_tasks:
-                    # 调整传递任务id, 不再共享会话
-                    future = executor.submit(worker_loop, task_id)
-                    future.add_done_callback(thread_call_back)
+            # 长期线程池提交任务
+            for task_id in pending_tasks:
+                future = task_executor.submit(worker_loop, task_id)
+                future.add_done_callback(thread_call_back)
         except Exception as e:
-            logger.error(f"查询任务时出错: {e}")
+            logger.error(f'任务查询失败: {e}')
         finally:
             session.close()
 
-        # 完成所有数据库检查休眠
-        time.sleep(60)
+        # 等待新任务触发或定时检查60秒
+        task_trigger.wait(60)
+        task_trigger.clear()
 
 
 def process_exit():
     """ 预处理退出前检查 """
+    task_executor.shutdown()  # 关闭线程池
+
     session = next(get_session())
     try:
+        # 运行中任务重置为待处理
         all_processing = session.query(ProcessingTask).filter_by(status='processing').all()
         for task in all_processing:
             task.status = 'pending'
