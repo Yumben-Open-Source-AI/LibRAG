@@ -163,7 +163,7 @@ def init_process():
             session.close()
 
         # 等待新任务触发或定时检查60秒
-        task_trigger.wait(60)
+        task_trigger.wait(os.getenv('PARSER_TASK_WAIT_TIME', 60))
         task_trigger.clear()
 
 
