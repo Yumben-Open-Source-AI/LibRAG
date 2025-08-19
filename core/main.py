@@ -70,7 +70,7 @@ async def log_request(request: Request, call_next):
     query_params = dict(request.query_params)  # 获取查询参数
 
     # 打印开始日志
-    logger.debug(f'请求路径: {path} | 参数: {query_params}')
+    logger.info(f'请求路径: {path} | 参数: {query_params}')
 
     try:
         response = await call_next(request)
@@ -78,7 +78,7 @@ async def log_request(request: Request, call_next):
         # 确保无论是否异常都记录结束时间
         end_time = datetime.datetime.now()
         duration = end_time - start_time
-        logger.debug(f'请求时长: {duration.total_seconds():.2f}s')
+        logger.info(f'请求时长: {duration.total_seconds():.2f}s')
 
     return response
 

@@ -137,7 +137,7 @@ class ProcessingTask(SQLModel, table=True):
     )
     parse_strategy: str = Field(default='', sa_column_kwargs={'comment': '解析文档策略'})
     status: str = Field(default='pending')  # pending 队列等待, processing 处理中, succeed 成功, failed 失败, filing 归档
-    created_at: datetime = Field(default=datetime.now())
+    created_at: datetime = Field(default_factory=lambda: datetime.now())
     started_at: datetime | None = Field(nullable=True)
     completed_at: datetime | None = Field(nullable=True)
     progress: int | None = Field(default=0)
