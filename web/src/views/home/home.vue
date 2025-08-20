@@ -466,7 +466,7 @@ async function checkDocuments() {
     intervalId.value = setInterval(() => {
       // 定时刷新文档状态
       fetchDocuments(selectedKB.value.kb_id);
-    }, 20000); // 20秒刷新一次
+    }, 3000); // 3秒刷新一次
   }
 }
 
