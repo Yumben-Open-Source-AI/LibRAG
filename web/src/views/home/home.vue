@@ -330,7 +330,7 @@
 
 <script setup>
 import { ElMessage } from 'element-plus'
-import { ref, reactive, computed, inject } from 'vue'
+import { ref, reactive, computed, inject, onUnmounted } from 'vue'
 
 const api = inject('$api')
 
@@ -387,6 +387,9 @@ const documerntTotal = ref(100)
 
 /* 文档筛选相关 */
 const docFilterText = ref('') // 文档名筛选
+
+/* 定时器 */
+const intervalId = ref(null);
 
 // 处理回车事件
 function handlerKeyDown(event) {
@@ -453,16 +456,37 @@ async function fetchDocuments(kbId) {
   }))
 }
 
+async function checkDocuments() {
+  const processTask = fileTableData.value.filter(
+    document => document.task && document.task.status === 'processing'
+  );
+
+  if (processTask.length > 0) {
+    // 存在处理中的任务时
+    intervalId.value = setInterval(() => {
+      // 定时刷新文档状态
+      fetchDocuments(selectedKB.value.kb_id);
+    }, 20000); // 20秒刷新一次
+  }
+}
+
+
 async function fetchParagraphs(documentId) {
   const { data } = await api.get(`paragraphs/${documentId}`)
   parTableData.value = data
 }
 
 /* 事件处理 */
-function handleKBRowClick(row) {
+async function handleKBRowClick(row) {
+  if (intervalId.value) {
+    clearInterval(intervalId.value);
+    intervalId.value = null;
+  }
+
   selectedKB.value = row
   selectedKBOption.value = `${row.kb_id}:${row.kb_name}`
-  fetchDocuments(row.kb_id)
+  await fetchDocuments(selectedKB.value.kb_id)
+  checkDocuments()
 }
 
 function handleDocRowClick(index, row) {
@@ -685,6 +709,7 @@ async function submitAppend() {
   ElMessage.success(`${data.message}`)
   appendDialogVisible.value = false
   await fetchDocuments(selectedKB.value.kb_id)
+  checkDocuments()
 }
 
 /*  删除 KB  */
@@ -760,6 +785,14 @@ function resetRecall() {
   selectedKBOption.value = ''
   recallTableData.value = []
 }
+
+onUnmounted(() => {
+  // 组件销毁时同步检查定时器
+  if (intervalId.value) {
+    clearInterval(intervalId.value);
+    intervalId.value = null;
+  }
+})
 
 /* 初始化 */
 fetchKnowledgeBases()

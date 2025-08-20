@@ -3,7 +3,7 @@ import json
 import os
 import shutil
 import uuid
-from concurrent.futures import ThreadPoolExecutor,as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from datetime import timedelta
 from decimal import Decimal
@@ -40,6 +40,8 @@ router = APIRouter(tags=['ai'], prefix='/ai')
 # 建议放模块级，整个进程复用，避免每次请求新建线程池
 SCORING_WORKERS = int(os.getenv("SCORING_WORKERS", "64"))
 SCORING_POOL = ThreadPoolExecutor(max_workers=SCORING_WORKERS)
+
+
 @router.get('/recall')
 def query_with_llm(
         kb_id: int,
@@ -89,14 +91,16 @@ def query_with_llm(
     if not selected_documents:
         return []
 
-    target_paragraphs = ParagraphSelector(params).collate_select_params(selected_documents).start_select().collate_select_result()
+    target_paragraphs = ParagraphSelector(params).collate_select_params(
+        selected_documents).start_select().collate_select_result()
     # ---- 评分阶段（可选，纯同步+线程池并发）----
     # 逻辑：只要 has_score=True 且阈值未指定或 >=0 就进行评分
     do_scoring = has_score and (score_threshold is None or score_threshold >= 0)
     if not do_scoring:
         return target_paragraphs
 
-    selector_logger.info(f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
+    selector_logger.info(
+        f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
 
     recall_content = [f"{par.get('parent_description', '')}{par.get('content', '')}" for par in target_paragraphs]
     if not recall_content:
