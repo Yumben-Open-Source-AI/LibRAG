@@ -66,6 +66,7 @@ create table paragraph
     position           VARCHAR  not null,
     meta_data          JSON     not null,
     keywords           JSON     not null,
+    verify_status      BOOLEAN  not null,
     parent_description VARCHAR  not null,
     parent_id          CHAR(32)
         references document,
