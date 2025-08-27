@@ -79,7 +79,12 @@
               <el-scrollbar v-if="selectedKB" :height=headerHeight class="doc-scroll">
                 <el-card v-for="doc in fileTableData" :key="doc.document_id" class="mb-4" shadow="always">
                   <div v-if="doc.task">
-                    <el-descriptions :title="'正在处理的文档: ' + doc.task.file_path" :column="3" size="small" border>
+                    <el-descriptions :column="3" size="small" border>
+                      <template #title>
+                        <el-text @click="handleFilePreview(doc.task.file_path)" class="mx-1" type="primary"
+                          style="text-decoration: underline;">{{
+                            '正在处理的文档: ' + doc.task.file_path }}</el-text>
+                      </template>
                       <el-descriptions-item label="状态" span="2">{{ doc['task']['status'] }}
                       </el-descriptions-item>
                       <el-descriptions-item label="切割策略">{{ doc.task.parse_strategy }}</el-descriptions-item>
@@ -98,7 +103,11 @@
                     </el-descriptions>
                   </div>
                   <div v-else>
-                    <el-descriptions :title="doc['文件名']" :column="3" size="small" border>
+                    <el-descriptions :column="3" size="small" border>
+                      <template #title>
+                        <el-text @click="handleFilePreview(doc['文件名'])" class="mx-1" type="primary"
+                          style="text-decoration: underline;">{{ doc['文件名'] }}</el-text>
+                      </template>
                       <template #extra>
                         <el-button type="info" size="small" @click="handleDocRowClick(null, doc)" round>查看段落
                         </el-button>
@@ -167,7 +176,7 @@
               <el-input v-model="row.content" style="width: 100%" :rows="18" type="textarea" />
             </template>
           </el-table-column>
-          <el-table-column label="原文" v-if="parTableData.some(row => row.source_text)">
+          <el-table-column label="段落原文" v-if="parTableData.some(row => row.source_text)">
             <template #default="{ row }">
               <el-input v-model="row.source_text" style="width: 100%" :rows="18" type="textarea" />
             </template>
@@ -307,7 +316,7 @@
             <el-input v-model="row.content" style="width: 100%" :rows="10" type="textarea" placeholder="Please input" />
           </template>
         </el-table-column>
-        <el-table-column label="原文" v-if="parTableData.some(row => row.source_text)">
+        <el-table-column label="段落原文" v-if="parTableData.some(row => row.source_text)">
           <template #default="{ row }">
             <el-input v-model="row.source_text" style="width: 100%" :rows="10" type="textarea" v-if="row.source_text"
               placeholder="Please input" />
@@ -325,12 +334,48 @@
         <el-button type="danger" @click="submitUpdateIndex" round>重构建</el-button>
       </template>
     </el-dialog>
+
+    <!-- 文件预览 Dialog -->
+    <el-dialog v-model="previewDialogVisible" style="bottom: 0; left: 0; overflow: auto; position: fixed; right: 0;">
+      <template #header>
+        文件预览
+        <el-button @click="handleImagePreview" round v-if="previewFileType === 'image'">点击图片或按钮放大图片</el-button>
+      </template>
+
+      <div class="docx-preview-container" v-if="previewFileType === 'docx'">
+        <div>
+          <vue-office-docx :src="previewFileUrl" class="a4-docx" @rendered="renderedHandler" @error="errorHandler" />
+        </div>
+
+        <div v-if="previewFileType === 'unknown'">
+          <el-alert title="不支持的文件类型" message="当前文件类型不支持在线预览" type="warning" show-icon />
+        </div>
+      </div>
+      <div class="orther-preview-container" v-else>
+        <div v-if="previewFileType === 'pdf'" class="pdf-container">
+          <vue-office-pdf :style="{ height: `100% !important` }" :src="previewFileUrl" @rendered="renderedHandler"
+            @error="errorHandler" />
+        </div>
+        <div v-else-if="previewFileType === 'image'">
+          <el-image style="width: 100%;" :src="previewFileUrl" class="a4-image" ref="imageRef"
+            :preview-src-list="[previewFileUrl]" show-progress fit="contain" @close="showPreview = false" />
+        </div>
+
+        <div v-if="previewFileType === 'unknown'">
+          <el-alert title="不支持的文件类型" message="当前文件类型不支持在线预览" type="warning" show-icon />
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ElMessage } from 'element-plus'
 import { ref, reactive, computed, inject, onUnmounted } from 'vue'
+import { ElImage, ElImageViewer } from 'element-plus'
+import VueOfficeDocx from '@vue-office/docx'
+import VueOfficePdf from '@vue-office/pdf'
+
 
 const api = inject('$api')
 
@@ -390,6 +435,14 @@ const docFilterText = ref('') // 文档名筛选
 
 /* 定时器 */
 const intervalId = ref(null);
+
+/* 文件预览 */
+const previewDialogVisible = ref(false)
+const previewFileUrl = ref('')
+const previewFileType = ref('')
+const imageRef = ref(null)
+const showPreview = ref(false)
+const filePreviewBaseUrl = `${import.meta.env.VITE_APP_API_URL}files/`
 
 // 处理回车事件
 function handlerKeyDown(event) {
@@ -786,6 +839,54 @@ function resetRecall() {
   recallTableData.value = []
 }
 
+function handleImagePreview() {
+  imageRef.value?.showPreview()
+}
+
+async function handleFilePreview(fileName) {
+  if (!fileName) {
+    ElMessage.warning('文件名称不存在')
+    return
+  }
+
+
+  // 提取文件名
+  let fileNameOnly = fileName.split('\\').pop()
+  if (fileName.indexOf('/') != -1) {
+    fileNameOnly = fileName.split('/').pop()
+  }
+  const fileType = fileNameOnly.toLowerCase().split('.').pop();
+
+  if (fileType === 'doc') {
+    previewFileType.value = 'docx'
+    console.log(previewFileType.value);
+  } else if (fileType === 'docx') {
+    previewFileType.value = 'docx'
+  } else if (fileType === 'pdf') {
+    previewFileType.value = 'pdf'
+  } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].some(ext =>
+    fileType === ext
+  )) {
+    previewFileType.value = 'image'
+  } else {
+    previewFileType.value = 'unknown'
+  }
+
+  // 设置文件URL
+  previewFileUrl.value = `${filePreviewBaseUrl}${fileNameOnly}`
+  previewDialogVisible.value = true
+}
+
+// 预览相关回调
+function renderedHandler() {
+  console.log("文件渲染完成")
+}
+
+function errorHandler(error) {
+  console.error("文件预览错误:", error)
+  ElMessage.error('文件预览失败')
+}
+
 onUnmounted(() => {
   // 组件销毁时同步检查定时器
   if (intervalId.value) {
@@ -880,5 +981,67 @@ fetchKnowledgeBases()
 
 .kb-card:hover {
   transform: translateY(-3px);
+}
+
+.docx-preview-container {
+  width: 100%;
+  height: calc(100vh - 160px);
+  overflow: auto;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.orther-preview-container {
+  width: 100%;
+  height: calc(100vh - 160px);
+  overflow: hidden;
+  padding: 10px 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.a4-docx {
+  height: 100%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+  background: gray;
+  transform: scale(0.9);
+  transform-origin: top center;
+  margin: 0 auto;
+}
+
+.a4-image {
+  height: 100%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+  background: gray;
+  transform-origin: top center;
+  margin: 0 auto;
+}
+
+.pdf-container {
+  width: 90%;
+  height: 100%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  margin: 0 auto;
+  overflow: auto;
+  transform-origin: top center;
+}
+
+.pdf-container canvas {
+  width: 100% !important;
+  height: auto !important;
+}
+
+:deep(.el-dialog__body) {
+  padding: 0 !important;
+  margin: 0;
+}
+
+:deep(.el-dialog__header) {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
 }
 </style>

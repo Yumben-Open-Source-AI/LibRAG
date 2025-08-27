@@ -2,7 +2,7 @@
   <div class="login-wrapper">
     <el-form :model="form" :rules="rules" ref="loginForm" class="login-container" @submit.prevent="submitForm">
       <div class="login-header">
-        <el-image style="width: 100px; height: 100px" :src="logUrl" :fit="fit"/>
+        <el-image style="width: 100px; height: 100px" :src="logUrl" :fit="fit" />
         <h2>
           嗨，最近如何？
         </h2>
@@ -72,7 +72,6 @@ const submitForm = async () => {
     if (response?.data.access_token) {
       ElMessage.success('登录成功')
       const token = response.data.access_token;
-      
       authStore.setToken(token)
       router.push({ name: 'home' })
     }

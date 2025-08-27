@@ -1,16 +1,15 @@
-import asyncio
 import json
 import os
 import shutil
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from datetime import timedelta
 from decimal import Decimal
-from functools import partial
+from pathlib import Path
 from typing import Annotated, List
 
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends, status
+from fastapi.responses import FileResponse
 from fastapi_pagination import Page, paginate
 from fastapi_pagination.ext.sqlalchemy import paginate as sqlalchemy_paginate
 from fastapi_pagination.utils import disable_installed_extensions_check
@@ -21,6 +20,7 @@ from llm.llmchat import LlmChat
 from parser.class_parser import CategoryParser
 from parser.document_parser import DocumentParser
 from parser.domain_parser import DomainParser
+from parser.load_api import convert_file_type
 from parser.parser_worker import task_trigger
 from selector.base import SelectorParam
 from selector.class_selector import CategorySelector
@@ -298,6 +298,47 @@ def upload_file(
 
     response_count = f'共{count}个文件成功解析' if count > 0 else ''
     return {'message': response_count + message}
+
+
+@router.get('/files/{filename}')
+def open_file(filename: str, token=Depends(verify_token)):
+    file_path = os.path.join('files', filename)
+    file_obj = Path(file_path)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail='文件不存在')
+
+    # 支持的文件类型
+    allowed_suffixes = ['.docx', '.doc', '.pdf', '.png', '.jpeg', '.jpg']
+    if file_obj.suffix not in allowed_suffixes:
+        raise HTTPException(status_code=400, detail='Unsupported file type')
+
+    if file_obj.suffix == '.doc':
+        filename = filename.replace('.doc', '.docx')
+        file_path = os.path.join('files', filename)
+        # 检查是否存在docx版本
+        if not os.path.exists(file_path):
+            convert_file_type(
+                file_obj.absolute(),
+                file_obj.parent.absolute(),
+                'docx'
+            )
+        file_obj = Path(file_path)
+
+    if file_obj.suffix == '.pdf':
+        media_type = 'application/pdf'
+    elif file_obj.suffix == '.png':
+        media_type = 'image/png'
+    elif file_obj.suffix in ['.jpg', '.jpeg']:
+        media_type = 'image/jpeg'
+    elif file_obj.suffix == '.docx':
+        media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        filename=filename,
+    )
 
 
 @router.post('/knowledge_bases', response_model=KnowledgeBase)
