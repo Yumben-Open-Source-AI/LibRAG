@@ -301,7 +301,7 @@ def upload_file(
 
 
 @router.get('/files/{filename}')
-def open_file(filename: str, token=Depends(verify_token)):
+def open_file(filename: str):
     file_path = os.path.join('files', filename)
     file_obj = Path(file_path)
 
