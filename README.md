@@ -242,4 +242,6 @@ RAG is only one piece. It must cooperate with function calls, agents, etc., not 
 
 > **Selector chain + AI-native index + functional extensions** give a pragmatic, production-ready answer to multi-hop, routing, structured-data, and orchestration challenges.
 ## For online experience, please contact: 
+> http://home.yumben.cn:43800/login
+
 > lsf@yumben.com Please note: Company name, usage scenario, document scale.
