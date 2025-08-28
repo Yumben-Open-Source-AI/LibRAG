@@ -11,24 +11,47 @@ const api = axios.create({
 // 配置请求拦截器
 api.interceptors.request.use(config => {
     const authStore = useAuthStore();
-
     if (authStore.token) {
         config.headers.Authorization = `Bearer ${authStore.token}`;
     }
     return config;
-}, error => {
-    return Promise.reject(error)
-})
+}, error => Promise.reject(error))
 
 // 配置响应拦截器
 api.interceptors.response.use(
     response => response,
-    error => {
-        if (error.response.status == 401) {
+    async error => {
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            originalRequest._retry = true; // 标记为已尝试刷新
             const authStore = useAuthStore();
-            authStore.clearToken();
-            router.push('/login');
+
+            try {
+                const params = {
+                    refresh_token: authStore.refreshToken
+                }
+                // 重置token
+                const { data } = await api.post("refresh", params, {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+
+                // 更新token
+                authStore.setToken(data.access_token, data.refresh_token);
+
+                // 使用新token重新请求
+                originalRequest.headers.Authorization = `Bearer ${data.token}`;
+                return api(originalRequest);
+            } catch (refreshError) {
+                // 刷新失败，跳转登录
+                authStore.clearToken();
+                router.push('/login');
+                return Promise.reject(refreshError);
+            }
         }
+
         return Promise.reject(error);
     }
 )

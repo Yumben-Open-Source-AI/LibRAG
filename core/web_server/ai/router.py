@@ -32,7 +32,8 @@ from tools.result_scoring import ResultScoringParser
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink, \
     ProcessingTask
 from web_server.ai.schemas import Token, UserTokenConfig
-from web_server.ai.views import authenticate_user, create_access_token, verify_token, check_file_strategy
+from web_server.ai.views import authenticate_user, create_access_token, verify_token, check_file_strategy, \
+    create_refresh_token, refresh_access_token
 from web_server.ai.views import check_file_md5
 
 router = APIRouter(tags=['ai'], prefix='/ai')
@@ -512,11 +513,20 @@ def login_for_access_token(
             detail="用户名或者密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token_expires = timedelta(minutes=UserTokenConfig.ACCESS_TOKEN_EXPIRE_MINUTES)
+
     access_token = create_access_token(
-        data={"sub": user.user_name}, expires_delta=access_token_expires
+        data={"sub": user.user_name}
     )
-    return Token(access_token=access_token, token_type="bearer")
+    fresh_token = create_refresh_token(
+        data={"sub": user.user_name}
+    )
+    return Token(access_token=access_token, refresh_token=fresh_token, token_type='bearer')
+
+
+@router.post('/refresh')
+def login_refresh_token(refresh_token: str = Form(...)):
+    access_token, fresh_token = refresh_access_token(refresh_token)
+    return Token(access_token=access_token, refresh_token=fresh_token, token_type='bearer')
 
 
 @router.get('/tasks')

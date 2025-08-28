@@ -72,7 +72,8 @@ const submitForm = async () => {
     if (response?.data.access_token) {
       ElMessage.success('登录成功')
       const token = response.data.access_token;
-      authStore.setToken(token)
+      const refreshToken = response.data.refresh_token;
+      authStore.setToken(token, refreshToken);
       router.push({ name: 'home' })
     }
 

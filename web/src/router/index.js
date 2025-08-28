@@ -36,9 +36,6 @@ router.beforeEach((to, from, next) => {
     const authStore = useAuthStore();
     const isAuthenticated = authStore.isAuthenticated;
 
-    console.log(isAuthenticated);
-    
-    
     if (isAuthenticated) {
         next();
     } else {

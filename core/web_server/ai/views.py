@@ -50,6 +50,29 @@ def verify_token(token: str = Depends(oauth2_scheme)):
     raise credentials_exception
 
 
+def refresh_access_token(token: str):
+    """ 自动续签token """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无效的认证凭据",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = decode(token, UserTokenConfig.get_secret_key(), algorithms=[UserTokenConfig.ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        data = {'sub': username}
+        # 置换新token
+        return create_access_token(data), create_refresh_token(data)
+    except ExpiredSignatureError:
+        pass
+    except InvalidTokenError:
+        pass
+
+    raise credentials_exception
+
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -71,10 +94,23 @@ def authenticate_user(db: SessionDep, username: str, password: str):
     return user
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict):
+    expires_delta = timedelta(minutes=UserTokenConfig.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = encode(to_encode, UserTokenConfig.get_secret_key(), algorithm=UserTokenConfig.ALGORITHM)
+    return encoded_jwt
+
+
+def create_refresh_token(data: dict):
+    refresh_expires_delta = timedelta(minutes=UserTokenConfig.REFRESH_TOKEN_EXPIRE_MINUTES)
+    to_encode = data.copy()
+    if refresh_expires_delta:
+        expire = datetime.now(timezone.utc) + refresh_expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})

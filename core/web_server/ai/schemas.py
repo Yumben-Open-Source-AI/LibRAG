@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class UserTokenConfig:
     ALGORITHM: str = 'HS256'
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 10080
 
     @staticmethod
     def get_secret_key():
@@ -21,6 +22,7 @@ class User(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
 
 
