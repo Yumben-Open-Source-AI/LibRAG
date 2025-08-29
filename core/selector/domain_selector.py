@@ -8,6 +8,7 @@
 import copy
 import datetime
 import json
+import os
 
 from string import Template
 from typing import List, Dict
@@ -35,6 +36,7 @@ DOMAIN_USER_MESSAGES = [
 
 
 class DomainSelector(BaseSelector):
+    PARSER_DOMAIN_GROUP_COUNT = int(os.getenv('PARSER_DOMAIN_GROUP_COUNT', 0))
 
     def __init__(self, param):
         super().__init__(param)
@@ -82,7 +84,7 @@ class DomainSelector(BaseSelector):
             domains=self.select_params
         )
         logger.debug(f'领域选择器 user prompt:{domain_user_messages}')
-        response_chat = llm.chat(domain_system_messages + DOMAIN_FEW_SHOT_MESSAGES + domain_user_messages)
+        response_chat = llm.chat(domain_system_messages + DOMAIN_FEW_SHOT_MESSAGES + domain_user_messages,count=self.PARSER_DOMAIN_GROUP_COUNT)
         # 将数字ID转换回原始ID
         selected_num_domains = set(response_chat['selected_domains'])
         selected_domains = {self.id_mapping[num_id] for num_id in selected_num_domains}

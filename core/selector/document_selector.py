@@ -1,6 +1,7 @@
 import copy
 import datetime
 import json
+import os
 import uuid
 
 from string import Template
@@ -32,6 +33,8 @@ DOCUMENT_USER_PROMPT = [
 
 
 class DocumentSelector(BaseSelector):
+    PARSER_DOCUMENT_GROUP_COUNT = int(os.getenv('PARSER_DOCUMENT_GROUP_COUNT', 10))
+
     def __init__(self, params):
         super().__init__(params)
         self.document_names = {}
@@ -103,7 +106,7 @@ class DocumentSelector(BaseSelector):
             documents=self.select_params
         )
         logger.debug(f'文档选择器 user prompt:{document_user_prompt}')
-        response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=10)
+        response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=self.PARSER_DOCUMENT_GROUP_COUNT)
         # 将数字ID转换回原始ID
         selected_num_documents = set(response_chat)
         selected_documents = {self.id_mapping[num_id] for num_id in selected_num_documents if num_id in self.id_mapping}

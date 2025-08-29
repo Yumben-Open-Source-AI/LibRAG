@@ -8,6 +8,7 @@
 import copy
 import datetime
 import json
+import os
 import uuid
 
 from string import Template
@@ -36,6 +37,7 @@ CATEGORY_USER_MESSAGES = [
 
 
 class CategorySelector(BaseSelector):
+    PARSER_CLASS_GROUP_COUNT = int(os.getenv('PARSER_CLASS_GROUP_COUNT', 0))
 
     def __init__(self, params):
         super().__init__(params)
@@ -110,7 +112,7 @@ class CategorySelector(BaseSelector):
             categories=self.select_params
         )
         logger.debug(f'类别选择器 user prompt:{category_user_messages}')
-        response_chat = llm.chat(category_system_messages + CATEGORY_FEW_SHOT_MESSAGES + category_user_messages)
+        response_chat = llm.chat(category_system_messages + CATEGORY_FEW_SHOT_MESSAGES + category_user_messages, count=self.PARSER_CLASS_GROUP_COUNT)
         # 将数字ID转换回原始ID
         selected_num_categories = set(response_chat['selected_categories'])
         selected_categories = {self.id_mapping[num_id] for num_id in selected_num_categories}

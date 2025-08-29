@@ -1,6 +1,7 @@
 import copy
 import datetime
 import json
+import os
 import uuid
 
 from string import Template
@@ -31,6 +32,8 @@ PARAGRAPH_USER_MESSAGES = [
 
 
 class ParagraphSelector(BaseSelector):
+    PARSER_PARAGRAPH_GROUP_COUNT = int(os.getenv('PARSER_PARAGRAPH_GROUP_COUNT', 20))
+
     def __init__(self, params):
         super().__init__(params)
         self.id_mapping = {}  # 数字ID到原始ID的映射
@@ -98,7 +101,7 @@ class ParagraphSelector(BaseSelector):
             paragraphs=self.select_params
         )
         logger.debug(f'段落选择器 user prompt:{paragraph_user_messages}')
-        response_chat = llm.chat(paragraph_system_messages + PARAGRAPH_FEW_SHOT_MESSAGES + paragraph_user_messages, count=20)
+        response_chat = llm.chat(paragraph_system_messages + PARAGRAPH_FEW_SHOT_MESSAGES + paragraph_user_messages, count=self.PARSER_PARAGRAPH_GROUP_COUNT)
         # 将数字ID转换回原始ID
         selected_num_paragraphs = set(response_chat)
         self.selected_paragraphs = {self.id_mapping[num_id] for num_id in selected_num_paragraphs if
