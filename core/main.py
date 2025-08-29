@@ -93,7 +93,6 @@ if __name__ == '__main__':
         app='main:app',
         host='0.0.0.0',
         port=13113,
-        workers=10,
         timeout_keep_alive=3,  # 指定3s内保持活动状态的连接
         backlog=4096  # 等待处理最大连接数
     )
