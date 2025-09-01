@@ -25,14 +25,10 @@ class DocumentParser(BaseParser):
 
     @staticmethod
     def tidy_up_data(paragraphs):
-        for paragraph in paragraphs:
-            # TODO 代码整理
-            del paragraph['paragraph_name']
-            del paragraph['content']
-            del paragraph['keywords']
-            del paragraph['position']
-            del paragraph['meta_data']
-        return paragraphs
+        tidy_paragraphs = [{
+            'summary': paragraph['summary'],
+        } for paragraph in paragraphs]
+        return tidy_paragraphs
 
     def parse(self, **kwargs):
         path = kwargs.get('path')
