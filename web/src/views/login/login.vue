@@ -34,7 +34,7 @@ import { ElMessage } from 'element-plus'
 import { getToken } from '@/api/login'
 import { Lock, User } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/store/modules/auth';
-import logUrl from '@/static/log(500x500).png';
+import logUrl from '@/static/logo(500x500).png';
 
 const router = useRouter()
 const loginForm = ref(null)
