@@ -21,6 +21,13 @@ class LlmChat(OpenAILike):
         kwargs['max_retries'] = 3
         kwargs['timeout'] = 1800
         kwargs['reuse_client'] = True
+        if 'qwen3' in kwargs['model']:
+            # 关闭qwen3思考链
+            kwargs['additional_kwargs'] = {
+                'extra_body': {
+                    "enable_thinking": False
+                }
+            }
         super().__init__(**kwargs)
 
     @staticmethod

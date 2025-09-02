@@ -56,7 +56,7 @@ class CategoryParser(BaseParser):
             try:
                 category_uuid = uuid.UUID(category_id_str)
             except ValueError as e:
-                raise ValueError(f"无法解析UUID: {category_id_str}, 错误: {e}")
+                raise ValueError(f"new_classification judge is wrong, generate uuid error: {e}")
 
             if parse_type == 'rebuild':
                 # 重构建优先从ext_categories匹配

@@ -50,6 +50,8 @@ class DataLoader:
         self.backend = os.getenv('MINERU_BACKEND')
         self.server_url = os.getenv('MINERU_SERVER_URL')
         self.page_count = self.load_file_page_number()
+        if os.getenv('MINERU_MODEL_SOURCE', 'modelscope'):
+            os.environ['MINERU_MODEL_SOURCE'] = os.getenv('MINERU_MODEL_SOURCE')
 
     def load_file_page_number(self) -> int:
         """
@@ -63,10 +65,9 @@ class DataLoader:
 
     def to_parse_file(self):
         try:
-            # if self.backend == 'pipeline':
-            #     return self.__use_pipeline_parse_file([], [])
-            # else:
-            if self.backend == 'vlm-sglang-client':
+            if self.backend == 'pipeline':
+                return self.__use_pipeline_parse_file()
+            else:
                 return self.__use_vlm_parse_file()
         except Exception as e:
             print(e)
@@ -168,8 +169,6 @@ class DataLoader:
 
     def __use_pipeline_parse_file(
             self,
-            pdf_file_names: list[str],
-            p_lang_list: list[str],
             parse_method="ocr",
             p_formula_enable=True,
             p_table_enable=True,
@@ -187,8 +186,6 @@ class DataLoader:
         """
         使用ocr逐页解析文件内容
         Arag:
-            pdf_file_names: 文件名
-            p_lang_list: 文件语言类型，选择正确的语言可增强ocr准确性
             parse_method: 解析的方式，默认为ocr 可选auto、txt
             p_formula_enable: 是否开启公式解析
             p_table_enable: 是否开启表格解析
@@ -205,19 +202,24 @@ class DataLoader:
         Return:
             content_list: 按页读取的文件内容
         """
-        output_dir = ''
-        pdf_bytes = read_fn(self.file_path)
-        pdf_bytes_list = [pdf_bytes]
-        for idx, pdf_bytes in enumerate(pdf_bytes_list):
-            new_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(pdf_bytes, start_page_id, end_page_id)
-            pdf_bytes_list[idx] = new_pdf_bytes
+        return_content_list = []
+        temp_base_dir = tempfile.mkdtemp()
+        one_pdf_bytes = read_fn(self.file_path)
+        pdf_bytes_list = [0] * self.page_count
+        # 按页拆分解析pdf
+        for page_num in range(start_page_id, self.page_count):
+            new_pdf_bytes = convert_pdf_bytes_to_bytes_by_pypdfium2(one_pdf_bytes, page_num, page_num)
+            pdf_bytes_list[page_num] = new_pdf_bytes
 
+        pdf_file_names = [self.file_path.name] * self.page_count
+        p_lang_list = [self.lang] * self.page_count
         infer_results, all_image_lists, all_pdf_docs, lang_list, ocr_enabled_list = pipeline_doc_analyze(
             pdf_bytes_list, p_lang_list, parse_method=parse_method, formula_enable=p_formula_enable,
             table_enable=p_table_enable)
 
         for idx, model_list in enumerate(infer_results):
             model_json = copy.deepcopy(model_list)
+            output_dir = os.path.join(temp_base_dir, str(idx + 1))
             pdf_file_name = pdf_file_names[idx]
             local_image_dir, local_md_dir = prepare_env(output_dir, pdf_file_name, parse_method)
             image_writer, md_writer = FileBasedDataWriter(local_image_dir), FileBasedDataWriter(local_md_dir)
@@ -271,6 +273,12 @@ class DataLoader:
                     f"{pdf_file_name}_model.json",
                     json.dumps(model_json, ensure_ascii=False, indent=4),
                 )
+            cur_md_file = ' '.join(self.open_md(os.path.join(local_md_dir, f'{pdf_file_name}.md')))
+            if cur_md_file != '':
+                # 如果提取内容不为空则追加
+                return_content_list.append(cur_md_file)
+        shutil.rmtree(temp_base_dir, ignore_errors=True)
+        return return_content_list
 
     @property
     def supported_file_types(self) -> List[str]:
