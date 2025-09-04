@@ -239,6 +239,6 @@ RAG只是应用的一部分，如何与其他技术（如function call）无缝�
 > **LibRAG 把「Selector 链 + AI-Native 索引 + 函数式扩展」三板斧合起来，针对多跳、路由、结构化、协同这四大痛点给出了一套可落地的工程化解法。**
 > 
 ## 线上体验请联系： 
->http://home.yumben.cn:43800/login
+>http://home.yumben.cn:42800/login
 
 >lsf@yumben.com 请备注：公司名称，使用场景，文档规模
