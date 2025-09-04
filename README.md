@@ -1,5 +1,5 @@
 <div align="center">
-<img src="./img/log(500x500).png" width="300px" alt="xorbits" />
+<img src="./img/logo(500x500).png" width="300px" alt="xorbits" />
 
 <p align="center">
   <a href="./README.md"><img alt="README in English" src="https://img.shields.io/badge/English-454545?style=for-the-badge"></a>
