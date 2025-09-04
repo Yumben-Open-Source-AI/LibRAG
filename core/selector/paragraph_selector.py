@@ -58,7 +58,7 @@ class ParagraphSelector(BaseSelector):
 
             paragraphs.append({
                 'paragraph_id': num_id,  # 使用数字ID
-                'paragraph_description': f'{paragraph.parent_description};{paragraph.parent_description}'
+                'paragraph_description': f'{paragraph.summary};{paragraph.parent_description}'
             })
         return paragraphs
 
