@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Annotated, List
+from typing import Annotated, List, Dict
 
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends, status
 from fastapi.responses import FileResponse
@@ -15,6 +15,7 @@ from fastapi_pagination.ext.sqlalchemy import paginate as sqlalchemy_paginate
 from fastapi_pagination.utils import disable_installed_extensions_check
 from sqlmodel import select
 
+from chat.ai_answers import AIAnswerGenerator
 from db.database import SessionDep
 from llm.llmchat import LlmChat
 from parser.class_parser import CategoryParser
@@ -532,3 +533,52 @@ def login_refresh_token(refresh_token: str = Form(...)):
 @router.get('/tasks')
 def query_processing_tasks(kb_id: int, session: SessionDep, token=Depends(verify_token)):
     return session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id).all()
+
+@router.post('/chat')
+def chat_with_llm(
+        session: SessionDep,
+        question: str = Form(...),
+        context: str = Form(...),  # 这里接收JSON字符串
+        kb_id: int = Form(...),
+        token=Depends(verify_token)
+) -> dict:
+    """
+    使用LLM生成回答（支持接收数组格式上下文）
+    Args:
+        question: 用户问题
+        context: 召回的相关段落内容(JSON字符串)
+        kb_id: 知识库ID
+    """
+    try:
+        # 参数校验
+        if not question.strip():
+            raise HTTPException(status_code=400, detail="问题不能为空")
+
+        # 解析JSON字符串为Python列表
+        try:
+            context_list: List[Dict] = json.loads(context)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="上下文格式无效，必须是JSON数组")
+
+        if not context_list:
+            raise HTTPException(status_code=400, detail="上下文内容不能为空")
+
+        # 检查知识库是否存在
+        if not session.get(KnowledgeBase, kb_id):
+            raise HTTPException(status_code=404, detail="知识库不存在")
+        # 初始化LLM和回答生成器
+        llm = LlmChat()
+        answer_generator = AIAnswerGenerator(llm)
+
+        # 生成回答
+        return answer_generator.generate_answer(
+            question=question,
+            context=context,  # 传递拼接后的文本
+            kb_id=kb_id
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        selector_logger.error(f"生成回答时出错: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"生成回答时出错: {str(e)}")

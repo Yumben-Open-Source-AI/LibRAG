@@ -163,6 +163,7 @@
             <el-col :span="4">
               <el-button type="primary" @click="doRecall" v-loading.fullscreen.lock="fullscreenLoading" round>测试召回
               </el-button>
+              <el-button type="info"  @click="aiAnswers" round>答案预览</el-button>
               <el-button @click="resetRecall" round>重置查询</el-button>
             </el-col>
           </el-row>
@@ -370,7 +371,7 @@
 </template>
 
 <script setup>
-import { ElMessage } from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import { ref, reactive, computed, inject, onUnmounted } from 'vue'
 import { ElImage, ElImageViewer } from 'element-plus'
 import VueOfficeDocx from '@vue-office/docx'
@@ -795,6 +796,49 @@ async function submitUpdateIndex() {
   await fetchKnowledgeBases()
 }
 
+async function aiAnswers() {
+  if (!query.value.trim()) {
+    ElMessage.warning('请输入查询内容')
+    return
+  }
+  if (!selectedKBOption.value) {
+    ElMessage.warning('请选择知识库')
+    return
+  }
+  if (recallTableData.value.length === 0) {
+    ElMessage.warning('请先执行召回测试获取相关段落')
+    return
+  }
+
+  fullscreenLoading.value = true
+  try {
+    // 保持传递数组格式
+    const formData = new FormData()
+    formData.append('question', query.value)
+    formData.append('context', JSON.stringify(recallTableData.value)) // 将数组转为JSON字符串
+    formData.append('kb_id', selectedKBOption.value.split(':')[0])
+
+    const { data } = await api.post('chat', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    // 显示AI回答
+    ElMessageBox.alert(data.answer, 'AI回答', {
+      confirmButtonText: '确定',
+      customClass: 'ai-answer-message-box',
+      dangerouslyUseHTMLString: true,
+      showClose: false
+    })
+
+  } catch (error) {
+    console.error('获取AI回答失败:', error)
+    ElMessage.error('获取AI回答失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    fullscreenLoading.value = false
+  }
+}
 
 /*  召回测试  */
 async function doRecall() {
@@ -1035,6 +1079,18 @@ fetchKnowledgeBases()
   height: auto !important;
 }
 
+.ai-answer-message-box {
+  width: 80%;
+  max-width: 800px;
+}
+
+.ai-answer-message-box .el-message-box__content {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 20px;
+}
 :deep(.el-dialog__body) {
   padding: 0 !important;
   margin: 0;
