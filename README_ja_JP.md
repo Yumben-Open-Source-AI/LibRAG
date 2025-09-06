@@ -22,8 +22,7 @@ LibRAG は従来の RAG をよりシンプルかつインテリジェントに�
 ![image](./img/structruing.png)
 
 # プロジェクトきのう 機能デモンストレーション
-![[プロジェクトきのう 機能デモンストレーション]](https://github.com/Yumben-Open-Source-AI/LibRAG/raw/refs/heads/main/img/LibRAG%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA.mp4)
-
+![image](https://github.com/Yumben-Open-Source-AI/LibRAG/blob/main/img/LibRAG%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA.gif)
 ## 1 全体レイヤー構成
 
 ### ▍Web UI + API サーバー

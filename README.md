@@ -28,8 +28,7 @@ The diagram below (blue boxes = core modules, black arrows = main data/control f
 ![image](./img/structruing.png)
 
 # Project Function Demonstration
-![[Project Function Demonstration]](https://github.com/Yumben-Open-Source-AI/LibRAG/raw/refs/heads/main/img/LibRAG%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA.mp4)
-
+![image](https://github.com/Yumben-Open-Source-AI/LibRAG/blob/main/img/LibRAG%E4%BA%A7%E5%93%81%E6%BC%94%E7%A4%BA.gif)
 ## 1  Layered Architecture
 
 ### ▍Web UI + API Server
