@@ -468,13 +468,17 @@ def query_documents(category_id: str, session: SessionDep, token=Depends(verify_
 
 @router.get('/filter_documents')
 def query_documents(
+        kb_id: int,
         document_name: str,
         session: SessionDep,
         token=Depends(verify_token)
 ) -> Page[Document]:
     """ 模糊筛选条件文档 """
     filter_condition = f"%{document_name}%"
-    return sqlalchemy_paginate(session, select(Document).filter(Document.file_path.like(filter_condition)))
+    return sqlalchemy_paginate(
+        session,
+        select(Document).filter(Document.file_path.like(filter_condition), Document.kb_id == kb_id)
+    )
 
 
 @router.get('/document/{document_id}')
@@ -533,6 +537,7 @@ def login_refresh_token(refresh_token: str = Form(...)):
 @router.get('/tasks')
 def query_processing_tasks(kb_id: int, session: SessionDep, token=Depends(verify_token)):
     return session.query(ProcessingTask).filter(ProcessingTask.kb_id == kb_id).all()
+
 
 @router.post('/chat')
 def chat_with_llm(

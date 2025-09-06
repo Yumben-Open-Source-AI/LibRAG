@@ -456,6 +456,7 @@ function handlerKeyDown(event) {
 async function filteredFileTableData() {
   const { data } = await api.get('filter_documents', {
     params: {
+      kb_id: selectedKB.value.kb_id,
       document_name: docFilterText.value,
       page: 1,
       size: documentPageSize.value
