@@ -24,6 +24,9 @@ LibRAG 把传统 RAG 拆得更简、也更智能：它用 LLM 深层语义推理
 
 ![image](./img/structruing.png)  
 
+# 项目功能演示
+![[项目功能演示]](./img/LibRAG产品演示.mp4)
+
 ## 1 整体分层
 
 ### ▍Web UI + API Server

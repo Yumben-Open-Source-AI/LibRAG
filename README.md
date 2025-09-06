@@ -27,6 +27,9 @@ The diagram below (blue boxes = core modules, black arrows = main data/control f
 
 ![image](./img/structruing.png)
 
+# Project Function Demonstration
+![[Project Function Demonstration]](./img/LibRAG产品演示.mp4)
+
 ## 1  Layered Architecture
 
 ### ▍Web UI + API Server
