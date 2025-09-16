@@ -113,16 +113,18 @@ def query_with_llm(
     # 单个评分任务（在线程里执行，避免阻塞当前线程）
     def _score_one(idx: int, par_text: str):
         score = scorer_agent.rate(question, par_text)  # 同步函数，放在线程执行
-        rel = Decimal(str(score.get("A", 0) or 0))
-        suf = Decimal(str(score.get("B", 0) or 0))
-        clr = Decimal(str(score.get("C", 0) or 0))
-        total = rel + suf + clr
+        context_relevance = Decimal(str(score.get("A", 0) or 0))
+        context_sufficiency = Decimal(str(score.get("B", 0) or 0))
+        context_clarity = Decimal(str(score.get("C", 0) or 0))
+        reliability = Decimal(str(score.get("D", 0) or 0))
+        total = context_relevance + context_sufficiency + context_clarity + reliability
         return idx, {
-            "context_relevance": float(rel),
-            "context_sufficiency": float(suf),
-            "context_clarity": float(clr),
+            "context_relevance": float(context_relevance),
+            "context_sufficiency": float(context_sufficiency),
+            "context_clarity": float(context_clarity),
+            "reliability": float(reliability),
             "total_score": float(total),
-            "diagnosis": score.get("D", ""),
+            "diagnosis": score.get("E", ""),
         }
 
     # 提交并发评分任务（最大并发由 SCORING_POOL 控制）

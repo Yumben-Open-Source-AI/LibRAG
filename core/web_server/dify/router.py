@@ -170,10 +170,10 @@ def inner_recall(kb_id: int, question: str, session: SessionDep) -> List[Dict[st
     if not raw:
         return []
 
-    # 你的 total_score = relevance+sufficiency+clarity ∈ [0,1]（1*3）
-    max_score = 3
+    # 你的 total_score = relevance+sufficiency+clarity+reliability ∈ [0,1]（1*3）
+    max_score = 4
     for r in raw:
-        r["score"] = round(float(r["total_score"]) / max_score, 4)
+        r["score"] = round(float(r["total_score"]) / max_score, 4)# 归一化到 0~1 范围, 保留 4 位小数
         r.setdefault("title", r.get("document_title", ""))  # 没标题就补空
         r.setdefault("metadata", {})
     return raw
