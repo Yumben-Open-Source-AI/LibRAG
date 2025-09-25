@@ -141,9 +141,10 @@
       </el-tab-pane>
 
       <el-tab-pane label="召回测试" name="recall">
-        <div class="flex flex-wrap items-center gap-2 mb-4">
+        <!-- 查询参数区域 -->
+        <div class="flex flex-wrap items-center gap-2 mt-4">
           <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :span="10">
               <el-form-item label="请输入查询：">
                 <el-input type="textarea" v-model="query" placeholder="请输入查询，建议陈述性语句" :rows="1" class="flex-1"
                   @keydown.enter="handlerKeyDown($event)" />
@@ -151,46 +152,182 @@
             </el-col>
             <el-col :span="4">
               <el-form-item label="知识库：">
-                <el-select v-model="selectedKBOption" placeholder="选择知识库" style="width:220px">
+                <el-select v-model="selectedKBOption" placeholder="选择知识库" style="width:100%">
                   <el-option v-for="opt in kbOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="4">
               <el-switch v-model="has_score" active-text="开启打分" inactive-text="关闭打分" @change="handlerSwitch"
-                inactive-color="#F04134"></el-switch>
+                inactive-color="#F04134" />
             </el-col>
-            <el-col :span="4">
-              <el-button type="primary" @click="doRecall" v-loading.fullscreen.lock="fullscreenLoading" round>测试召回
+            <el-col :span="5">
+              <el-button type="primary" @click="doRecall" :loading="recallButtonLoading" round
+                :disabled="!!eventSource?.value">
+                开始召回
               </el-button>
-              <el-button type="info"  @click="aiAnswers" round>答案预览</el-button>
+              <el-button type="info" @click="aiAnswers" round :disabled="!recallTableData.length">
+                答案预览
+              </el-button>
               <el-button @click="resetRecall" round>重置查询</el-button>
             </el-col>
           </el-row>
         </div>
 
-        <el-table :data="recallTableData" border height="650" class="custom-table">
-          <el-table-column prop="paragraph_id" label="段落ID" width="150" />
-          <el-table-column prop="summary" label="段落摘要" />
-          <el-table-column label="段落内容">
-            <template #default="{ row }">
-              <el-input v-model="row.content" style="width: 100%" :rows="18" type="textarea" />
-            </template>
-          </el-table-column>
-          <el-table-column label="段落原文" v-if="parTableData.some(row => row.source_text)">
-            <template #default="{ row }">
-              <el-input v-model="row.source_text" style="width: 100%" :rows="18" type="textarea" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="parent_description" label="来源描述" />
-          <el-table-column prop="document_name" label="来源文档" />
-          <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性" v-if="has_score" />
-          <el-table-column prop="context_sufficiency" align="center" width="120" label="上下文充分性" v-if="has_score" />
-          <el-table-column prop="context_clarity" align="center" width="100" label="语境清晰性" v-if="has_score" />
-          <el-table-column prop="reliability" align="center" width="100" label="可信度" v-if="has_score" />
-          <el-table-column prop="total_score" align="center" width="100" label="汇总得分" v-if="has_score" />
-          <el-table-column prop="diagnosis" width="100" label="诊断信息" v-if="has_score" />
-        </el-table>
+        <!-- 水平展示的三层结果 -->
+        <div class="stages-horizontal-container mb-6">
+          <el-collapse v-model="activeStages" class="stages-collapse-container" @change="handleCollapseChange">
+            <!-- 领域筛选 -->
+            <el-collapse-item name="domain" :class="{ active: activeStages.includes('domain') }"
+              class="stage-collapse-item">
+              <template #title>
+                <div class="card-header">
+                  <span>领域筛选</span>
+                  <el-tag v-if="stageResults.domain.data.length" type="primary" size="small" class="time-gap">
+                    {{ stageResults.domain.data.length }} 个
+                  </el-tag>
+                  <el-tag v-if="stageResults.domain.data.length" type="primary" size="small" class="time-gap">
+                    耗时: {{ stageResults.domain.elapsed_time }}秒
+                  </el-tag>
+                  <el-icon v-if="stageResults.domain.loading" class="is-loading">
+                    <Loading />
+                  </el-icon>
+                </div>
+              </template>
+              <div class="stage-content">
+                <el-skeleton v-if="stageResults.domain.loading" :rows="2" animated />
+                <template v-else>
+                  <div v-if="stageResults.domain.data.length" class="tag-group">
+                    <el-tooltip v-for="domain in stageResults.domain.data" :key="domain.domain_id || domain"
+                      :content="domain.domain_id ? `领域ID: ${domain.domain_id}` : ''" placement="top">
+                      <el-tag type="primary" size="small" class="mb-1 hover:scale-105 transition-transform">
+                        {{ domain.domain_name || domain }}
+                      </el-tag>
+                    </el-tooltip>
+                  </div>
+                  <el-empty v-else-if="activeStages.includes('domain')" :image-size="50" description="无匹配领域" />
+                  <div v-else class="stage-tip">等待领域筛选...</div>
+                </template>
+              </div>
+            </el-collapse-item>
+
+            <!-- 分类筛选 -->
+            <el-collapse-item name="category" :class="{ active: activeStages.includes('category') }"
+              class="stage-collapse-item">
+              <template #title>
+                <div class="card-header">
+                  <span>分类筛选</span>
+                  <el-tag v-if="stageResults.category.data.length" type="success" size="small" class="time-gap">
+                    {{ stageResults.category.data.length }} 个
+                  </el-tag>
+                  <el-tag v-if="stageResults.category.data.length" type="success" size="small" class="time-gap">耗时: {{
+                    stageResults.category.elapsed_time }}秒
+                  </el-tag>
+                  <el-icon v-if="stageResults.category.loading" class="is-loading">
+                    <Loading />
+                  </el-icon>
+                </div>
+              </template>
+              <div class="stage-content">
+                <el-skeleton v-if="stageResults.category.loading" :rows="2" animated />
+                <template v-else>
+                  <div v-if="stageResults.category.data.length" class="tag-group">
+                    <el-tooltip v-for="category in stageResults.category.data" :key="category.category_id || category"
+                      :content="category.parent_name ? `所属领域: ${category.parent_name};分类ID: ${category.category_id}` : ''"
+                      placement="top">
+                      <el-tag type="success" size="small" class="mb-1 hover:scale-105 transition-transform">
+                        {{ category.category_name }}
+                      </el-tag>
+                    </el-tooltip>
+                  </div>
+                  <el-empty v-else-if="activeStages.includes('category')" :image-size="50" description="无匹配分类" />
+                  <div v-else class="stage-tip">等待分类筛选...</div>
+                </template>
+              </div>
+            </el-collapse-item>
+
+            <!-- 文档筛选 -->
+            <el-collapse-item name="document" :class="{ active: activeStages.includes('document') }"
+              class="stage-collapse-item">
+              <template #title>
+                <div class="card-header">
+                  <span>文档筛选</span>
+                  <el-tag v-if="stageResults.document.data.length" type="info" size="small" class="time-gap">
+                    {{ stageResults.document.data.length }} 个
+                  </el-tag>
+                  <el-tag v-if="stageResults.document.data.length" type="info" size="small" class="time-gap">耗时: {{
+                    stageResults.document.elapsed_time }}秒
+                  </el-tag>
+                  <el-icon v-if="stageResults.document.loading" class="is-loading">
+                    <Loading />
+                  </el-icon>
+                </div>
+              </template>
+              <div class="stage-content">
+                <el-skeleton v-if="stageResults.document.loading" :rows="2" animated />
+                <template v-else>
+                  <div v-if="stageResults.document.data.length" class="doc-card-group">
+                    <el-tooltip v-for="doc in stageResults.document.data" :key="doc.document_id || doc"
+                      :content="doc.parent_name ? `所属分类: ${doc.parent_name};文档ID: ${doc.document_id}` : ''"
+                      placement="top">
+                      <el-tag type="info" size="small" class="mb-1 hover:scale-105 transition-transform">
+                        {{ doc.document_name }}
+                      </el-tag>
+                    </el-tooltip>
+                  </div>
+                  <el-empty v-else-if="activeStages.includes('document')" :image-size="50" description="无匹配文档" />
+                  <div v-else class="stage-tip">等待文档筛选...</div>
+                </template>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+
+        <!-- 段落召回结果 -->
+        <el-card shadow="hover" class="paragraph-results-card">
+          <template #header>
+            <div class="card-header">
+              <span>段落召回结果（{{ recallTableData.length }} 条）</span>
+              <span v-if="stageResults.paragraph.elapsed_time">召回总耗时:{{ stageResults.paragraph.elapsed_time }}秒</span>
+              <div class="progress-group">
+                <span v-if="recallProgress">召回进度{{ recallProgress }}%</span>
+                <el-progress :percentage="recallProgress" :stroke-width="20" :format="() => ''" text-inside
+                  class="center-progress" style="width: 200px;" />
+              </div>
+            </div>
+          </template>
+
+          <el-table :data="recallTableData" border height="650" class="custom-table"
+            v-loading="stageResults.paragraph.loading">
+            <el-table-column prop="paragraph_id" label="段落ID" width="150" />
+            <el-table-column prop="summary" label="段落摘要" />
+            <el-table-column label="段落内容">
+              <template #default="{ row }">
+                <el-input v-model="row.content" style="width: 100%" :rows="15" type="textarea" />
+              </template>
+            </el-table-column>
+            <el-table-column label="段落原文" v-if="parTableData.some(row => row.source_text)" width="200">
+              <template #default="{ row }">
+                <el-input v-model="row.source_text" style="width: 100%" :rows="4" type="textarea" resize="none"
+                  v-if="row.source_text" placeholder="无原文内容" />
+              </template>
+            </el-table-column>
+            <el-table-column prop="parent_description" label="来源描述" width="150" />
+            <el-table-column prop="document_name" label="来源文档" width="150">
+              <template #default="{ row }">
+                <el-text @click="handleFilePreview(row.document_name)" class="mx-1" type="primary"
+                  style="text-decoration: underline;">{{
+                    row.document_name }}</el-text>
+              </template>
+            </el-table-column>
+            <el-table-column prop="context_relevance" align="center" width="100" label="语境相关性" v-if="has_score" />
+            <el-table-column prop="context_sufficiency" align="center" width="120" label="上下文充分性" v-if="has_score" />
+            <el-table-column prop="context_clarity" align="center" width="100" label="语境清晰性" v-if="has_score" />
+            <el-table-column prop="reliability" align="center" width="100" label="可信度" v-if="has_score" />
+            <el-table-column prop="total_score" align="center" width="100" label="汇总得分" v-if="has_score" />
+            <el-table-column prop="diagnosis" width="100" label="诊断信息" v-if="has_score" />
+          </el-table>
+        </el-card>
       </el-tab-pane>
     </el-tabs>
 
@@ -372,12 +509,12 @@
 </template>
 
 <script setup>
-import {ElMessage, ElMessageBox} from 'element-plus'
-import { ref, reactive, computed, inject, onUnmounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, computed, inject, onUnmounted, watch } from 'vue'
 import { ElImage, ElImageViewer } from 'element-plus'
+import { useAuthStore } from '@/store/modules/auth';
 import VueOfficeDocx from '@vue-office/docx'
 import VueOfficePdf from '@vue-office/pdf'
-
 
 const api = inject('$api')
 
@@ -402,6 +539,26 @@ const has_score = ref(true)
 const query = ref('')
 const selectedKBOption = ref('')
 const recallTableData = ref([])
+const eventSource = ref(null)
+const scoreThreshold = ref(null)
+const recallStatus = ref('')
+const recallButtonLoading = ref(false)
+
+const recallStages = ref([
+  { name: 'domain', desc: '筛选与问题匹配的知识领域' },
+  { name: 'category', desc: '筛选领域下的细分分类' },
+  { name: 'document', desc: '筛选分类下的相关文档' },
+  { name: 'paragraph', desc: '从文档中召回相关段落' }
+])
+const activeStages = ref([]);
+const currentStageIndex = ref(0)
+const recallProgress = ref(0)
+const stageResults = reactive({
+  domain: { loading: false, data: [], elapsed_time: '' }, // data=选中的领域列表
+  category: { loading: false, data: [], elapsed_time: '' }, // data=选中的分类列表
+  document: { loading: false, data: [], elapsed_time: '' }, // data=选中的文档列表
+  paragraph: { loading: false, data: [], elapsed_time: '' } // data=召回的段落列表（最终表格数据）
+})
 
 /* dialogs */
 const createDialogVisible = ref(false)
@@ -451,6 +608,14 @@ function handlerKeyDown(event) {
   if (event.keyCode == 13) {
     event.preventDefault();
     doRecall();
+  }
+}
+
+function handleCollapseChange(event) {
+  if (activeStages.value.length == 1) {
+    activeStages.value = ['domain', 'category', 'document']
+  } else {
+    activeStages.value = []
   }
 }
 
@@ -842,48 +1007,242 @@ async function aiAnswers() {
   }
 }
 
+function copyToClipboard(documentId) {
+  if (!documentId || documentId === '') {
+    ElMessage.warning('文档ID为空，无法复制');
+    return;
+  }
+
+  // 使用浏览器原生剪贴板API实现复制
+  navigator.clipboard.writeText(String(documentId))
+    .then(() => {
+      // 复制成功提示
+      ElMessage.success('文档ID已复制到剪贴板');
+    })
+    .catch((error) => {
+      ElMessage.error('复制失败，请手动复制');
+      console.error('剪贴板复制错误：', error);
+      const tempInput = document.createElement('input');
+      tempInput.value = String(documentId);
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+    });
+}
+
 /*  召回测试  */
 async function doRecall() {
   if (!query.value.trim()) {
-    ElMessage.warning('请输入查询内容')
-    return
+    ElMessage.warning('请输入查询内容');
+    return;
   }
   if (!selectedKBOption.value) {
-    ElMessage.warning('请选择知识库')
-    return
+    ElMessage.warning('请选择知识库');
+    return;
   }
-  const [kb_id] = selectedKBOption.value.split(':')
-  fullscreenLoading.value = true
-  const { data } = await api.get('recall', {
-    params: {
-      kb_id,
-      question: query.value,
-      has_source_text: true,
-      score_threshold: 0.0,
-      has_score: has_score.value
+  recallButtonLoading.value = true;
+  resetRecall(false);
+
+  const [kb_id] = selectedKBOption.value.split(':');
+  const authStore = useAuthStore();
+  const token = authStore.token || '';
+  const baseApiUrl = import.meta.env.VITE_APP_API_URL;
+
+  // 构建 SSE 请求参数
+  const urlParams = new URLSearchParams();
+  urlParams.append('kb_id', kb_id);
+  urlParams.append('question', query.value);
+  urlParams.append('has_source_text', 'true');
+  urlParams.append('has_score', has_score.value.toString());
+  urlParams.append('streaming', 'true');
+  if (scoreThreshold.value !== null && scoreThreshold.value !== '') {
+    urlParams.append('score_threshold', parseFloat(scoreThreshold.value).toString());
+  }
+  const sseUrl = `${baseApiUrl}recall?${urlParams.toString()}`;
+
+  try {
+    // 用 Fetch 发起请求
+    const response = await fetch(sseUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache'
+      },
+      credentials: 'same-origin'
+    });
+
+    // 检查请求是否成功
+    if (!response.ok) {
+      throw new Error(`身份验证失败或请求错误：${response.status} ${response.statusText}`);
     }
-  })
-  fullscreenLoading.value = false
-  recallTableData.value = data.map(par => ({
-    paragraph_id: par.paragraph_id,
-    summary: par.summary,
-    content: par.content,
-    document_name: par.document_name,
-    source_text: par.source_text,
-    parent_description: par.parent_description,
-    context_relevance: par.context_relevance,
-    context_sufficiency: par.context_sufficiency,
-    context_clarity: par.context_clarity,
-    reliability: par.reliability,
-    total_score: par.total_score,
-    diagnosis: par.diagnosis
-  }))
+
+    // 解析 SSE 响应流
+    const reader = response.body.getReader(); // 获取流读取器
+    const decoder = new TextDecoder('utf-8'); // 解码二进制流为字符串
+    let partialMessage = ''; // 存储分块到达的不完整消息
+
+    // 标记 SSE 连接状态
+    eventSource.value = {
+      reader,
+      closed: false,
+      close: () => { // 自定义关闭方法
+        reader.cancel('主动关闭 SSE 流');
+        eventSource.value.closed = true;
+      }
+    };
+
+    // 循环读取流数据
+    while (!eventSource.value.closed) {
+      const { done, value } = await reader.read();
+
+      // 流结束
+      if (done) {
+        ElMessage.success('流式召回全流程完成！');
+        break;
+      }
+
+      // 解码二进制数据 + 拼接之前的不完整消息
+      const chunk = decoder.decode(value, { stream: true });
+      partialMessage += chunk;
+
+      // 分割 SSE 消息
+      const messages = partialMessage.split('\n\n');
+      partialMessage = messages.pop() || ''; // 最后一个可能是不完整消息，留到下次处理
+
+      // 处理SSE 消息
+      for (const msg of messages) {
+        if (!msg.trim()) continue; // 跳过空消息
+
+        try {
+          const dataLine = msg.split('\n').find(line => line.startsWith('data:'));
+          if (!dataLine) continue;
+
+          // 解析 JSON 数据
+          const dataStr = dataLine.slice(5).trim();
+          const { stage, data, message: sseMsg } = JSON.parse(dataStr);
+
+          // 原有阶段更新逻辑
+          const stageMap = { domain: 0, category: 1, document: 2, paragraph: 3 };
+          const currentIdx = stageMap[stage] || 0;
+
+          currentStageIndex.value = currentIdx + 1;
+          recallProgress.value = (currentIdx + 1) * 25;
+          // ElMessage.success(`[${recallStages.value[currentIdx].label}] ${sseMsg}`);
+
+          // 阶段数据处理
+          switch (stage) {
+            case 'domain':
+              stageResults.domain.loading = false;
+
+              stageResults.domain.data = data.selected_domains || [];
+              stageResults.domain.elapsed_time = data.elapsed_time || '';
+              stageResults.category.loading = true;
+              break;
+
+            case 'category':
+              stageResults.category.loading = false;
+              stageResults.category.data = data.selected_categories || [];
+              stageResults.category.elapsed_time = data.elapsed_time || '';
+              stageResults.document.loading = true;
+              break;
+
+            case 'document':
+              stageResults.document.loading = false;
+              stageResults.document.data = data.selected_documents || [];
+              if (!data.selected_documents?.length) {
+                currentStageIndex.value = 4;
+                recallProgress.value = 100;
+                stageResults.paragraph.loading = false;
+                ElMessage.warning('无匹配文档，段落召回终止');
+                eventSource.value.close(); // 关闭流
+                return;
+              }
+              stageResults.document.elapsed_time = data.elapsed_time || '';
+              stageResults.paragraph.loading = true;
+              break;
+
+            case 'paragraph':
+              stageResults.paragraph.loading = false;
+              recallTableData.value = data.target_paragraphs.map(par => ({
+                paragraph_id: par.paragraph_id,
+                summary: par.summary || '-',
+                content: par.content || '-',
+                document_name: par.document_name || '-',
+                source_text: par.source_text || '-',
+                parent_description: par.parent_description || '-', // 修复表格字段缺失
+                context_relevance: par.context_relevance ?? '-',
+                context_sufficiency: par.context_sufficiency ?? '-', // 补充评分字段
+                context_clarity: par.context_clarity ?? '-', // 补充评分字段
+                reliability: par.reliability, // 置信度
+                total_score: par.total_score ?? '-',
+                diagnosis: par.diagnosis ?? '-' // 补充诊断字段
+              }));
+              stageResults.paragraph.elapsed_time = data.elapsed_time || '';
+              break;
+
+            case 'error':
+              currentStageIndex.value = stageMap[stage] || 0;
+              recallProgress.value = (stageMap[stage] + 1) * 25;
+              ElMessage.error(`[${recallStages.value[stageMap[stage]].label}] ${sseMsg}`);
+              Object.keys(stageResults).forEach(key => {
+                stageResults[key].loading = false;
+              });
+              eventSource.value.close();
+              break;
+
+            case 'complete':
+              ElMessage.success('流式召回全流程完成！');
+              recallProgress.value = 100;
+              eventSource.value.close();
+              break;
+          }
+        } catch (parseError) {
+          ElMessage.error('召回数据解析失败，请重试');
+          console.error('SSE 消息解析错误：', parseError, '原始消息：', msg);
+          eventSource.value.close();
+          resetRecall(true);
+          break;
+        }
+      }
+    }
+  } catch (initError) {
+    ElMessage.error(`流式召回初始化失败：${initError.message}`);
+    console.error('SSE 初始化错误：', initError);
+    resetRecall(true);
+  }
+  finally {
+    recallButtonLoading.value = false;
+  }
 }
 
-function resetRecall() {
-  query.value = ''
-  selectedKBOption.value = ''
-  recallTableData.value = []
+/*  重置召回 */
+function resetRecall(fullReset = true) {
+  // 关闭 SSE 流
+  if (eventSource.value) {
+    if (eventSource.value.close) {
+      eventSource.value.close(); // Fetch 流的自定义关闭方法
+    } else {
+      eventSource.value.close(); // EventSource 关闭方法
+    }
+    eventSource.value = null;
+  }
+
+  currentStageIndex.value = 0;
+  recallProgress.value = 0;
+  Object.keys(stageResults).forEach(key => {
+    stageResults[key] = { loading: false, data: [] };
+  });
+  recallTableData.value = [];
+  recallStatus.value = '';
+  recallButtonLoading.value = false;
+
+  if (fullReset) {
+    query.value = '';
+    selectedKBOption.value = '';
+    scoreThreshold.value = null;
+  }
 }
 
 function handleImagePreview() {
@@ -1030,6 +1389,191 @@ fetchKnowledgeBases()
   transform: translateY(-3px);
 }
 
+.horizontal-collapse {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.collapse-item {
+  flex: 1;
+  min-width: 280px;
+}
+
+:deep(.el-collapse-item__wrap) {
+  width: 100%;
+}
+
+:deep(.stage-collapse .el-collapse-item__wrap) {
+  will-change: height;
+  background-color: #fff;
+  border-bottom: none;
+}
+
+.stage-collapse.active {
+  border-top-color: var(--el-color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.stage-collapse .el-collapse-item__header) {
+  height: auto;
+  padding: 16px;
+  font-weight: bold;
+  border-bottom: none;
+  background-color: #f9f9f9;
+}
+
+.time-gap {
+  margin-left: 15px;
+}
+
+.recall-steps {
+  margin-bottom: 30px;
+}
+
+:deep(.stage-collapse .el-collapse-item__content) {
+  padding-bottom: 16px;
+}
+
+.stages-horizontal-container .stages-collapse-container {
+  display: flex;
+  width: 100%;
+  gap: 16px;
+  border: none;
+}
+
+.stage-collapse-item.active {
+  border-top-color: var(--el-color-primary) !important;
+  /* 选中时顶部蓝色边框 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  /* 增强阴影 */
+}
+
+:deep(.stages-collapse-container .el-collapse-item__wrap) {
+  border: none !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+:deep(.stage-collapse-item .el-collapse-item__header) {
+  height: auto;
+  padding: 16px;
+  font-weight: bold;
+  border-bottom: none !important;
+  background-color: #f9f9f9 !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.stage-collapse-item {
+  flex: 1;
+  /* 3个项平分宽度 */
+  min-width: 0;
+  /* 防止内容溢出 */
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.3s ease;
+  border-top: 3px solid #f0f0f0 !important;
+  /* 默认顶部边框色 */
+}
+
+
+.stage-card {
+  flex: 1;
+  transition: all 0.3s ease;
+  border-top: 3px solid #f0f0f0;
+  min-height: 0px;
+}
+
+.stage-card.active {
+  border-top-color: var(--el-color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stage-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+}
+
+.stage-content {
+  height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.paragraph-results-card {
+  margin-top: 20px;
+}
+
+.paragraph-results-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.paragraph-results-card .progress-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+:deep(.stage-collapse-item .el-collapse-item__content) {
+  padding: 0 16px 16px !important;
+  border-top: none !important;
+}
+
+.stage-tip {
+  color: var(--el-text-color-secondary);
+  text-align: center;
+  padding: 40px 0;
+  font-size: 14px;
+}
+
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  background-color: var(--el-bg-color);
+  border-radius: 4px;
+}
+
+:deep(.tag-group) {
+  padding: 8px;
+  gap: 6px;
+}
+
+:deep(.el-collapse-item__header) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:deep(.el-steps) {
+  margin-bottom: 5px;
+}
+
+:deep(.el-step__description) {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+:deep(.el-table__empty-text) {
+  padding: 60px 0;
+}
+
+
 .docx-preview-container {
   width: 100%;
   height: calc(100vh - 160px);
@@ -1094,6 +1638,7 @@ fetchKnowledgeBases()
   overflow-y: auto;
   padding: 20px;
 }
+
 :deep(.el-dialog__body) {
   padding: 0 !important;
   margin: 0;
@@ -1102,5 +1647,11 @@ fetchKnowledgeBases()
 :deep(.el-dialog__header) {
   padding: 16px 20px;
   border-bottom: 1px solid #eee;
+}
+
+:deep(.el-step.is-center .el-step__description) {
+  padding-left: 20%;
+  padding-right: 20%;
+  padding-top: 5px;
 }
 </style>

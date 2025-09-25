@@ -22,7 +22,7 @@ from parser.paragraph_parser import ParagraphParser
 from tools.log_tools import parser_logger as logger
 from web_server.ai.models import KnowledgeBase, ProcessingTask
 
-# 全局事件(新任务可唤醒线程池)
+# 全局事件
 task_trigger = Event()
 # 全局长期线程池
 task_executor = ThreadPoolExecutor(8, thread_name_prefix="parser_")

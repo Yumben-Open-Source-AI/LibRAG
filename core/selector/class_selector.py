@@ -66,7 +66,7 @@ class CategorySelector(BaseSelector):
                 'category_id': num_id,  # 使用数字ID
                 'category_description': category.category_description
             })
-            self.category_names[category_id] = category.category_name
+            self.category_names[category_id] = category
 
         return categories
 
@@ -117,6 +117,10 @@ class CategorySelector(BaseSelector):
         selected_num_categories = set(response_chat['selected_categories'])
         selected_categories = {self.id_mapping[num_id] for num_id in selected_num_categories}
 
-        categories = [{'category_id': category, 'category_name': self.category_names[category]}
-                      for category in selected_categories]
+        categories = [
+            {
+                'category_id': category,
+                'category_name': self.category_names[category].category_name,
+                'parent_name': self.category_names[category].domain.domain_name
+            } for category in selected_categories]
         return selected_categories, categories

@@ -18,7 +18,7 @@ RESULT_SCORING_MESSAGES = [
 ]
 
 
-class ResultScoringParser():
+class ResultScoringParser:
     def __init__(self, llm: LlmChat):
         self.llm = llm  # 直接赋值
 

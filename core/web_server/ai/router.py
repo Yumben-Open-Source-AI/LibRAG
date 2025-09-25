@@ -2,14 +2,13 @@ import json
 import os
 import shutil
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import timedelta
-from decimal import Decimal
+
 from pathlib import Path
-from typing import Annotated, List, Dict
+from typing import Annotated, List, Dict, Union
 
 from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form, Depends, status
 from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse, Response
 from fastapi_pagination import Page, paginate
 from fastapi_pagination.ext.sqlalchemy import paginate as sqlalchemy_paginate
 from fastapi_pagination.utils import disable_installed_extensions_check
@@ -24,36 +23,28 @@ from parser.domain_parser import DomainParser
 from parser.load_api import convert_file_type
 from parser.parser_worker import task_trigger
 from selector.base import SelectorParam
-from selector.class_selector import CategorySelector
-from selector.document_selector import DocumentSelector
-from selector.domain_selector import DomainSelector
-from selector.paragraph_selector import ParagraphSelector
-from tools.log_tools import selector_logger, parser_logger
-from tools.result_scoring import ResultScoringParser
+from tools.log_tools import parser_logger, selector_logger
 from web_server.ai.models import KnowledgeBase, KbBase, Paragraph, Document, Category, Domain, CategoryDocumentLink, \
     ProcessingTask
-from web_server.ai.schemas import Token, UserTokenConfig
+from web_server.ai.schemas import Token
 from web_server.ai.views import authenticate_user, create_access_token, verify_token, check_file_strategy, \
-    create_refresh_token, refresh_access_token
+    create_refresh_token, refresh_access_token, full_volume_recall, streaming_recall
 from web_server.ai.views import check_file_md5
 
 router = APIRouter(tags=['ai'], prefix='/ai')
 
-# 建议放模块级，整个进程复用，避免每次请求新建线程池
-SCORING_WORKERS = int(os.getenv("SCORING_WORKERS", "64"))
-SCORING_POOL = ThreadPoolExecutor(max_workers=SCORING_WORKERS)
 
-
-@router.get('/recall')
+@router.get('/recall', response_model=None)
 def query_with_llm(
         kb_id: int,
-        session: SessionDep,
         question: str,
+        session: SessionDep,
         has_source_text: bool = False,
         score_threshold: float | None = None,
-        token=Depends(verify_token),
         has_score: bool = True,
-) -> List[object]:
+        streaming: bool = False,
+        token=Depends(verify_token),
+) -> Union[List[dict], StreamingResponse, Response]:
     """
     领域-分类-文档-段落召回
     Arag:
@@ -64,18 +55,23 @@ def query_with_llm(
         score_threshold: 分数阈值
         token: 请求token
         has_score： 是否进行打分
+        streaming: 是否启用流式
     Return:
         target_paragraphs: 用户问题相关的段落答案
     """
-    # params init
     if score_threshold and not isinstance(score_threshold, float):
         score_threshold = float(str(score_threshold))
 
     if not session.get(KnowledgeBase, kb_id):
+        if streaming:
+            def error_handler():
+                yield f"data: {json.dumps({'stage': 'error', 'message': '数据库无此知识库，请检查'})}\n\n"
+
+            return StreamingResponse(error_handler(), media_type='text/event-stream')
         raise HTTPException(status_code=404, detail="数据库无此知识库，请检查")
 
     if question and isinstance(question, str):
-        # TODO 问题字符串格式校验不够优雅
+        # 问题格式清洗
         question = question.replace('\r\n', '')
         question = question.replace('\n', '')
         question = question.replace('"', '')
@@ -83,72 +79,14 @@ def query_with_llm(
 
     llm_chat = LlmChat()
     params = SelectorParam(llm_chat, kb_id, session, question, has_source_text)
-    selected_domains, domains = DomainSelector(params).collate_select_params().start_select()
-    selector_logger.info(f'{question} -> {domains}')
-    selected_categories, categories = CategorySelector(params).collate_select_params(selected_domains).start_select()
-    selector_logger.info(f'{question} -> {domains} \n-> {categories}')
-    selected_documents, documents = DocumentSelector(params).collate_select_params(selected_categories).start_select()
-    selector_logger.info(f'{question} -> {domains} \n-> {categories} \n-> {documents}')
+    recall_params = (params, has_score, score_threshold)
 
-    if not selected_documents:
-        return []
+    if not streaming:
+        # 非流式召回
+        return full_volume_recall(*recall_params)
 
-    target_paragraphs = ParagraphSelector(params).collate_select_params(
-        selected_documents).start_select().collate_select_result()
-    # ---- 评分阶段（可选，纯同步+线程池并发）----
-    # 逻辑：只要 has_score=True 且阈值未指定或 >=0 就进行评分
-    do_scoring = has_score and (score_threshold is None or score_threshold >= 0)
-    if not do_scoring:
-        return target_paragraphs
-
-    selector_logger.info(
-        f'选择完成正在打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}')
-
-    recall_content = [f"{par.get('parent_description', '')}{par.get('content', '')}" for par in target_paragraphs]
-    if not recall_content:
-        return []
-
-    scorer_agent = ResultScoringParser(llm_chat)
-
-    # 单个评分任务（在线程里执行，避免阻塞当前线程）
-    def _score_one(idx: int, par_text: str):
-        score = scorer_agent.rate(question, par_text)  # 同步函数，放在线程执行
-        context_relevance = Decimal(str(score.get("A", 0) or 0))
-        context_sufficiency = Decimal(str(score.get("B", 0) or 0))
-        context_clarity = Decimal(str(score.get("C", 0) or 0))
-        reliability = Decimal(str(score.get("D", 0) or 0))
-        total = context_relevance + context_sufficiency + context_clarity + reliability
-        return idx, {
-            "context_relevance": float(context_relevance),
-            "context_sufficiency": float(context_sufficiency),
-            "context_clarity": float(context_clarity),
-            "reliability": float(reliability),
-            "total_score": float(total),
-            "diagnosis": score.get("E", ""),
-        }
-
-    # 提交并发评分任务（最大并发由 SCORING_POOL 控制）
-    futures = [
-        SCORING_POOL.submit(_score_one, i, txt)
-        for i, txt in enumerate(recall_content)
-    ]
-
-    # 回填评分结果（在当前线程回填，避免并发写共享列表）
-    for fut in as_completed(futures):
-        idx, updates = fut.result()
-        target_paragraphs[idx].update(updates)
-
-    # 排序与阈值过滤
-    target_paragraphs.sort(key=lambda x: x.get("total_score", 0.0), reverse=True)
-
-    if score_threshold is not None:
-        selector_logger.info(f'过滤分数小于阈值：{score_threshold} 的段落')
-        target_paragraphs = [x for x in target_paragraphs if x.get("total_score", 0.0) >= score_threshold]
-
-    selector_logger.info(
-        f'已完成打分：{question} -> {domains} \n-> {categories} \n-> {documents} \n-> {target_paragraphs}'
-    )
-    return target_paragraphs
+    # 流式召回
+    return StreamingResponse(streaming_recall(*recall_params), media_type='text/event-stream')
 
 
 @router.get('/meta_data/{kb_id}/{meta_type}')

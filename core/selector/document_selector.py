@@ -61,7 +61,7 @@ class DocumentSelector(BaseSelector):
                 'document_id': num_id,  # 使用数字ID
                 'document_description': document.document_description
             })
-            self.document_names[document_id] = document.document_name
+            self.document_names[document_id] = document
         return documents
 
     def collate_select_params(self, selected_categories: List[Dict] = None):
@@ -106,7 +106,8 @@ class DocumentSelector(BaseSelector):
             documents=self.select_params
         )
         logger.debug(f'文档选择器 user prompt:{document_user_prompt}')
-        response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt, count=self.PARSER_DOCUMENT_GROUP_COUNT)
+        response_chat = llm.chat(document_system_messages + DOCUMENT_FEW_SHOT_MESSAGES + document_user_prompt,
+                                 count=self.PARSER_DOCUMENT_GROUP_COUNT)
         # 将数字ID转换回原始ID
         selected_num_documents = set(response_chat)
         selected_documents = {self.id_mapping[num_id] for num_id in selected_num_documents if num_id in self.id_mapping}
@@ -114,7 +115,11 @@ class DocumentSelector(BaseSelector):
         documents = []
         for doc in selected_documents.copy():
             if doc in self.document_names:
-                documents.append({'document_id': doc, 'document_name': self.document_names[doc]})
+                documents.append({
+                    'document_id': doc,
+                    'document_name': self.document_names[doc].document_name,
+                    'parent_name': [category.category_name for category in self.document_names[doc].categories]
+                })
             else:
                 selected_documents.remove(doc)
         return selected_documents, documents

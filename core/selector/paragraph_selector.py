@@ -101,7 +101,10 @@ class ParagraphSelector(BaseSelector):
             paragraphs=self.select_params
         )
         logger.debug(f'段落选择器 user prompt:{paragraph_user_messages}')
-        response_chat = llm.chat(paragraph_system_messages + PARAGRAPH_FEW_SHOT_MESSAGES + paragraph_user_messages, count=self.PARSER_PARAGRAPH_GROUP_COUNT)
+        response_chat = llm.chat(
+            paragraph_system_messages + PARAGRAPH_FEW_SHOT_MESSAGES + paragraph_user_messages,
+            count=self.PARSER_PARAGRAPH_GROUP_COUNT
+        )
         # 将数字ID转换回原始ID
         selected_num_paragraphs = set(response_chat)
         self.selected_paragraphs = {self.id_mapping[num_id] for num_id in selected_num_paragraphs if
