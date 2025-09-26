@@ -306,9 +306,9 @@
                 <el-input v-model="row.content" style="width: 100%" :rows="15" type="textarea" />
               </template>
             </el-table-column>
-            <el-table-column label="段落原文" v-if="parTableData.some(row => row.source_text)" width="200">
+            <el-table-column label="段落原文" v-if="recallTableData.some(row => row.source_text)" width="250">
               <template #default="{ row }">
-                <el-input v-model="row.source_text" style="width: 100%" :rows="4" type="textarea" resize="none"
+                <el-input v-model="row.source_text" style="width: 100%" :rows="15" type="textarea" resize="none"
                   v-if="row.source_text" placeholder="无原文内容" />
               </template>
             </el-table-column>
