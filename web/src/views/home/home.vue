@@ -308,7 +308,7 @@
             </el-table-column>
             <el-table-column label="段落原文" v-if="recallTableData.some(row => row.source_text)" width="250">
               <template #default="{ row }">
-                <el-input v-model="row.source_text" style="width: 100%" :rows="15" type="textarea" resize="none"
+                <el-input v-model="row.source_text" style="width:  100%" :rows="15" type="textarea" resize="none"
                   v-if="row.source_text" placeholder="无原文内容" />
               </template>
             </el-table-column>
@@ -509,7 +509,7 @@
 </template>
 
 <script setup>
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { ref, reactive, computed, inject, onUnmounted, watch } from 'vue'
 import { ElImage, ElImageViewer } from 'element-plus'
 import { useAuthStore } from '@/store/modules/auth';
@@ -569,7 +569,7 @@ const showParDialogVisible = ref(false)
 const updateIndexDialogVisible = ref(false)
 
 /* loading */
-const fullscreenLoading = ref(false)
+const loadingInstance = ref(null)
 
 /*  创建 KB 表单 */
 const createForm = reactive({ name: '', desc: '' })
@@ -977,21 +977,21 @@ async function aiAnswers() {
     return
   }
 
-  fullscreenLoading.value = true
+  loadingInstance.value = ElLoading.service({
+    lock: true, // 锁定滚动
+    text: '正在生成AI答案...', // 加载文本
+  })
+
   try {
-    // 保持传递数组格式
     const formData = new FormData()
     formData.append('question', query.value)
-    formData.append('context', JSON.stringify(recallTableData.value)) // 将数组转为JSON字符串
+    formData.append('context', JSON.stringify(recallTableData.value))
     formData.append('kb_id', selectedKBOption.value.split(':')[0])
 
     const { data } = await api.post('chat', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+      headers: { 'Content-Type': 'multipart/form-data' }
     })
 
-    // 显示AI回答
     ElMessageBox.alert(data.answer, 'AI回答', {
       confirmButtonText: '确定',
       customClass: 'ai-answer-message-box',
@@ -1003,7 +1003,10 @@ async function aiAnswers() {
     console.error('获取AI回答失败:', error)
     ElMessage.error('获取AI回答失败: ' + (error.response?.data?.message || error.message))
   } finally {
-    fullscreenLoading.value = false
+    if (loadingInstance.value) {
+      loadingInstance.value.close()
+      loadingInstance.value = null
+    }
   }
 }
 
