@@ -37,7 +37,7 @@ class DocumentSelector(BaseSelector):
 
     def __init__(self, params):
         super().__init__(params)
-        self.document_names = {}
+        self.all_documents = {}
         self.id_mapping = {}  # 数字ID到原始ID的映射
         self.reverse_mapping = {}  # 原始ID到数字ID的映射
         self.documents = self.get_layer_data()
@@ -61,7 +61,7 @@ class DocumentSelector(BaseSelector):
                 'document_id': num_id,  # 使用数字ID
                 'document_description': document.document_description
             })
-            self.document_names[document_id] = document
+            self.all_documents[document_id] = document
         return documents
 
     def collate_select_params(self, selected_categories: List[Dict] = None):
@@ -114,11 +114,11 @@ class DocumentSelector(BaseSelector):
 
         documents = []
         for doc in selected_documents.copy():
-            if doc in self.document_names:
+            if doc in self.all_documents:
                 documents.append({
                     'document_id': doc,
-                    'document_name': self.document_names[doc].document_name,
-                    'parent_name': [category.category_name for category in self.document_names[doc].categories]
+                    'document_name': self.all_documents[doc].document_name,
+                    'parent_name': [category.category_name for category in self.all_documents[doc].categories]
                 })
             else:
                 selected_documents.remove(doc)

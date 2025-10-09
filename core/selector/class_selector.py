@@ -41,7 +41,7 @@ class CategorySelector(BaseSelector):
 
     def __init__(self, params):
         super().__init__(params)
-        self.category_names = {}
+        self.all_categories = {}
         self.id_mapping = {}  # 数字ID到原始ID的映射
         self.reverse_mapping = {}  # 原始ID到数字ID的映射
         self.categories = self.get_layer_data()
@@ -66,7 +66,7 @@ class CategorySelector(BaseSelector):
                 'category_id': num_id,  # 使用数字ID
                 'category_description': category.category_description
             })
-            self.category_names[category_id] = category
+            self.all_categories[category_id] = category
 
         return categories
 
@@ -120,7 +120,7 @@ class CategorySelector(BaseSelector):
         categories = [
             {
                 'category_id': category,
-                'category_name': self.category_names[category].category_name,
-                'parent_name': self.category_names[category].domain.domain_name
+                'category_name': self.all_categories[category].category_name,
+                'parent_name': self.all_categories[category].domain.domain_name
             } for category in selected_categories]
         return selected_categories, categories
