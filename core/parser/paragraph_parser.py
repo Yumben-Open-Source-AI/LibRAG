@@ -32,7 +32,7 @@ PARAGRAPH_PARSE_MESSAGES = [
 FULL_TEXT_CATALOG_MESSAGES = [
     {
         'role': 'system',
-        'content': TextFileReader().read_file("prompts/agent/FULL_TEXT_CATALOG_SYSTEN.txt")
+        'content': TextFileReader().read_file("prompts/agent/FULL_TEXT_CATALOG_SYSTEM.txt")
     },
     {
         'role': 'user',
