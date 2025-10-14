@@ -11,6 +11,13 @@ from tools.log_tools import parser_logger as logger
 from tools.prompt_load import TextFileReader
 from web_server.ai.models import Document, Category
 
+# parse() 会先根据可选的 compression_config 调整阈值，然后调用 tidy_up_data() 将原始段落简化为仅含 summary 的列表，并交给 _compress_paragraphs() 判断总长度是否超过限制。
+#
+# _compress_paragraphs() 会检测序列化后的长度，若超限则进入循环，持续用 _summarise_groups() 进行分组压缩，直到总长度回到阈值以内或只剩一个摘要。
+#
+# _summarise_groups() 使用 _determine_group_size() 计算分组大小，逐组调用 _summarise_chunk()，后者基于成对的系统/用户提示词请求 LLM 输出合并摘要，必要时回退到简单拼接。
+#
+# 完成分组汇总后，压缩得到的摘要列表会被重新注入到主提示词模板中，作为最终文档解析的输入，符合您描述的“先分组迭代压缩，再把汇总摘要喂给文档解析器”的流程。
 # 文档解析主提示词配置
 DOCUMENT_PARSE_MESSAGES = [
     {
@@ -76,6 +83,7 @@ class DocumentParser(BaseParser):
         tidy_paragraphs = [{
             'summary': paragraph['summary'],
         } for paragraph in paragraphs]
+        # 判断总长度是否超过限制
         return self._compress_paragraphs(tidy_paragraphs)
 
     @classmethod
@@ -134,6 +142,7 @@ class DocumentParser(BaseParser):
         )
 
         grouped = paragraphs
+        # 若超限则进入循环，持续用 _summarise_groups() 进行分组压缩，直到总长度回到阈值以内或只剩一个摘要
         while len(self._serialize_paragraphs(grouped)) > self.max_paragraph_payload and len(grouped) > 1:
             grouped = self._summarise_groups(grouped)
 
@@ -142,31 +151,39 @@ class DocumentParser(BaseParser):
     def _summarise_groups(self, paragraphs):
         """将段落按分组进行压缩，输出更短的摘要列表。"""
         compressed = []
+        # 计算出分组的大小（每组包含多少段落）
         step = self._determine_group_size(len(paragraphs))
+        # 表示从0开始，每次增加step值，直到覆盖所有段落,例如如果有10个段落，step=3，那么会分成4组：0-2, 3-5, 6-8, 9
         for start in range(0, len(paragraphs), step):
             chunk = paragraphs[start:start + step]
+            # 逐组调用 _summarise_chunk()，后者基于成对的系统/用户提示词请求 LLM 输出合并摘要
             summary_text = self._summarise_chunk(chunk)
             compressed.append({'summary': summary_text})
         return compressed
 
     def _determine_group_size(self, paragraph_count: int) -> int:
         """计算当前批次段落应使用的分组大小。"""
+        # 使用配置的分组大小：
+        # 如果configured_size存在并且大于1，则直接返回这个配置值。
         configured_size = self.group_size
         if configured_size and configured_size > 1:
             return configured_size
 
-        # Automatic mode: compress more aggressively for large paragraph sets.
+        # 自动模式：
+        # 如果段落数量paragraph_count小于或等于0，则返回1。
         if paragraph_count <= 0:
             return 1
-
+        # 为小段落集计算分组大小：
+        # 如果段落数量小于或等于self.MIN_AUTOMATIC_GROUP_SIZE（默认为2），则返回1或段落数量中的较大值。
         if paragraph_count <= self.MIN_AUTOMATIC_GROUP_SIZE:
             return max(1, paragraph_count)
-
+        # 为大段落集动态计算分组大小：
+        # 使用数学平方根来计算动态的分组大小，确保结果不小于self.MIN_AUTOMATIC_GROUP_SIZE。
         dynamic_size = max(
             self.MIN_AUTOMATIC_GROUP_SIZE,
             int(math.ceil(math.sqrt(paragraph_count)))
         )
-        logger.debug(
+        logger.info(
             'DocumentParser automatically calculated group size %s for %s paragraphs.',
             dynamic_size,
             paragraph_count
