@@ -534,162 +534,191 @@ const escapeHtml = (str = '') => str
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;')
 
-const escapeAttribute = (str = '') => str
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;')
-
-const inlineMarkdown = (text = '') => {
-  const placeholders = []
-  const createPlaceholder = (html) => {
-    const token = `__MDPLACEHOLDER_${placeholders.length}__`
-    placeholders.push({ token, html })
-    return token
+const formatInlineMarkdown = (text = '') => {
+  if (!text) {
+    return ''
   }
 
-  let working = text
+  const pattern = /!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_|~~([^~]+)~~/g
+  let result = ''
+  let lastIndex = 0
+  let match
 
-  working = working.replace(/`([^`]+)`/g, (_, code = '') =>
-    createPlaceholder(`<code>${escapeHtml(code)}</code>`))
+  while ((match = pattern.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, match.index))
 
-  working = working.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt = '', url = '') =>
-    createPlaceholder(`<img src="${escapeAttribute(url)}" alt="${escapeHtml(alt)}" loading="lazy" />`))
+    if (match[1] !== undefined) {
+      const alt = escapeHtml(match[1])
+      const src = escapeHtml(match[2])
+      result += `<img src="${src}" alt="${alt}" />`
+    } else if (match[3] !== undefined) {
+      const label = formatInlineMarkdown(match[3])
+      const href = escapeHtml(match[4])
+      result += `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`
+    } else if (match[5] !== undefined) {
+      result += `<code>${escapeHtml(match[5])}</code>`
+    } else if (match[6] !== undefined || match[7] !== undefined) {
+      const boldContent = escapeHtml(match[6] ?? match[7])
+      result += `<strong>${boldContent}</strong>`
+    } else if (match[8] !== undefined || match[9] !== undefined) {
+      const italicContent = escapeHtml(match[8] ?? match[9])
+      result += `<em>${italicContent}</em>`
+    } else if (match[10] !== undefined) {
+      result += `<del>${escapeHtml(match[10])}</del>`
+    }
 
-  working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label = '', url = '') =>
-    createPlaceholder(`<a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`))
-
-  let result = escapeHtml(working)
-
-  result = result.replace(/\*\*([^*]+)\*\*/g, (_, content = '') => `<strong>${content}</strong>`)
-  result = result.replace(/\*([^*]+)\*/g, (_, content = '') => `<em>${content}</em>`)
-  result = result.replace(/~~([^~]+)~~/g, (_, content = '') => `<del>${content}</del>`)
-
-  for (const { token, html } of placeholders) {
-    result = result.replaceAll(token, html)
+    lastIndex = pattern.lastIndex
   }
+
+  result += escapeHtml(text.slice(lastIndex))
 
   return result
 }
 
 const renderMarkdown = (markdown = '') => {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
-  const html = []
-  let inCodeBlock = false
-  let codeBuffer = []
-  let codeLang = ''
-  let listType = null
-  let listBuffer = []
-  let paragraphBuffer = []
+  const lines = (markdown || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
 
-  const flushParagraph = () => {
-    if (!paragraphBuffer.length) return
-    html.push(`<p>${paragraphBuffer.join(' ')}</p>`)
-    paragraphBuffer = []
-  }
+  const htmlParts = []
+  let inOrderedList = false
+  let inUnorderedList = false
+  let inBlockquote = false
+  let nestedUnorderedListOpen = false
 
-  const flushList = () => {
-    if (!listType || !listBuffer.length) return
-    html.push(`<${listType}>${listBuffer.join('')}</${listType}>`)
-    listType = null
-    listBuffer = []
-  }
-
-  const flushCode = () => {
-    if (!inCodeBlock) return
-    const codeContent = escapeHtml(codeBuffer.join('\n'))
-    const langAttr = codeLang ? ` class="language-${escapeAttribute(codeLang)}"` : ''
-    html.push(`<pre><code${langAttr}>${codeContent}</code></pre>`)
-    inCodeBlock = false
-    codeBuffer = []
-    codeLang = ''
-  }
-
-  for (const rawLine of lines) {
-    const trimmed = rawLine.trim()
-
-    if (trimmed.startsWith('```')) {
-      if (inCodeBlock) {
-        flushCode()
-      } else {
-        flushParagraph()
-        flushList()
-        inCodeBlock = true
-        codeLang = trimmed.slice(3).trim()
-      }
-      continue
+  const appendToLastListItem = (snippet) => {
+    if (!htmlParts.length) {
+      return
     }
 
-    if (inCodeBlock) {
-      codeBuffer.push(rawLine)
-      continue
+    htmlParts[htmlParts.length - 1] = htmlParts[htmlParts.length - 1].replace(/<\/li>$/, `${snippet}</li>`)
+  }
+
+  const ensureNestedUnorderedList = () => {
+    if (!nestedUnorderedListOpen) {
+      appendToLastListItem('<ul>')
+      nestedUnorderedListOpen = true
     }
+  }
+
+  const appendNestedUnorderedListItem = (content) => {
+    ensureNestedUnorderedList()
+    appendToLastListItem(`<li>${content}</li>`)
+  }
+
+  const closeNestedUnorderedList = () => {
+    if (nestedUnorderedListOpen) {
+      appendToLastListItem('</ul>')
+      nestedUnorderedListOpen = false
+    }
+  }
+
+  const closeOrderedList = () => {
+    if (inOrderedList) {
+      closeNestedUnorderedList()
+      htmlParts.push('</ol>')
+      inOrderedList = false
+    }
+  }
+
+  const closeUnorderedList = () => {
+    if (inUnorderedList) {
+      htmlParts.push('</ul>')
+      inUnorderedList = false
+    }
+  }
+
+  const closeLists = () => {
+    closeOrderedList()
+    closeUnorderedList()
+  }
+
+  const closeBlockquote = () => {
+    if (inBlockquote) {
+      htmlParts.push('</blockquote>')
+      inBlockquote = false
+    }
+  }
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.replace(/\t/g, '    ')
+    const trimmed = line.trim()
+    const leadingSpaces = (rawLine.match(/^(\s*)/)?.[1] ?? '').length
 
     if (!trimmed) {
-      flushParagraph()
-      continue
-    }
+      if (nestedUnorderedListOpen) {
+        const upcoming = lines.slice(index + 1).find(next => next.trim() !== '')
+        if (!upcoming || !upcoming.trim().match(/^[-*+]\s+/)) {
+          closeNestedUnorderedList()
+        }
+      }
 
-    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
-    if (headingMatch) {
-      const level = headingMatch[1].length
-      const content = headingMatch[2]
-      flushParagraph()
-      flushList()
-      html.push(`<h${level}>${inlineMarkdown(content)}</h${level}>`)
-      continue
-    }
-
-    if (trimmed.startsWith('>')) {
-      const content = trimmed.replace(/^>\s?/, '')
-      flushParagraph()
-      flushList()
-      html.push(`<blockquote>${inlineMarkdown(content)}</blockquote>`)
-      continue
+      if (inBlockquote) {
+        htmlParts.push('<br />')
+      }
+      return
     }
 
     const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
     if (orderedMatch) {
-      const content = orderedMatch[2]
-      flushParagraph()
-      if (listType !== 'ol') {
-        flushList()
-        listType = 'ol'
+      closeBlockquote()
+      if (!inOrderedList) {
+        htmlParts.push('<ol>')
+        inOrderedList = true
+      } else {
+        closeNestedUnorderedList()
       }
-      listBuffer.push(`<li>${inlineMarkdown(content)}</li>`)
-      continue
+      const content = formatInlineMarkdown(orderedMatch[2].trim())
+      htmlParts.push(`<li>${content}</li>`)
+      return
     }
 
     const unorderedMatch = trimmed.match(/^[-*+]\s+(.*)$/)
     if (unorderedMatch) {
-      const content = unorderedMatch[1]
-      flushParagraph()
-      if (listType !== 'ul') {
-        flushList()
-        listType = 'ul'
+      closeBlockquote()
+
+      if (leadingSpaces >= 2 && inOrderedList) {
+        const content = formatInlineMarkdown(unorderedMatch[1].trim())
+        appendNestedUnorderedListItem(content)
+        return
       }
-      listBuffer.push(`<li>${inlineMarkdown(content)}</li>`)
-      continue
+
+      closeNestedUnorderedList()
+      closeOrderedList()
+
+      if (!inUnorderedList) {
+        htmlParts.push('<ul>')
+        inUnorderedList = true
+      }
+
+      const content = formatInlineMarkdown(unorderedMatch[1].trim())
+      htmlParts.push(`<li>${content}</li>`)
+      return
     }
 
-    if (!paragraphBuffer.length) {
-      flushList()
-      paragraphBuffer.push(inlineMarkdown(trimmed))
-    } else {
-      paragraphBuffer.push('<br />' + inlineMarkdown(trimmed))
+    const blockquoteMatch = trimmed.match(/^>\s?(.*)$/)
+    if (blockquoteMatch) {
+      closeLists()
+      if (!inBlockquote) {
+        htmlParts.push('<blockquote>')
+        inBlockquote = true
+      }
+      const content = formatInlineMarkdown(blockquoteMatch[1])
+      htmlParts.push(`<p>${content}</p>`)
+      return
     }
-  }
 
-  flushCode()
-  flushParagraph()
-  flushList()
+    closeLists()
+    closeBlockquote()
 
-  if (!html.length) {
-    return '<p></p>'
-  }
+    const content = formatInlineMarkdown(trimmed)
+    htmlParts.push(`<p>${content}</p>`)
+  })
 
-  return html.join('\n')
+  closeLists()
+  closeBlockquote()
+
+  return htmlParts.join('')
 }
 
 /* 全局状态 */
