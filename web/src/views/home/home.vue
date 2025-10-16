@@ -526,6 +526,172 @@ const ALL_STRATEGY = {
   '智能语义分块切割': 'agentic_chunking'
 }
 const headerHeight = ref('680')
+
+const escapeHtml = (str = '') => str
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
+const escapeAttribute = (str = '') => str
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
+const inlineMarkdown = (text = '') => {
+  const placeholders = []
+  const createPlaceholder = (html) => {
+    const token = `__MDPLACEHOLDER_${placeholders.length}__`
+    placeholders.push({ token, html })
+    return token
+  }
+
+  let working = text
+
+  working = working.replace(/`([^`]+)`/g, (_, code = '') =>
+    createPlaceholder(`<code>${escapeHtml(code)}</code>`))
+
+  working = working.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt = '', url = '') =>
+    createPlaceholder(`<img src="${escapeAttribute(url)}" alt="${escapeHtml(alt)}" loading="lazy" />`))
+
+  working = working.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label = '', url = '') =>
+    createPlaceholder(`<a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`))
+
+  let result = escapeHtml(working)
+
+  result = result.replace(/\*\*([^*]+)\*\*/g, (_, content = '') => `<strong>${content}</strong>`)
+  result = result.replace(/\*([^*]+)\*/g, (_, content = '') => `<em>${content}</em>`)
+  result = result.replace(/~~([^~]+)~~/g, (_, content = '') => `<del>${content}</del>`)
+
+  for (const { token, html } of placeholders) {
+    result = result.replaceAll(token, html)
+  }
+
+  return result
+}
+
+const renderMarkdown = (markdown = '') => {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const html = []
+  let inCodeBlock = false
+  let codeBuffer = []
+  let codeLang = ''
+  let listType = null
+  let listBuffer = []
+  let paragraphBuffer = []
+
+  const flushParagraph = () => {
+    if (!paragraphBuffer.length) return
+    html.push(`<p>${paragraphBuffer.join(' ')}</p>`)
+    paragraphBuffer = []
+  }
+
+  const flushList = () => {
+    if (!listType || !listBuffer.length) return
+    html.push(`<${listType}>${listBuffer.join('')}</${listType}>`)
+    listType = null
+    listBuffer = []
+  }
+
+  const flushCode = () => {
+    if (!inCodeBlock) return
+    const codeContent = escapeHtml(codeBuffer.join('\n'))
+    const langAttr = codeLang ? ` class="language-${escapeAttribute(codeLang)}"` : ''
+    html.push(`<pre><code${langAttr}>${codeContent}</code></pre>`)
+    inCodeBlock = false
+    codeBuffer = []
+    codeLang = ''
+  }
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim()
+
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        flushCode()
+      } else {
+        flushParagraph()
+        flushList()
+        inCodeBlock = true
+        codeLang = trimmed.slice(3).trim()
+      }
+      continue
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(rawLine)
+      continue
+    }
+
+    if (!trimmed) {
+      flushParagraph()
+      flushList()
+      continue
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      const content = headingMatch[2]
+      flushParagraph()
+      flushList()
+      html.push(`<h${level}>${inlineMarkdown(content)}</h${level}>`)
+      continue
+    }
+
+    if (trimmed.startsWith('>')) {
+      const content = trimmed.replace(/^>\s?/, '')
+      flushParagraph()
+      flushList()
+      html.push(`<blockquote>${inlineMarkdown(content)}</blockquote>`)
+      continue
+    }
+
+    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
+    if (orderedMatch) {
+      const content = orderedMatch[2]
+      flushParagraph()
+      if (listType !== 'ol') {
+        flushList()
+        listType = 'ol'
+      }
+      listBuffer.push(`<li>${inlineMarkdown(content)}</li>`)
+      continue
+    }
+
+    const unorderedMatch = trimmed.match(/^[-*+]\s+(.*)$/)
+    if (unorderedMatch) {
+      const content = unorderedMatch[1]
+      flushParagraph()
+      if (listType !== 'ul') {
+        flushList()
+        listType = 'ul'
+      }
+      listBuffer.push(`<li>${inlineMarkdown(content)}</li>`)
+      continue
+    }
+
+    if (paragraphBuffer.length) {
+      paragraphBuffer.push('<br />' + inlineMarkdown(trimmed))
+    } else {
+      paragraphBuffer.push(inlineMarkdown(trimmed))
+    }
+  }
+
+  flushCode()
+  flushParagraph()
+  flushList()
+
+  if (!html.length) {
+    return '<p></p>'
+  }
+
+  return html.join('\n')
+}
+
 /* 全局状态 */
 const activeTab = ref('kb')
 const kbTableData = ref([])
@@ -992,7 +1158,10 @@ async function aiAnswers() {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 
-    ElMessageBox.alert(data.answer, 'AI回答', {
+    const markdownAnswer = data.answer || ''
+    const htmlContent = `<div class="markdown-body">${renderMarkdown(markdownAnswer)}</div>`
+
+    ElMessageBox.alert(htmlContent, 'AI回答', {
       confirmButtonText: '确定',
       customClass: 'ai-answer-message-box',
       dangerouslyUseHTMLString: true,
@@ -1630,16 +1799,121 @@ fetchKnowledgeBases()
 }
 
 .ai-answer-message-box {
-  width: 80%;
-  max-width: 800px;
+  width: min(70vw, 960px);
+  max-height: 80vh;
 }
 
 .ai-answer-message-box .el-message-box__content {
-  white-space: pre-wrap;
-  line-height: 1.6;
-  max-height: 70vh;
+  max-height: calc(80vh - 120px);
   overflow-y: auto;
-  padding: 20px;
+  padding: 0 24px 24px;
+}
+
+.ai-answer-message-box .el-message-box__content .markdown-body {
+  padding-top: 12px;
+}
+
+.markdown-body {
+  color: #1f2933;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 16px 0 12px;
+}
+
+.markdown-body h1 {
+  font-size: 26px;
+}
+
+.markdown-body h2 {
+  font-size: 22px;
+}
+
+.markdown-body h3 {
+  font-size: 18px;
+}
+
+.markdown-body p {
+  margin: 12px 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.5em;
+  margin: 12px 0;
+}
+
+.markdown-body li + li {
+  margin-top: 4px;
+}
+
+.markdown-body blockquote {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-left: 4px solid #2c7be5;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.markdown-body pre {
+  background: #f6f8fa;
+  border-radius: 6px;
+  padding: 12px 16px;
+  overflow: auto;
+  font-size: 13px;
+}
+
+.markdown-body code {
+  background: #f6f8fa;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 12px auto;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: #f8fafc;
+}
+
+.markdown-body a {
+  color: #2563eb;
+  text-decoration: underline;
+  word-break: break-word;
 }
 
 :deep(.el-dialog__body) {
