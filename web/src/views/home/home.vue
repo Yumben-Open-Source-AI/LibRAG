@@ -526,6 +526,201 @@ const ALL_STRATEGY = {
   '智能语义分块切割': 'agentic_chunking'
 }
 const headerHeight = ref('680')
+
+const escapeHtml = (str = '') => str
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
+const formatInlineMarkdown = (text = '') => {
+  if (!text) {
+    return ''
+  }
+
+  const pattern = /!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|__([^_]+)__|\*([^*]+)\*|_([^_]+)_|~~([^~]+)~~/g
+  let result = ''
+  let lastIndex = 0
+  let match
+
+  while ((match = pattern.exec(text)) !== null) {
+    result += escapeHtml(text.slice(lastIndex, match.index))
+
+    if (match[1] !== undefined) {
+      const alt = escapeHtml(match[1])
+      const src = escapeHtml(match[2])
+      result += `<img src="${src}" alt="${alt}" />`
+    } else if (match[3] !== undefined) {
+      const label = formatInlineMarkdown(match[3])
+      const href = escapeHtml(match[4])
+      result += `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`
+    } else if (match[5] !== undefined) {
+      result += `<code>${escapeHtml(match[5])}</code>`
+    } else if (match[6] !== undefined || match[7] !== undefined) {
+      const boldContent = escapeHtml(match[6] ?? match[7])
+      result += `<strong>${boldContent}</strong>`
+    } else if (match[8] !== undefined || match[9] !== undefined) {
+      const italicContent = escapeHtml(match[8] ?? match[9])
+      result += `<em>${italicContent}</em>`
+    } else if (match[10] !== undefined) {
+      result += `<del>${escapeHtml(match[10])}</del>`
+    }
+
+    lastIndex = pattern.lastIndex
+  }
+
+  result += escapeHtml(text.slice(lastIndex))
+
+  return result
+}
+
+const renderMarkdown = (markdown = '') => {
+  const lines = (markdown || '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+
+  const htmlParts = []
+  let inOrderedList = false
+  let inUnorderedList = false
+  let inBlockquote = false
+  let nestedUnorderedListOpen = false
+
+  const appendToLastListItem = (snippet) => {
+    if (!htmlParts.length) {
+      return
+    }
+
+    htmlParts[htmlParts.length - 1] = htmlParts[htmlParts.length - 1].replace(/<\/li>$/, `${snippet}</li>`)
+  }
+
+  const ensureNestedUnorderedList = () => {
+    if (!nestedUnorderedListOpen) {
+      appendToLastListItem('<ul>')
+      nestedUnorderedListOpen = true
+    }
+  }
+
+  const appendNestedUnorderedListItem = (content) => {
+    ensureNestedUnorderedList()
+    appendToLastListItem(`<li>${content}</li>`)
+  }
+
+  const closeNestedUnorderedList = () => {
+    if (nestedUnorderedListOpen) {
+      appendToLastListItem('</ul>')
+      nestedUnorderedListOpen = false
+    }
+  }
+
+  const closeOrderedList = () => {
+    if (inOrderedList) {
+      closeNestedUnorderedList()
+      htmlParts.push('</ol>')
+      inOrderedList = false
+    }
+  }
+
+  const closeUnorderedList = () => {
+    if (inUnorderedList) {
+      htmlParts.push('</ul>')
+      inUnorderedList = false
+    }
+  }
+
+  const closeLists = () => {
+    closeOrderedList()
+    closeUnorderedList()
+  }
+
+  const closeBlockquote = () => {
+    if (inBlockquote) {
+      htmlParts.push('</blockquote>')
+      inBlockquote = false
+    }
+  }
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.replace(/\t/g, '    ')
+    const trimmed = line.trim()
+    const leadingSpaces = (rawLine.match(/^(\s*)/)?.[1] ?? '').length
+
+    if (!trimmed) {
+      if (nestedUnorderedListOpen) {
+        const upcoming = lines.slice(index + 1).find(next => next.trim() !== '')
+        if (!upcoming || !upcoming.trim().match(/^[-*+]\s+/)) {
+          closeNestedUnorderedList()
+        }
+      }
+
+      if (inBlockquote) {
+        htmlParts.push('<br />')
+      }
+      return
+    }
+
+    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/)
+    if (orderedMatch) {
+      closeBlockquote()
+      if (!inOrderedList) {
+        htmlParts.push('<ol>')
+        inOrderedList = true
+      } else {
+        closeNestedUnorderedList()
+      }
+      const content = formatInlineMarkdown(orderedMatch[2].trim())
+      htmlParts.push(`<li>${content}</li>`)
+      return
+    }
+
+    const unorderedMatch = trimmed.match(/^[-*+]\s+(.*)$/)
+    if (unorderedMatch) {
+      closeBlockquote()
+
+      if (leadingSpaces >= 2 && inOrderedList) {
+        const content = formatInlineMarkdown(unorderedMatch[1].trim())
+        appendNestedUnorderedListItem(content)
+        return
+      }
+
+      closeNestedUnorderedList()
+      closeOrderedList()
+
+      if (!inUnorderedList) {
+        htmlParts.push('<ul>')
+        inUnorderedList = true
+      }
+
+      const content = formatInlineMarkdown(unorderedMatch[1].trim())
+      htmlParts.push(`<li>${content}</li>`)
+      return
+    }
+
+    const blockquoteMatch = trimmed.match(/^>\s?(.*)$/)
+    if (blockquoteMatch) {
+      closeLists()
+      if (!inBlockquote) {
+        htmlParts.push('<blockquote>')
+        inBlockquote = true
+      }
+      const content = formatInlineMarkdown(blockquoteMatch[1])
+      htmlParts.push(`<p>${content}</p>`)
+      return
+    }
+
+    closeLists()
+    closeBlockquote()
+
+    const content = formatInlineMarkdown(trimmed)
+    htmlParts.push(`<p>${content}</p>`)
+  })
+
+  closeLists()
+  closeBlockquote()
+
+  return htmlParts.join('')
+}
+
 /* 全局状态 */
 const activeTab = ref('kb')
 const kbTableData = ref([])
@@ -992,7 +1187,10 @@ async function aiAnswers() {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 
-    ElMessageBox.alert(data.answer, 'AI回答', {
+    const markdownAnswer = data.answer || ''
+    const htmlContent = `<div class="markdown-body">${renderMarkdown(markdownAnswer)}</div>`
+
+    ElMessageBox.alert(htmlContent, 'AI回答', {
       confirmButtonText: '确定',
       customClass: 'ai-answer-message-box',
       dangerouslyUseHTMLString: true,
@@ -1630,16 +1828,121 @@ fetchKnowledgeBases()
 }
 
 .ai-answer-message-box {
-  width: 80%;
-  max-width: 800px;
+  width: min(70vw, 960px);
+  max-height: 80vh;
 }
 
 .ai-answer-message-box .el-message-box__content {
-  white-space: pre-wrap;
-  line-height: 1.6;
-  max-height: 70vh;
+  max-height: calc(80vh - 120px);
   overflow-y: auto;
-  padding: 20px;
+  padding: 0 24px 24px;
+}
+
+.ai-answer-message-box .el-message-box__content .markdown-body {
+  padding-top: 12px;
+}
+
+.markdown-body {
+  color: #1f2933;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 16px 0 12px;
+}
+
+.markdown-body h1 {
+  font-size: 26px;
+}
+
+.markdown-body h2 {
+  font-size: 22px;
+}
+
+.markdown-body h3 {
+  font-size: 18px;
+}
+
+.markdown-body p {
+  margin: 12px 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.5em;
+  margin: 12px 0;
+}
+
+.markdown-body li + li {
+  margin-top: 4px;
+}
+
+.markdown-body blockquote {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-left: 4px solid #2c7be5;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.markdown-body pre {
+  background: #f6f8fa;
+  border-radius: 6px;
+  padding: 12px 16px;
+  overflow: auto;
+  font-size: 13px;
+}
+
+.markdown-body code {
+  background: #f6f8fa;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 12px auto;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: #f8fafc;
+}
+
+.markdown-body a {
+  color: #2563eb;
+  text-decoration: underline;
+  word-break: break-word;
 }
 
 :deep(.el-dialog__body) {
