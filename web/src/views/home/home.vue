@@ -628,6 +628,7 @@ const renderMarkdown = (markdown = '') => {
 
     if (!trimmed) {
       flushParagraph()
+      flushList()
       continue
     }
 
@@ -673,11 +674,10 @@ const renderMarkdown = (markdown = '') => {
       continue
     }
 
-    if (!paragraphBuffer.length) {
-      flushList()
-      paragraphBuffer.push(inlineMarkdown(trimmed))
-    } else {
+    if (paragraphBuffer.length) {
       paragraphBuffer.push('<br />' + inlineMarkdown(trimmed))
+    } else {
+      paragraphBuffer.push(inlineMarkdown(trimmed))
     }
   }
 
